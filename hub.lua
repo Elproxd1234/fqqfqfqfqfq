@@ -38129,28 +38129,6 @@ function CreatePremiumTab()
         local _gunNames = {}
         for _, s in ipairs(_SC_GUN_SKINS) do _gunNames[#_gunNames+1] = s.name end
 
-        -- BOTON DEBUG: imprimir estructura del Handle de la gun actual
-        CreateButton(leftColumn, "[DEBUG] Info Handle Gun", ThemeColors.Primary, function()
-            local gun = _findGun and _findGun()
-            if not gun then CreateCustomNotification("DEBUG", "No gun encontrada", 3); return end
-            local h = gun:FindFirstChild("Handle")
-            if not h then CreateCustomNotification("DEBUG", "Sin Handle: " .. gun.Name, 3); return end
-            local sm = h:FindFirstChildOfClass("SpecialMesh")
-            local canWriteSM = sm and pcall(function() sm.Scale = sm.Scale end)
-            local info = "Gun: " .. gun.Name
-                .. "  Handle: " .. h.ClassName
-                .. "  Size: " .. tostring(h.Size)
-                .. "  SM: " .. tostring(sm ~= nil)
-            if sm then
-                info = info
-                    .. "  SM.Scale: " .. tostring(sm.Scale)
-                    .. "  Escribible: " .. tostring(canWriteSM)
-                    .. "  MeshId: " .. sm.MeshId:sub(1,30)
-            end
-            print("[SC DEBUG] " .. info)
-            CreateCustomNotification("DEBUG HANDLE", info, 10)
-        end)
-
         CreateNebulaSelector(leftColumn, "Skin -- Gun", _gunNames, _gunNames[1], function(sel)
             -- Auto-setear modo gun al usar este selector
             if _skinState.mode ~= "gun" then
