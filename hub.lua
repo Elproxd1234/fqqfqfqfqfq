@@ -37740,17 +37740,13 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- USP: mesh + texture custom, grip con rotacion 180 en Y para corregir orientacion
+                -- USP: grip reconstruido desde cero con angulos explicitos
                 name   = "usp",
                 meshId = "rbxassetid://111298369807853",
                 texId  = "rbxassetid://129462008300983",
                 scale  = Vector3.new(0.035, 0.035, 0.035),
-                grip   = CFrame.new(
-                    -0.567565918, -0.124303818, -0.0424308777,
-                     0.000212550163, -0.0230092816,  0.999735236,
-                    -0.011778634,    0.999665856,    0.0230101906,
-                    -0.99993062,    -0.0117804073,  -5.85317612e-05
-                ),
+                grip   = CFrame.new(-0.567565918, -0.124303818, -0.0424308777)
+                       * CFrame.Angles(0, math.rad(180), math.rad(90)),
                 dualGun = true,
             },
 
