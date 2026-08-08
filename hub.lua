@@ -619,7 +619,7 @@ local _configSaveThrottle = 0  -- throttle: no guardar mas de 1 vez por segundo
 -- Intenta todos los metodos conocidos en orden de preferencia
 local function _hubWriteFile(path, data)
     -- Synapse X v3 / Wave / Krnl / Delta / Comet
-    if writefile then
+    if type(writefile) == "function" then
         local ok = pcall(writefile, path, data)
         if ok then return end
     end
@@ -642,7 +642,7 @@ end
 local function _hubReadFile(path)
     local ok, data
     -- Synapse X v3 / Wave / Krnl / Delta / Comet
-    if readfile then
+    if type(readfile) == "function" then
         ok, data = pcall(readfile, path)
         if ok and type(data) == "string" and #data > 0 then return data end
     end
@@ -666,10 +666,13 @@ end
 
 -- Verificar si el executor soporta escritura de archivos
 local function _hubCanSaveFiles()
-    return (writefile ~= nil)
-        or (syn ~= nil and syn.write_file ~= nil)
-        or (fluxus ~= nil and fluxus.write_file ~= nil)
-        or (saveFile ~= nil)
+    local ok1 = pcall(function() return type(writefile) end)
+    local ok2 = pcall(function() return type(readfile) end)
+    if not ok1 or not ok2 then return false end
+    return (type(writefile) == "function")
+        or (type(syn) == "table" and type(syn.write_file) == "function")
+        or (type(fluxus) == "table" and type(fluxus.write_file) == "function")
+        or (type(saveFile) == "function")
 end
 
 -- =====================================================================
@@ -680,7 +683,7 @@ local HttpService = (function() local ok,s = pcall(function() return game:GetSer
 
 local function _saveConfig()
     if not _G._autoSaveEnabled then return end
-    if not writefile then return end
+    if type(writefile) ~= "function" then return end
     local toSave = {}
     for k, v in pairs(_G._toggleStates or {}) do
         if not (_neverRestoreToggles and _neverRestoreToggles[k]) then
