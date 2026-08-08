@@ -777,7 +777,10 @@ local function _loadConfig()
 end
 
 -- Flag de auto-save (el toggle en Settings lo puede apagar)
-if _G._autoSaveEnabled == nil then _G._autoSaveEnabled = true end
+-- FIX AUTO-SAFE: siempre iniciar en true para garantizar que _saveConfig funcione
+-- desde el primer tick. Si el usuario lo apago manualmente, se restaura desde disco
+-- cuando CreateAuroraToggle("Auto Save Config") se crea en el tab Settings.
+_G._autoSaveEnabled = true
 
 
 -- Toggles que NUNCA se guardan ni se restauran del disco
@@ -28963,9 +28966,17 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                     end
                     -- Esperar a que el tab est? construido (max 15s)
                     if _targetTabIdx then
-                        while not _G._tabBuilt[_targetTabIdx] and _waitTick < 150 do
+                        -- FIX AUTO-SAFE: si el tab ya fue buildeado antes de que este
+                        -- closure lo chequee (ej: re-ejecucion rapida), salir inmediatamente.
+                        -- Si _G._tabBuilt cambio (nuevo hub), esperar con timeout de seguridad.
+                        local _waitStart = tick()
+                        while not (_G._tabBuilt and _G._tabBuilt[_targetTabIdx]) and _waitTick < 150 do
                             task.wait(0.1)
                             _waitTick = _waitTick + 1
+                            -- FIX: si hay callback registrado en _G._toggleCallbacks, el tab ya fue construido
+                            if _G._toggleCallbacks and _G._toggleCallbacks[nombre] then
+                                break
+                            end
                         end
                         -- Peque?o delay extra para que las upvalues locales del tab queden listas
                         task.wait(0.05)
@@ -55893,13 +55904,13 @@ particles = {}
             -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
             -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes
             -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-            task.delay(1.0, function() pcall(function() _buildTabCached(2) end) end)
-            task.delay(1.5, function() pcall(function() _buildTabCached(3) end) end)
-            task.delay(2.0, function() pcall(function() _buildTabCached(6) end) end)
+            task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
+            task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
+            task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
             -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-            task.delay(3.5, function() pcall(function() _buildTabCached(7) end) end)
-            task.delay(5.0, function() pcall(function() _buildTabCached(8) end) end)
-            task.delay(6.5, function() pcall(function() _buildTabCached(9) end) end)
+            task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
+            task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
+            task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
             return
         end
 
@@ -56313,20 +56324,20 @@ particles = {}
         -- se auto-active si estaba ON en disco. Sin esto, el toggle solo se crea
         -- cuando el usuario navega a Settings manualmente.
         -- FIX DOUBLE COLUMN: delay aumentado a 1.2s para que SetActiveTab(1) tome el mutex primero
-        task.delay(1.2, function()
+        task.delay(0.8, function()
             pcall(function() _buildTabCached(5) end)
         end)
         -- AUTO-BUILD TODOS LOS TABS: para que toggles guardados de cualquier pesta?a
         -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
         -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes
         -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-        task.delay(1.0, function() pcall(function() _buildTabCached(2) end) end)
-        task.delay(1.5, function() pcall(function() _buildTabCached(3) end) end)
-        task.delay(2.0, function() pcall(function() _buildTabCached(6) end) end)
+        task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
+        task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
+        task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
         -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-        task.delay(3.5, function() pcall(function() _buildTabCached(7) end) end)
-        task.delay(5.0, function() pcall(function() _buildTabCached(8) end) end)
-        task.delay(6.5, function() pcall(function() _buildTabCached(9) end) end)
+        task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
+        task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
+        task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
         -- AUTORESTORE: notificar si se restauraron toggles activos desde disco (config por jugador)
         -- FIX NOTIF SPAWN: solo mostrar la primera vez que el hub carga en este servidor.
         -- _G._autoRestoreNotifShown evita que la notif aparezca cada vez que el jugador
@@ -56395,13 +56406,13 @@ particles = {}
             -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
             -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes 9=Update
             -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-            task.delay(1.0, function() pcall(function() _buildTabCached(2) end) end)
-            task.delay(1.5, function() pcall(function() _buildTabCached(3) end) end)
-            task.delay(2.0, function() pcall(function() _buildTabCached(6) end) end)
+            task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
+            task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
+            task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
             -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-            task.delay(3.5, function() pcall(function() _buildTabCached(7) end) end)
-            task.delay(5.0, function() pcall(function() _buildTabCached(8) end) end)
-            task.delay(6.5, function() pcall(function() _buildTabCached(9) end) end)
+            task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
+            task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
+            task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
         end
     end)
 
