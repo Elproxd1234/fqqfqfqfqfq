@@ -615,6 +615,88 @@ _G._playerCacheConn2 = Players.PlayerRemoving:Connect(function() task.defer(_reb
 local _CONFIG_FILE = "rex_config_" .. tostring(Players.LocalPlayer and Players.LocalPlayer.UserId or "unknown") .. ".json"
 local _configSaveThrottle = 0  -- throttle: no guardar mas de 1 vez por segundo
 
+-- =====================================================================
+-- AUTO-SAFE POR TOGGLE: cada toggle activo guarda su propio archivo .txt
+-- Logica identica al LocalScript de referencia (fly_autosave_config.txt)
+-- Al salir/unirse de nuevo: lee cada archivo y auto-activa si dice "true"
+-- Carpeta: rex_toggles_<UserId>/  para no mezclar con el JSON global
+-- =====================================================================
+local _UID_STR      = tostring(Players.LocalPlayer and Players.LocalPlayer.UserId or "unknown")
+local _TOGGLE_DIR   = "rex_toggles_" .. _UID_STR
+
+-- Crear carpeta si no existe (makefolder es estandar en Synapse/Wave/Krnl)
+pcall(function()
+    if makefolder and not isfolder(_TOGGLE_DIR) then
+        makefolder(_TOGGLE_DIR)
+    end
+end)
+
+-- Convierte nombre del toggle a nombre de archivo seguro (sin chars raros)
+local function _toggleFileName(nombre)
+    -- Reemplazar caracteres no permitidos en nombres de archivo
+    local safe = nombre:gsub("[%[%]%/%\\%:%*%?%\"%<%>%|%s]", "_"):gsub("__+", "_")
+    return _TOGGLE_DIR .. "/" .. safe .. "_" .. _UID_STR .. ".txt"
+end
+
+-- Guardar estado de un toggle individual en su propio .txt
+local function _saveToggleFile(nombre, enabled)
+    pcall(function()
+        if not (makefolder and isfolder) then return end
+        if not isfolder(_TOGGLE_DIR) then makefolder(_TOGGLE_DIR) end
+        local path = _toggleFileName(nombre)
+        if type(writefile) == "function" then
+            writefile(path, tostring(enabled))
+        elseif type(syn) == "table" and syn.write_file then
+            syn.write_file(path, tostring(enabled))
+        end
+    end)
+end
+
+-- Leer estado de un toggle individual desde su .txt
+-- Devuelve true/false/nil (nil = archivo no existe)
+local function _readToggleFile(nombre)
+    local result = nil
+    pcall(function()
+        if not (isfile and isfile(_toggleFileName(nombre))) then return end
+        local path = _toggleFileName(nombre)
+        local ok, data
+        if type(readfile) == "function" then
+            ok, data = pcall(readfile, path)
+        elseif type(syn) == "table" and syn.read_file then
+            ok, data = pcall(syn.read_file, path)
+        end
+        if ok and type(data) == "string" then
+            result = (data:lower():find("true") ~= nil)
+        end
+    end)
+    return result
+end
+
+-- Tabla de nombres de toggles que tienen archivo .txt guardado como true
+-- Se llena al inicio leyendo todos los archivos existentes
+local _toggleFileStates = {}
+
+-- Escanear carpeta y precargar estados de todos los toggles guardados
+pcall(function()
+    if not (listfiles and isfolder and isfolder(_TOGGLE_DIR)) then return end
+    local files = listfiles(_TOGGLE_DIR)
+    for _, fpath in ipairs(files or {}) do
+        -- Extraer nombre del archivo (sin extension)
+        local fname = fpath:match("[/\\]([^/\\]+)$") or fpath
+        if fname:sub(-4) == ".txt" then
+            local ok2, content
+            if type(readfile) == "function" then
+                ok2, content = pcall(readfile, fpath)
+            end
+            if ok2 and type(content) == "string" then
+                local isOn = (content:lower():find("true") ~= nil)
+                -- Guardar por path para lookup rapido
+                _toggleFileStates[fpath] = isOn
+            end
+        end
+    end
+end)
+
 -- COMPAT FILE I/O: soporta Synapse X, Wave, Krnl, Fluxus, Delta, Arceus X, Comet
 -- Intenta todos los metodos conocidos en orden de preferencia
 local function _hubWriteFile(path, data)
@@ -28802,6 +28884,14 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         -- PASO 3: Auto-guardar inmediatamente en el JSON
         pcall(_saveConfig)
 
+        -- AUTO-SAFE POR TOGGLE: guardar estado en archivo .txt propio
+        -- Identico a la logica del LocalScript de referencia:
+        -- activar -> escribe "true", desactivar -> escribe "false"
+        -- Al re-unirse al juego, se lee este archivo y se auto-activa
+        if not (_neverRestoreToggles and _neverRestoreToggles[nombre]) then
+            pcall(_saveToggleFile, nombre, estado)
+        end
+
         -- PASO 4: Ejecutar la accion real del toggle (callback del feature)
         -- FIX: suprimir notificaciones al activar/desactivar manualmente,
         -- EXCEPTO toggles de tipo "Information" (muestran paneles de informacion).
@@ -28823,6 +28913,30 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         -- FIX: al desactivar, forzar limpieza inmediata de todos los visuals
         if not estado and _vcRefreshAll then
             task.defer(_vcRefreshAll)
+        end
+    end
+
+    -- =====================================================================
+    -- AUTO-SAFE POR TOGGLE (lectura del .txt individual)
+    -- Si el archivo .txt de este toggle dice "true" Y el estado actual
+    -- es false (el JSON no lo capturó, ej: salida sin guardar, re-join),
+    -- forzar el estado a true para que el bloque de auto-activacion lo dispare.
+    -- Exactamente igual que el LocalScript de referencia:
+    --   success, data = pcall(readfile, fileName)
+    --   if success and data == "true" then isEnabled = true end
+    -- =====================================================================
+    if not (_neverRestoreToggles and _neverRestoreToggles[nombre])
+       and not (_G._isTabRebuild == true) then
+        local _fileState = _readToggleFile(nombre)
+        if _fileState == true and not estado then
+            -- El archivo dice ON pero el JSON no lo tenia: sincronizar
+            estado = true
+            _G._toggleStates[nombre] = true
+            -- Actualizar visual del knob a ON
+            pcall(function() ApplyState(true, false) end)
+        elseif _fileState == false and estado then
+            -- El archivo dice OFF explicitamente: respetar (el usuario lo apago)
+            -- No tocar: el JSON ya tiene false, estado ya es false o lo sera
         end
     end
 
