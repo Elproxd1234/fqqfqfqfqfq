@@ -37693,16 +37693,16 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- USP: MeshPart, scale 1, grip pegado a la mano (mismo patron ElderwoodGun)
+                -- USP: MeshPart, scale 0.055, grip identico al Bacon
                 name   = "USP",
                 meshId = "rbxassetid://111298369807853",
                 texId  = "rbxassetid://96289683042320",
-                scale  = Vector3.new(1, 1, 1),
+                scale  = Vector3.new(0.055, 0.055, 0.055),
                 grip   = CFrame.new(
-                    -0.567565918, -0.124303818, -0.0424308777,
-                    -0.000212550163, 0.0230092816, -0.999735236,
-                    -0.011778634,   0.999665856,   0.0230101906,
-                     0.99993062,    0.0117804073,  5.85317612e-05
+                    0, -0.759000003, -0.314999998,
+                    1, 0, 0,
+                    0, 0, -1,
+                    0, 1, 0
                 ),
                 dualGun = true,
             },
@@ -37838,8 +37838,12 @@ function CreatePremiumTab()
                     -- Handle MeshPart moderno
                     if not _skinState.origData[tool].Elements[handle] then
                         _skinState.origData[tool].Elements[handle] = {
-                            Mesh = handle.MeshId, Texture = handle.TextureID
+                            Mesh = handle.MeshId, Texture = handle.TextureID, Size = handle.Size
                         }
+                    end
+                    -- Aplicar Size si la skin lo especifica (unico modo de escalar MeshPart)
+                    if skin.scale then
+                        pcall(function() handle.Size = skin.scale end)
                     end
                     -- Intentar escribir MeshId directo
                     local meshWriteOk = pcall(function()
