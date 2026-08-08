@@ -14162,7 +14162,18 @@ function CreateMainUI_Fly()
 
     -- -- Variables internas de vuelo --
     local flyNoclipConn       = nil
-    local flyNoclipEnabled    = false
+    -- AUTO-SAFE: usar _G._flyEnabled para que el estado persista entre builds de tab.
+    -- _readToggleFile lee el .txt individual; si dice "true" y el toggle no estaba
+    -- en el JSON (_G._toggleStates), sincronizamos aqui antes de crear el toggle.
+    do
+        local _fState = _readToggleFile("Fly (WASD + Space/Ctrl + Shift boost)")
+        if _fState == true then
+            _G._toggleStates = _G._toggleStates or {}
+            _G._toggleStates["Fly (WASD + Space/Ctrl + Shift boost)"] = true
+        end
+        if _G._flyEnabled == nil then _G._flyEnabled = false end
+    end
+    local flyNoclipEnabled    = (_G._toggleStates and _G._toggleStates["Fly (WASD + Space/Ctrl + Shift boost)"]) == true
     local flyNoclipSpeed      = 40
     local flyNoclipAccel      = 12
     local flyNoclipBoost      = 2.5
@@ -14407,15 +14418,34 @@ function CreateMainUI_Fly()
     end
 
     -- Toggle principal de Fly
+    -- AUTO-SAFE: initialValue lee _G._toggleStates (ya sincronizado con el .txt arriba).
+    -- Al re-ejecutar el hub: _readToggleFile devuelve "true" -> _G._toggleStates = true
+    -- -> initialValue = true -> CreateAuroraToggle dispara callback(true) via _autoRestoreOnReexec.
+    -- Al cambiar de tab (rebuild): estado ya guardado en _G._toggleStates, toggle arranca en ON
+    -- pero callback NO se re-dispara (isPhysical=true + _isTabRebuild=true).
+    local _flyInitVal = (_G._toggleStates and _G._toggleStates["Fly (WASD + Space/Ctrl + Shift boost)"]) == true
     CreateToggle(leftColumn, "Fly (WASD + Space/Ctrl + Shift boost)", function(on)
         flyNoclipEnabled = on
+        _G._flyEnabled   = on   -- sincronizar global para keybind y auto-safe
         if on then
             startFlyNoclip()
             -- [notif removed]
         else
             -- [notif removed]
         end
-    end, false)
+    end, _flyInitVal)
+
+    -- AUTO-SAFE: si al construir el tab el toggle ya estaba ON (re-ejecucion real,
+    -- el sistema _autoRestoreOnReexec aun no disparo el callback porque espera al tab),
+    -- activar fly directamente aqui sin esperar la cola de restauracion.
+    if _flyInitVal and not flyNoclipEnabled then
+        flyNoclipEnabled = true
+        _G._flyEnabled   = true
+        task.defer(function()
+            task.wait(0.15)  -- esperar un frame para que el personaje este listo
+            pcall(startFlyNoclip)
+        end)
+    end
 
     -- Keybind para toggle de Fly
     do
@@ -14473,6 +14503,9 @@ function CreateMainUI_Fly()
             if _G._hubDisableKeybinds then return end
             if inp.UserInputType == Enum.UserInputType.Keyboard and inp.KeyCode == _flyKeybind and not _flyListening then
                 flyNoclipEnabled = not flyNoclipEnabled
+                _G._flyEnabled   = flyNoclipEnabled  -- sincronizar global
+                -- Guardar en .txt igual que el LocalScript de referencia
+                pcall(_saveToggleFile, "Fly (WASD + Space/Ctrl + Shift boost)", flyNoclipEnabled)
                 if flyNoclipEnabled then startFlyNoclip() end
                 -- [notif removed]
             end
@@ -14493,6 +14526,8 @@ function CreateMainUI_Fly()
             _flyBindGui = sg
             MakeCapyBindableFrame(sg, "FLY", function()
                 flyNoclipEnabled = not flyNoclipEnabled
+                _G._flyEnabled   = flyNoclipEnabled  -- sincronizar global
+                pcall(_saveToggleFile, "Fly (WASD + Space/Ctrl + Shift boost)", flyNoclipEnabled)
                 if flyNoclipEnabled then startFlyNoclip() end
                 -- [notif removed]
             end, 20, 200)
