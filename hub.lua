@@ -37693,16 +37693,16 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- USP: MeshPart, grip identico al Bacon (mirada al frente), GunClient compatible
+                -- USP: MeshPart, scale 1, grip pegado a la mano (mismo patron ElderwoodGun)
                 name   = "USP",
                 meshId = "rbxassetid://111298369807853",
                 texId  = "rbxassetid://96289683042320",
-                scale  = Vector3.new(1.5, 1.5, 1.5),
+                scale  = Vector3.new(1, 1, 1),
                 grip   = CFrame.new(
-                    0, -0.759000003, -0.314999998,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
+                    -0.567565918, -0.124303818, -0.0424308777,
+                    -0.000212550163, 0.0230092816, -0.999735236,
+                    -0.011778634,   0.999665856,   0.0230101906,
+                     0.99993062,    0.0117804073,  5.85317612e-05
                 ),
                 dualGun = true,
             },
