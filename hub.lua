@@ -37720,7 +37720,7 @@ function CreatePremiumTab()
                 texId  = "rbxassetid://96289683042320",
                 scale  = Vector3.new(0.055, 0.055, 0.055),
                 grip   = CFrame.new(
-                    -0.567565918, -0.124303818, 0.45,
+                    2, -0.23, 0.23,
                     0, 0,  1,
                     0, 1,  0,
                    -1, 0,  0
