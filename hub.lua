@@ -37739,20 +37739,7 @@ function CreatePremiumTab()
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
-            {
-                -- Shotgun: modelo custom exportado desde Blender
-                name   = "Shotgun",
-                meshId = "rbxassetid://113266841572317",
-                texId  = "rbxassetid://108221897243102",
-                scale  = Vector3.new(0.05, 0.05, 0.05),
-                grip   = CFrame.new(
-                    0, -0.1, -0.5,
-                    1,  0,    0,
-                    0,  1,    0,
-                    0,  0,    1
-                ),
-                dualGun = true,
-            },
+
         }
         -- FIX: exponer la lista en _G para que _dualStartArm pueda referenciarla
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
