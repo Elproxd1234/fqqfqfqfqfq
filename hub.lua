@@ -620,7 +620,7 @@ local _configSaveThrottle = 0  -- throttle: no guardar mas de 1 vez por segundo
 local function _hubWriteFile(path, data)
     -- Synapse X v3 / Wave / Krnl / Delta / Comet
     if type(writefile) == "function" then
-        local ok = pcall(writefile, path, data)
+        local ok = (type(writefile)=="function" and pcall(function() writefile(path,data) end))
         if ok then return end
     end
     -- Synapse X v2
@@ -643,7 +643,7 @@ local function _hubReadFile(path)
     local ok, data
     -- Synapse X v3 / Wave / Krnl / Delta / Comet
     if type(readfile) == "function" then
-        ok, data = pcall(readfile, path)
+        ok, data = (type(readfile)=="function" and pcall(function() return readfile(path) end))
         if ok and type(data) == "string" and #data > 0 then return data end
     end
     -- Synapse X v2
@@ -719,7 +719,7 @@ local function _saveConfig()
     toSave["__currentTheme"] = "Neon Green"
     local ok, json = pcall(function() return HttpService:JSONEncode(toSave) end)
     if ok and json then
-        pcall(writefile, _CONFIG_FILE, json)
+        (type(writefile)=="function" and pcall(function() writefile(_CONFIG_FILE,json) end))
     end
 end
 
@@ -729,7 +729,7 @@ end
 
 local function _loadConfig()
     if not (isfile and isfile(_CONFIG_FILE)) then return end
-    local ok, raw = pcall(readfile, _CONFIG_FILE)
+    local ok, raw = (type(readfile)=="function" and pcall(function() return readfile(_CONFIG_FILE) end))
     if not ok or type(raw) ~= "string" or raw == "" then return end
     local ok2, saved = pcall(function() return HttpService:JSONDecode(raw) end)
     if not ok2 or type(saved) ~= "table" then return end
