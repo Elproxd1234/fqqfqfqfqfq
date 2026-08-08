@@ -28970,8 +28970,13 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
             -- Actualizar visual del knob a ON
             pcall(function() ApplyState(true, false) end)
         elseif _fileState == false and estado then
-            -- El archivo dice OFF explicitamente: respetar (el usuario lo apago)
-            -- No tocar: el JSON ya tiene false, estado ya es false o lo sera
+            -- El archivo dice OFF explicitamente: el usuario lo apago manualmente.
+            -- FIX: forzar estado a false para que NO se auto-active al reabrir el hub.
+            -- Sin esto, _G._toggleStates[nombre] puede quedar true (del JSON) y el
+            -- bloque de auto-activacion lo dispara igual aunque el .txt diga false.
+            estado = false
+            _G._toggleStates[nombre] = false
+            pcall(function() ApplyState(false, false) end)
         end
     end
 
@@ -36188,20 +36193,36 @@ function CreateWorldTab()
                 if state == true
                 and not (_neverRestoreToggles and _neverRestoreToggles[nombre])
                 and _G._toggleCallbacks[nombre] then
-                    -- Silenciar notificaciones durante el restore
-                    local _origNotif = CreateCustomNotification
-                    CreateCustomNotification = function() end
-                    -- FIX: llamar callback directamente sin buscar el frame en GUI.
-                    -- El callback ya actualiza el estado interno (ej: GB.enabled = true
-                    -- y llama _startDetect() en Gold Bomb) sin necesitar el frame visual.
-                    pcall(_G._toggleCallbacks[nombre], true)
-                    CreateCustomNotification = _origNotif
-                    -- FIX VISUAL KNOB: actualizar el indicador a verde para que el toggle
-                    -- muestre ON visualmente, no solo en la logica interna.
-                    -- ApplyState es una closure local, pero la exponemos en _toggleApplyStates
-                    -- al crear cada toggle para poder llamarla desde aqui.
-                    if _G._toggleApplyStates and _G._toggleApplyStates[nombre] then
-                        pcall(_G._toggleApplyStates[nombre], true, false)
+                    -- FIX AUTO-SAFE: antes de restaurar, verificar el .txt individual.
+                    -- Si el usuario desactivo el toggle manualmente, el .txt dice "false".
+                    -- En ese caso NO activar el toggle aunque _G._toggleStates diga true
+                    -- (puede haber quedado desincronizado si el JSON se guardo antes de
+                    -- que el usuario lo apagara, o si el hub se cerro sin guardar el false).
+                    local _txtState = _readToggleFile(nombre)
+                    if _txtState == false then
+                        -- El archivo .txt dice OFF: el usuario lo apago, respetar esa decision.
+                        -- Sincronizar _G._toggleStates para que el knob quede en OFF tambien.
+                        _G._toggleStates[nombre] = false
+                        if _G._toggleApplyStates and _G._toggleApplyStates[nombre] then
+                            pcall(_G._toggleApplyStates[nombre], false, false)
+                        end
+                    else
+                        -- _txtState == true o nil (archivo no existe): activar normalmente.
+                        -- Silenciar notificaciones durante el restore
+                        local _origNotif = CreateCustomNotification
+                        CreateCustomNotification = function() end
+                        -- FIX: llamar callback directamente sin buscar el frame en GUI.
+                        -- El callback ya actualiza el estado interno (ej: GB.enabled = true
+                        -- y llama _startDetect() en Gold Bomb) sin necesitar el frame visual.
+                        pcall(_G._toggleCallbacks[nombre], true)
+                        CreateCustomNotification = _origNotif
+                        -- FIX VISUAL KNOB: actualizar el indicador a verde para que el toggle
+                        -- muestre ON visualmente, no solo en la logica interna.
+                        -- ApplyState es una closure local, pero la exponemos en _toggleApplyStates
+                        -- al crear cada toggle para poder llamarla desde aqui.
+                        if _G._toggleApplyStates and _G._toggleApplyStates[nombre] then
+                            pcall(_G._toggleApplyStates[nombre], true, false)
+                        end
                     end
                 end
             end
@@ -37661,7 +37682,7 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado — IDs capturados en consola
+                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado ? IDs capturados en consola
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
                 texId  = "rbxassetid://107224776622554",
@@ -37670,7 +37691,7 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- XenoShot: Handle MeshPart, GunClient confirmado — IDs capturados en consola
+                -- XenoShot: Handle MeshPart, GunClient confirmado ? IDs capturados en consola
                 name   = "XenoShot",
                 meshId = "rbxassetid://96867436912658",
                 texId  = "rbxassetid://103568875118220",
@@ -37693,16 +37714,16 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- USP: MeshPart, scale 0.055, grip identico al Bacon
+                -- USP: MeshPart, scale 0.055, sacada hacia adelante para no meterse en el brazo
                 name   = "USP",
                 meshId = "rbxassetid://111298369807853",
                 texId  = "rbxassetid://96289683042320",
                 scale  = Vector3.new(0.055, 0.055, 0.055),
                 grip   = CFrame.new(
-                    0, -0.759000003, -0.314999998,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
+                    -0.567565918, -0.124303818, 0.45,
+                    0, 0,  1,
+                    0, 1,  0,
+                   -1, 0,  0
                 ),
                 dualGun = true,
             },
@@ -38001,7 +38022,7 @@ function CreatePremiumTab()
                     end
                 end)
                 -- Re-check extra con delay por si la gun tarda en cargarse en mobile
-                -- FIX MOBILE v4: más delays cubre executors lentos (Delta, Arceus X)
+                -- FIX MOBILE v4: m?s delays cubre executors lentos (Delta, Arceus X)
                 task.delay(0.5,  _scTryApplyGun)
                 task.delay(1.2,  _scTryApplyGun)
                 task.delay(2.5,  _scTryApplyGun)
@@ -38141,7 +38162,40 @@ function CreatePremiumTab()
             CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
         end)
 
-        -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
+        -- SCAN GRIP: lee el grip real de la gun equipada y lo imprime en consola
+        -- Usarlo con la gun DEFAULT (sin skin aplicada) para obtener el grip nativo del mesh
+        do
+            local scanBtn = Instance.new("TextButton")
+            scanBtn.Size = UDim2.new(1, 0, 0, 30)
+            scanBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 80)
+            scanBtn.BackgroundTransparency = 0.3
+            scanBtn.BorderSizePixel = 0
+            scanBtn.Text = "?? Scan Grip (consola)"
+            scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            scanBtn.TextSize = 12
+            scanBtn.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+            scanBtn.ZIndex = 22
+            scanBtn.Parent = leftColumn
+            Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
+            scanBtn.Activated:Connect(function()
+                local gun = _findGun and _findGun()
+                if not gun then
+                    CreateCustomNotification("SCAN GRIP", "No tenes la gun equipada!", 2)
+                    return
+                end
+                local g = gun.Grip
+                local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = g:GetComponents()
+                local msg = string.format(
+                    "USP GRIP:\nCFrame.new(\n  %.9f, %.9f, %.9f,\n  %.9f, %.9f, %.9f,\n  %.9f, %.9f, %.9f,\n  %.9f, %.9f, %.9f\n)",
+                    px,py,pz, r00,r01,r02, r10,r11,r12, r20,r21,r22
+                )
+                print(msg)
+                -- Tambien mostrar en notif resumido
+                CreateCustomNotification("GRIP ESCANEADO", string.format("pos=(%.3f,%.3f,%.3f) - ver consola F9", px,py,pz), 6)
+            end)
+        end
+
+
         do
             local _knifeNames = {}
             for _, s in ipairs(_SC_KNIFE_SKINS) do _knifeNames[#_knifeNames+1] = s.name end
@@ -52103,10 +52157,21 @@ function CreateCombatTab()
                     and _autoRestoreOnReexec and _autoRestoreOnReexec[nombre]
                     and not (_neverRestoreToggles and _neverRestoreToggles[nombre])
                     and _G._toggleCallbacks[nombre] then
-                        local _origNotif = CreateCustomNotification
-                        CreateCustomNotification = function() end
-                        pcall(_G._toggleCallbacks[nombre], true)
-                        CreateCustomNotification = _origNotif
+                        -- FIX AUTO-SAFE: verificar el .txt antes de activar.
+                        -- Si el usuario lo apago manualmente, el .txt dice "false":
+                        -- no activar aunque _G._toggleStates diga true.
+                        local _txtState = _readToggleFile(nombre)
+                        if _txtState == false then
+                            _G._toggleStates[nombre] = false
+                            if _G._toggleApplyStates and _G._toggleApplyStates[nombre] then
+                                pcall(_G._toggleApplyStates[nombre], false, false)
+                            end
+                        else
+                            local _origNotif = CreateCustomNotification
+                            CreateCustomNotification = function() end
+                            pcall(_G._toggleCallbacks[nombre], true)
+                            CreateCustomNotification = _origNotif
+                        end
                     end
                 end
             end)
