@@ -34,6 +34,42 @@ end
 -- == FIN COMPAT SHIM v18
 -- ================================================================
 
+-- ================================================================
+-- == GUARD DE RE-EJECUCION DE SCRIPT (v1)
+-- Evita que todo el script corra dos veces si el usuario lo ejecuta
+-- mas de una vez. Solo se permite una instancia activa a la vez.
+-- Si ya existe una instancia corriendo, simplemente reabre el hub.
+-- ================================================================
+if _G._hubScriptExecuted then
+    warn("[ZerqonHUB] Script ya ejecutado. Re-abriendo hub existente...")
+    if _G._hubRunning then
+        warn("[ZerqonHUB] Hub ya en construccion, ignorando.")
+        return
+    end
+    -- Si el hub existe pero esta oculto, reabrirlo
+    local _pg = game:GetService("Players").LocalPlayer
+    local _pg2 = _pg and _pg:FindFirstChild("PlayerGui")
+    local _cg  = game:GetService("CoreGui")
+    local _existing = (_pg2 and _pg2:FindFirstChild("f"))
+                   or _cg:FindFirstChild("f")
+                   or (gethui and gethui():FindFirstChild("f"))
+    if _existing then
+        _existing.Enabled = true
+        _G._hubHidden = false
+        warn("[ZerqonHUB] Hub reactivado.")
+    else
+        -- Hub destruido externamente -> reconstruir
+        if type(abrirHub) == "function" then
+            abrirHub()
+        end
+    end
+    return
+end
+_G._hubScriptExecuted = true
+-- ================================================================
+-- == FIN GUARD DE RE-EJECUCION
+-- ================================================================
+
 -- Mensaje de bienvenida en consola con color azul
 print("[34m" .. "Welcome to Zerqon Hub" .. "[0m")
 
@@ -3041,7 +3077,9 @@ end
 -- El sheriff (con gun) y otros roles tambien necesitan historial actualizado.
 HIST_INTERVAL_HZ = 1/8   -- OPT: 8Hz suficiente para prediccion (reducido de 10Hz)
 _histLastUpdate  = 0
-RunService.Heartbeat:Connect(function()
+-- GUARD: desconectar conexion anterior si existe (evita duplicados al re-ejecutar)
+if _G._histUpdaterConn then pcall(function() _G._histUpdaterConn:Disconnect() end) end
+_G._histUpdaterConn = RunService.Heartbeat:Connect(function()
     -- Guard: solo correr si algun Silent Aim esta activo
     if not KnifeSAState.enabled and not (CombatTabState and CombatTabState.silentAimEnabled) then return end
     local now = tick()
@@ -26710,7 +26748,9 @@ end
 _hbTtracer = 0
 _tracerViewCenter = Vector2.new(0, 0)
 _tracerViewTick = 0
-RunService.Heartbeat:Connect(function()
+-- GUARD: desconectar conexion anterior si existe (evita duplicados al re-ejecutar)
+if _G._tracerHBConn then pcall(function() _G._tracerHBConn:Disconnect() end) end
+_G._tracerHBConn = RunService.Heartbeat:Connect(function()
     -- FIX LAG: guard ANTES del ticker ? si no hay tracers activos no incrementar ni entrar
     local vt = VisualState.tracer
     local anyTracer = vt.everyone or vt.murderer or vt.sheriff or vt.hero
@@ -37682,7 +37722,7 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado — IDs capturados en consola
+                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado ? IDs capturados en consola
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
                 texId  = "rbxassetid://107224776622554",
@@ -37691,7 +37731,7 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- XenoShot: Handle MeshPart, GunClient confirmado — IDs capturados en consola
+                -- XenoShot: Handle MeshPart, GunClient confirmado ? IDs capturados en consola
                 name   = "XenoShot",
                 meshId = "rbxassetid://96867436912658",
                 texId  = "rbxassetid://103568875118220",
@@ -38004,7 +38044,7 @@ function CreatePremiumTab()
                     end
                 end)
                 -- Re-check extra con delay por si la gun tarda en cargarse en mobile
-                -- FIX MOBILE v4: más delays cubre executors lentos (Delta, Arceus X)
+                -- FIX MOBILE v4: m?s delays cubre executors lentos (Delta, Arceus X)
                 task.delay(0.5,  _scTryApplyGun)
                 task.delay(1.2,  _scTryApplyGun)
                 task.delay(2.5,  _scTryApplyGun)
