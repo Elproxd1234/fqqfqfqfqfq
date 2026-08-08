@@ -17827,7 +17827,7 @@ function CreateMainUI_GameInfo()
         local _cpanel = Instance.new("Frame", _cpWrapper)
         _cpanel.Name = "MainCenterPanel"
         _cpanel.AnchorPoint = Vector2.new(0.5, 0)
-        _cpanel.Position = UDim2.new(0.5, 0, 0, 4)
+        _cpanel.Position = UDim2.new(0.5, 0, 0, -8)
         _cpanel.BackgroundColor3 = Color3.fromRGB(5, 14, 30)
         _cpanel.BackgroundTransparency = 0.18
         _cpanel.BorderSizePixel = 0
@@ -17851,7 +17851,7 @@ function CreateMainUI_GameInfo()
         -- Layout: mobile = columna vertical, PC = fila horizontal
         if _isMobile then
             -- MOBILE: 3 filas apiladas, bien separadas
-            _cpanel.Size = UDim2.new(0.92, 0, 0, 118)
+            _cpanel.Size = UDim2.new(0.92, 0, 0, 96)
 
             local _layout = Instance.new("UIListLayout", _cpanel)
             _layout.FillDirection = Enum.FillDirection.Vertical
@@ -17963,7 +17963,7 @@ function CreateMainUI_GameInfo()
 
         else
             -- PC: 3 bloques en fila horizontal, bien centrados
-            _cpanel.Size = UDim2.new(0.88, 0, 0, 76)
+            _cpanel.Size = UDim2.new(0.88, 0, 0, 58)
 
             local _layout = Instance.new("UIListLayout", _cpanel)
             _layout.FillDirection = Enum.FillDirection.Horizontal
@@ -17992,23 +17992,23 @@ function CreateMainUI_GameInfo()
 
                 local cap = Instance.new("TextLabel", blk)
                 cap.Size = UDim2.new(1, 0, 0, 20)
-                cap.Position = UDim2.new(0, 0, 0, 8)
+                cap.Position = UDim2.new(0, 0, 0, 4)
                 cap.BackgroundTransparency = 1
                 cap.Text = caption
                 cap.Font = Enum.Font.GothamBold
-                cap.TextSize = 11
+                cap.TextSize = 10
                 cap.TextColor3 = Color3.fromRGB(0, 180, 240)
                 cap.TextXAlignment = Enum.TextXAlignment.Center
                 cap.ZIndex = 61
 
                 local val = Instance.new("TextLabel", blk)
                 val.Name = "CP" .. caption .. "Val"
-                val.Size = UDim2.new(1, 0, 0, 38)
-                val.Position = UDim2.new(0, 0, 0, 28)
+                val.Size = UDim2.new(1, 0, 0, 30)
+                val.Position = UDim2.new(0, 0, 0, 18)
                 val.BackgroundTransparency = 1
                 val.Text = defaultVal
                 val.Font = Enum.Font.GothamBold
-                val.TextSize = 28
+                val.TextSize = 20
                 val.TextColor3 = defaultColor
                 val.TextXAlignment = Enum.TextXAlignment.Center
                 val.ZIndex = 61
@@ -37521,6 +37521,14 @@ function CreatePremiumTab()
                              math.rad(-96),
                              math.rad(2)
                          ),
+                dualGun = true,
+            },
+            {
+                name   = "USP",
+                meshId = "rbxassetid://76131983147025",
+                texId  = "rbxassetid://96289683042320",
+                scale  = Vector3.new(1.5, 1.5, 1.5),
+                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
                 dualGun = true,
             },
         }
