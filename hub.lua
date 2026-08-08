@@ -37617,11 +37617,12 @@ function CreatePremiumTab()
                 meshId = "http://www.roblox.com/asset/?id=95356090",
                 texId  = "http://www.roblox.com/asset/?id=126534866",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
@@ -37630,11 +37631,12 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://7775027413",
                 texId  = "http://www.roblox.com/asset/?id=7775245551",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
@@ -37644,11 +37646,12 @@ function CreatePremiumTab()
                 meshId = "http://www.roblox.com/asset/?id=79401392",
                 texId  = "rbxassetid://178240361",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
@@ -37672,11 +37675,12 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://15374602183",
                 texId  = "rbxassetid://15409041564",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
@@ -37686,11 +37690,12 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://96867436912658",
                 texId  = "rbxassetid://103568875118220",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
@@ -37713,11 +37718,12 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://76131983147025",
                 texId  = "rbxassetid://96289683042320",
                 scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(0, -0.3, -0.5) *
+                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
                          CFrame.fromEulerAnglesXYZ(
-                             math.rad(-90),
-                             math.rad(0),
-                             math.rad(0)
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
                          ),
                 dualGun = true,
             },
