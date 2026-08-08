@@ -11191,7 +11191,7 @@ function _makeTwoColumns()
     end)
 
     -- == COLUMNAS ===============================================
-    local COL_TOP = SEARCH_H + 8
+    local COL_TOP = SEARCH_H + 68
     local GAP = 4
     -- Leer preferencia de doble columna
     local _useDoubleCol = _G._hubSettings and _G._hubSettings.doubleColumn or false
@@ -17912,7 +17912,7 @@ function CreateMainUI_GameInfo()
         local _cpanel = Instance.new("Frame", _cpWrapper)
         _cpanel.Name = "MainCenterPanel"
         _cpanel.AnchorPoint = Vector2.new(0.5, 0)
-        _cpanel.Position = UDim2.new(0.5, 0, 0, -8)
+        _cpanel.Position = UDim2.new(0.5, 0, 0, 2)
         _cpanel.BackgroundColor3 = Color3.fromRGB(5, 14, 30)
         _cpanel.BackgroundTransparency = 0.18
         _cpanel.BorderSizePixel = 0
@@ -28919,7 +28919,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     -- =====================================================================
     -- AUTO-SAFE POR TOGGLE (lectura del .txt individual)
     -- Si el archivo .txt de este toggle dice "true" Y el estado actual
-    -- es false (el JSON no lo capturó, ej: salida sin guardar, re-join),
+    -- es false (el JSON no lo captur?, ej: salida sin guardar, re-join),
     -- forzar el estado a true para que el bloque de auto-activacion lo dispare.
     -- Exactamente igual que el LocalScript de referencia:
     --   success, data = pcall(readfile, fileName)
