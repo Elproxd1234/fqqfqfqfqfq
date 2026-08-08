@@ -37616,28 +37616,20 @@ function CreatePremiumTab()
                 name   = "Luger",
                 meshId = "http://www.roblox.com/asset/?id=95356090",
                 texId  = "http://www.roblox.com/asset/?id=126534866",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
-                dualGun = true,
+                scale  = Vector3.new(1.7999999523162842, 1.7999999523162842, 1.7999999523162842),
+                grip   = CFrame.new(
+                    0, -0.5, 0.5,
+                    0.999924004,    -0.00871835742, -0.00871835742,
+                    0.00871835742,   0.999961972,   -3.80063248e-05,
+                    0.00871835742,  -3.80063248e-05,  0.999961972
+                ),
             },
             {
                 name   = "Harvester",
                 meshId = "rbxassetid://7775027413",
                 texId  = "http://www.roblox.com/asset/?id=7775245551",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
@@ -37645,14 +37637,13 @@ function CreatePremiumTab()
                 name   = "Bacon",
                 meshId = "http://www.roblox.com/asset/?id=79401392",
                 texId  = "rbxassetid://178240361",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                scale  = Vector3.new(1.5, 1.5, 1.5),
+                grip   = CFrame.new(
+                    0, -0.759000003, -0.314999998,
+                    1, 0, 0,
+                    0, 0, -1,
+                    0, 1, 0
+                ),
                 dualGun = true,
             },
             {
@@ -37660,71 +37651,45 @@ function CreatePremiumTab()
                 name   = "ElderwoodGun",
                 meshId = "rbxassetid://4210029922",
                 texId  = "rbxassetid://4210038158",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                scale  = Vector3.new(0.035, 0.035, 0.035),
+                grip   = CFrame.new(
+                    -0.567565918, -0.124303818, -0.0424308777,
+                    -0.000212550163, 0.0230092816, -0.999735236,
+                    -0.011778634,   0.999665856,   0.0230101906,
+                     0.99993062,    0.0117804073,  5.85317612e-05
+                ),
                 dualGun = true,
             },
             {
-                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado
+                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado — IDs capturados en consola
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
-                texId  = "rbxassetid://15409041564",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                texId  = "rbxassetid://107224776622554",
+                scale  = Vector3.new(0.08, 0.08, 0.08),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
-                -- XenoShot: Handle MeshPart, GunClient confirmado ? IDs capturados en consola
+                -- XenoShot: Handle MeshPart, GunClient confirmado — IDs capturados en consola
                 name   = "XenoShot",
                 meshId = "rbxassetid://96867436912658",
                 texId  = "rbxassetid://103568875118220",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
-                dualGun = true,
-            },
-
-            {
-                name   = "AK",
-                meshId = "rbxassetid://130016653323757",
-                texId  = "rbxassetid://110314778967742",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                scale  = Vector3.new(0.055, 0.055, 0.055),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
-                name   = "USP",
-                meshId = "rbxassetid://76131983147025",
-                texId  = "rbxassetid://96289683042320",
-                scale  = Vector3.new(0.030, 0.055, 0.055),
-                -- GRIP ELDEERWOOD: todas las armas usan el mismo agarre frontal
-                grip   = CFrame.new(-0.55, -0.23, -0.15) *
-                         CFrame.fromEulerAnglesXYZ(
-                             math.rad(2),
-                             math.rad(-96),
-                             math.rad(2)
-                         ),
+                -- Shotgun: modelo custom exportado desde Blender
+                name   = "Shotgun",
+                meshId = "rbxassetid://113266841572317",
+                texId  = "rbxassetid://108221897243102",
+                scale  = Vector3.new(0.05, 0.05, 0.05),
+                grip   = CFrame.new(
+                    0, -0.1, -0.5,
+                    1,  0,    0,
+                    0,  1,    0,
+                    0,  0,    1
+                ),
                 dualGun = true,
             },
         }
@@ -37762,31 +37727,14 @@ function CreatePremiumTab()
                 dualKnife = true,
             },
             {
-                name   = "New Knife",
-                meshId = "rbxassetid://106376139482867",
-                texId  = "rbxassetid://112744655854803",
-                scale  = Vector3.new(0.6, 0.6, 0.6),
-                grip   = CFrame.new(0, -0.55, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                dualKnife = true,
-            },
-            {
-                name   = "Katana",
-                meshId = "rbxassetid://127532806202585",
-                texId  = "rbxassetid://138272175698969",
-                scale  = Vector3.new(0.0560000017285347, 0.0560000017285347, 0.0560000017285347),
-                -- GRIP v10: invertido respecto a v9 (filo mirando hacia arriba correcto)
-                grip   = CFrame.new(1.85, 0.1, -0.05) * CFrame.Angles(math.rad(-65), math.rad(0), math.rad(90)),
-                dualKnife = true,
+                name   = " Coming Soon...",
+                meshId = "",
+                texId  = "",
+                scale  = Vector3.new(0.05, 0.05, 0.05),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                comingSoon = true,
             },
         }
-
-        -- FIX v18: re-parchear grip del Katana por si _G tenia una version vieja cacheada
-        for _, _ks in ipairs(_SC_KNIFE_SKINS) do
-            if _ks.name == "Katana" then
-                _ks.grip = CFrame.new(1.85, 0.1, -0.05) * CFrame.Angles(math.rad(-65), math.rad(0), math.rad(90))
-                break
-            end
-        end
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
         _G._SC_KNIFE_SKINS = _SC_KNIFE_SKINS
@@ -37825,12 +37773,10 @@ function CreatePremiumTab()
                                 elseif obj:IsA("SpecialMesh") then
                                     obj.MeshId    = eData.Mesh
                                     obj.TextureId = eData.Texture
-                                    if eData.Scale then pcall(function() obj.Scale = eData.Scale end) end
+                                    obj.Scale     = eData.Scale
                                 elseif obj:IsA("MeshPart") then
                                     if eData.Mesh and eData.Mesh ~= "" then obj.MeshId = eData.Mesh end
                                     obj.TextureID = eData.Texture
-                                    -- FIX: restaurar Size original si fue guardado (evita que quede agrandado al cambiar skin)
-                                    if eData.Scale then pcall(function() obj.Size = eData.Scale end) end
                                 end
                             end)
                         end
@@ -37847,11 +37793,6 @@ function CreatePremiumTab()
         --                          el part completamente invisible en Roblox.
         --   2. Handle BasePart con SpecialMesh hijo  -> pisar MeshId/TextureId/Scale del SM
         --   3. Handle BasePart sin SpecialMesh (legacy)  -> pisar MeshId/TextureID directo
-        -- FIX MOBILE: detectar dispositivo para escalar correctamente
-        local _UIS_SC = game:GetService("UserInputService")
-        local _scIsMobile = pcall(function() return _UIS_SC.TouchEnabled end)
-            and _UIS_SC.TouchEnabled and not _UIS_SC.KeyboardEnabled
-
         local function _scApply(tool, skin, bypass)
             if not tool or not skin then return end
             if not bypass then
@@ -37861,25 +37802,7 @@ function CreatePremiumTab()
             if not _skinState.origData[tool] then
                 _skinState.origData[tool] = { Grip = tool.Grip, Elements = {} }
             end
-
-            -- Limpiar _SC_FakeSM huerfanos de ejecuciones previas (dentro de MeshPart los hace invisibles)
-            pcall(function()
-                local h = tool:FindFirstChild("Handle")
-                if h and h:IsA("MeshPart") then
-                    local old = h:FindFirstChild("_SC_FakeSM")
-                    if old then old:Destroy() end
-                end
-            end)
-
-            -- Aplicar grip en todos los dispositivos (mobile incluido)
-            local _applyGrip = true
-            if _applyGrip and skin.grip ~= nil then
-                pcall(function() tool.Grip = skin.grip end)
-            end
-
-            -- _effectiveScale: aplica SOLO a SpecialMesh (SM.Scale si funciona desde executor).
-            -- NO aplica a MeshPart.Size (read-only en cliente).
-            local _effectiveScale = skin.scale
+            pcall(function() tool.Grip = skin.grip end)
 
             -- PASO 1: manejar el Handle directamente (mismo enfoque que actualizarBomba/GoldBomb)
             local handle = tool:FindFirstChild("Handle")
@@ -37895,21 +37818,37 @@ function CreatePremiumTab()
                     pcall(function()
                         existingSM.MeshId    = skin.meshId
                         existingSM.TextureId = skin.texId
-                        if _effectiveScale then existingSM.Scale = _effectiveScale end
+                        existingSM.Scale     = skin.scale
                     end)
                 elseif handle:IsA("MeshPart") then
                     -- Handle MeshPart moderno
                     if not _skinState.origData[tool].Elements[handle] then
                         _skinState.origData[tool].Elements[handle] = {
-                            Mesh = handle.MeshId, Texture = handle.TextureID,
-                            Scale = handle.Size
+                            Mesh = handle.MeshId, Texture = handle.TextureID
                         }
                     end
-                    -- Intentar escribir MeshId + TextureID directo
-                    local meshOk = pcall(function() handle.MeshId = skin.meshId end)
-                    pcall(function() handle.TextureID = skin.texId end)
-                    -- NUNCA inyectar SpecialMesh dentro de un MeshPart: lo vuelve invisible.
-                    -- Si MeshId es read-only solo se aplica la textura (skin parcial visible).
+                    -- Intentar escribir MeshId directo
+                    local meshWriteOk = pcall(function()
+                        handle.MeshId    = skin.meshId
+                        handle.TextureID = skin.texId
+                    end)
+                    if not meshWriteOk then
+                        -- Fallback: inyectar SpecialMesh FileMesh cuando el executor bloquea MeshPart.MeshId
+                        local _smFake = handle:FindFirstChild("_SC_FakeSM")
+                        if not _smFake then
+                            _smFake = Instance.new("SpecialMesh", handle)
+                            _smFake.Name     = "_SC_FakeSM"
+                            _smFake.MeshType = Enum.MeshType.FileMesh
+                            _skinState.origData[tool].Elements[_smFake] = {
+                                Mesh = "", Texture = "", Scale = Vector3.new(1,1,1), _isFakeSM = true
+                            }
+                        end
+                        pcall(function()
+                            _smFake.MeshId    = skin.meshId
+                            _smFake.TextureId = skin.texId
+                            _smFake.Scale     = skin.scale
+                        end)
+                    end
                 else
                     -- Handle BasePart sin SpecialMesh (legacy)
                     if not _skinState.origData[tool].Elements[handle] then
@@ -37920,32 +37859,20 @@ function CreatePremiumTab()
             end
 
             -- PASO 2: descendientes adicionales (modelos multi-parte), saltando el Handle ya procesado
-            -- FIX: si la skin usa MeshPart (AK), NO pisar SpecialMeshes de descendientes.
-            -- El AK no tiene SMs propios; pisarlos rompe guns como Luger/Bacon al cambiar skin.
-            -- FIX TAMA?O: NO aplicar scale a SMs que NO son hijos directos del Handle;
-            -- el scale correcto ya se aplico en PASO 1 al SM hijo del Handle.
-            -- Aplicar scale a SMs secundarios los hace verse grandes (rompe Luger, etc).
-            local _skinIsMeshPart = handle and handle:IsA("MeshPart")
             for _, obj in pairs(tool:GetDescendants()) do
                 if obj == handle then
                     -- ya procesado arriba
                 elseif obj:IsA("SpecialMesh") and obj.Name ~= "_SC_FakeSM" then
-                    -- Solo es el SM del Handle si su padre directo ES el Handle
-                    local _isHandleSM = handle and (obj.Parent == handle)
-                    if _skinIsMeshPart then
-                        -- skin es MeshPart: no tocar SMs ajenos para no romper otras guns
-                    elseif not _skinState.origData[tool].Elements[obj] then
+                    if not _skinState.origData[tool].Elements[obj] then
                         _skinState.origData[tool].Elements[obj] = {
                             Mesh = obj.MeshId, Texture = obj.TextureId, Scale = obj.Scale
                         }
                     end
-                    if not _skinIsMeshPart then pcall(function()
+                    pcall(function()
                         obj.MeshId    = skin.meshId
                         obj.TextureId = skin.texId
-                        -- FIX TAMA?O: aplicar scale SOLO al SM hijo directo del Handle.
-                        -- Los SMs de partes secundarias no reciben scale para no quedar grandes.
-                        if _effectiveScale and _isHandleSM then obj.Scale = _effectiveScale end
-                    end) end
+                        obj.Scale     = skin.scale
+                    end)
                 elseif obj:IsA("MeshPart") and obj ~= handle then
                     if not _skinState.origData[tool].Elements[obj] then
                         _skinState.origData[tool].Elements[obj] = { Mesh = obj.MeshId, Texture = obj.TextureID }
@@ -37975,7 +37902,7 @@ function CreatePremiumTab()
                             pcall(function()
                                 obj.MeshId    = skin.meshId
                                 obj.TextureId = skin.texId
-                                obj.Scale     = _effectiveScale
+                                obj.Scale     = skin.scale
                             end)
                         elseif obj:IsA("MeshPart") then
                             pcall(function()
@@ -38056,11 +37983,11 @@ function CreatePremiumTab()
                     end
                 end)
                 -- Re-check extra con delay por si la gun tarda en cargarse en mobile
-                -- FIX MOBILE v4: m?s delays cubre executors lentos (Delta, Arceus X)
-                task.delay(0.5,  function() if _scTryApplyGun then _scTryApplyGun() end end)
-                task.delay(1.2,  function() if _scTryApplyGun then _scTryApplyGun() end end)
-                task.delay(2.5,  function() if _scTryApplyGun then _scTryApplyGun() end end)
-                task.delay(4.0,  function() if _scTryApplyGun then _scTryApplyGun() end end)
+                -- FIX MOBILE v4: más delays cubre executors lentos (Delta, Arceus X)
+                task.delay(0.5,  _scTryApplyGun)
+                task.delay(1.2,  _scTryApplyGun)
+                task.delay(2.5,  _scTryApplyGun)
+                task.delay(4.0,  _scTryApplyGun)
             end
 
             local _scChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -38128,7 +38055,6 @@ function CreatePremiumTab()
         -- Selector skin Gun
         local _gunNames = {}
         for _, s in ipairs(_SC_GUN_SKINS) do _gunNames[#_gunNames+1] = s.name end
-
         CreateNebulaSelector(leftColumn, "Skin -- Gun", _gunNames, _gunNames[1], function(sel)
             -- Auto-setear modo gun al usar este selector
             if _skinState.mode ~= "gun" then
@@ -38149,10 +38075,6 @@ function CreatePremiumTab()
             -- FIX AUTO-APPLY: activar siempre, aunque no tenga la gun todavia.
             -- Los listeners de _scSetupListener se encargan de aplicar cuando aparezca.
             _skinState.enabled = true
-
-            -- FIX: resetear skin anterior antes de aplicar la nueva para limpiar origData
-            -- Esto evita que el Scale del AK quede guardado en origData[tool] y afecte skins siguientes
-            _scResetAll()
 
             -- FIX: usar _findGun() que busca en char y backpack correctamente (MM2 usa modelo en workspace)
             local tool = _findGun and _findGun()
@@ -38176,15 +38098,15 @@ function CreatePremiumTab()
             -- Delays de seguridad para executors lentos / mobile
             task.delay(0.3, function()
                 if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                if _scTryApplyGun then task.spawn(_scTryApplyGun) end
+                task.spawn(_scTryApplyGun)
             end)
             task.delay(1.0, function()
                 if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                if _scTryApplyGun then task.spawn(_scTryApplyGun) end
+                task.spawn(_scTryApplyGun)
             end)
             task.delay(2.5, function()
                 if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                if _scTryApplyGun then task.spawn(_scTryApplyGun) end
+                task.spawn(_scTryApplyGun)
             end)
 
             -- FIX DUAL GUN POSE: si Dual Gun esta activo, destruir el clon actual
@@ -38200,134 +38122,6 @@ function CreatePremiumTab()
 
             CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
         end)
-
-        -- ==============================================================
-        --  GUN CUSTOMIZER (Premium) -- Tamaño, Grip y Giro en tiempo real
-        --  Valores default = AK: scale(0.030,0.055,0.055), grip(-0.55,-0.23,-0.15), rot(2,-96,2)
-        -- ==============================================================
-        do
-            CreateSection(leftColumn, "", "?? GUN CUSTOMIZER", ThemeColors.Primary)
-
-            -- Estado del customizer (persistente en _G)
-            _G._gunCustomizerState = _G._gunCustomizerState or {
-                scaleX  = 0.030,  scaleY  = 0.055,  scaleZ  = 0.055,
-                gripX   = -0.55,  gripY   = -0.23,  gripZ   = -0.15,
-                rotX    =  2,     rotY    = -96,     rotZ    =  2,
-            }
-            local _GCS = _G._gunCustomizerState
-
-            -- Funcion que aplica el customizer a la gun actualmente equipada
-            local function _applyGunCustomizer()
-                local tool = _findGun and _findGun()
-                if not tool then return end
-                -- Aplicar Scale
-                pcall(function()
-                    local handle = tool:FindFirstChild("Handle")
-                    if handle then
-                        -- SpecialMesh
-                        local sm = handle:FindFirstChildOfClass("SpecialMesh")
-                        if sm then
-                            sm.Scale = Vector3.new(_GCS.scaleX, _GCS.scaleY, _GCS.scaleZ)
-                        end
-                        -- MeshPart directo (AK y otros MeshPart guns)
-                        if handle:IsA("MeshPart") then
-                            handle.Size = Vector3.new(_GCS.scaleX, _GCS.scaleY, _GCS.scaleZ)
-                        end
-                    end
-                end)
-                -- Aplicar Grip + Giro
-                pcall(function()
-                    tool.Grip = CFrame.new(_GCS.gripX, _GCS.gripY, _GCS.gripZ) *
-                        CFrame.fromEulerAnglesXYZ(
-                            math.rad(_GCS.rotX),
-                            math.rad(_GCS.rotY),
-                            math.rad(_GCS.rotZ)
-                        )
-                end)
-            end
-
-            -- Helper para crear un mini-label descriptivo antes del slider
-            local function _gcLabel(parent, txt)
-                local lbl = Instance.new("TextLabel", parent)
-                lbl.Size = UDim2.new(1, -8, 0, 18)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = txt
-                lbl.TextColor3 = ThemeColors.Primary
-                lbl.Font = Enum.Font.GothamSemibold
-                lbl.TextSize = 10
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.TextYAlignment = Enum.TextYAlignment.Center
-            end
-
-            -- -- SCALE --
-            _gcLabel(leftColumn, "  ? Tamaño (Scale) — default AK: 0.030 / 0.055 / 0.055")
-            CreateSlider(leftColumn, "Scale X (×1000)", 1, 200, math.floor(_GCS.scaleX * 1000 + 0.5), function(v)
-                _GCS.scaleX = v / 1000
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Scale Y (×1000)", 1, 200, math.floor(_GCS.scaleY * 1000 + 0.5), function(v)
-                _GCS.scaleY = v / 1000
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Scale Z (×1000)", 1, 200, math.floor(_GCS.scaleZ * 1000 + 0.5), function(v)
-                _GCS.scaleZ = v / 1000
-                _applyGunCustomizer()
-            end)
-
-            -- -- GRIP POSITION --
-            _gcLabel(leftColumn, "  ? Grip Pos — default AK: -0.55 / -0.23 / -0.15")
-            CreateSlider(leftColumn, "Grip X (×100)", -200, 200, math.floor(_GCS.gripX * 100 + 0.5), function(v)
-                _GCS.gripX = v / 100
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Grip Y (×100)", -200, 200, math.floor(_GCS.gripY * 100 + 0.5), function(v)
-                _GCS.gripY = v / 100
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Grip Z (×100)", -200, 200, math.floor(_GCS.gripZ * 100 + 0.5), function(v)
-                _GCS.gripZ = v / 100
-                _applyGunCustomizer()
-            end)
-
-            -- -- ROTATION / GIRO --
-            _gcLabel(leftColumn, "  ? Giro (°) — default AK: 2 / -96 / 2")
-            CreateSlider(leftColumn, "Rot X (grado)", -180, 180, _GCS.rotX, function(v)
-                _GCS.rotX = v
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Rot Y (grado)", -180, 180, _GCS.rotY, function(v)
-                _GCS.rotY = v
-                _applyGunCustomizer()
-            end)
-            CreateSlider(leftColumn, "Rot Z (grado)", -180, 180, _GCS.rotZ, function(v)
-                _GCS.rotZ = v
-                _applyGunCustomizer()
-            end)
-
-            -- Botón: resetear a valores del AK
-            do
-                local _resetBtn = Instance.new("TextButton", leftColumn)
-                _resetBtn.Size = UDim2.new(1, -8, 0, 30)
-                _resetBtn.BackgroundColor3 = ThemeColors.Primary
-                _resetBtn.BackgroundTransparency = 0.7
-                _resetBtn.BorderSizePixel = 0
-                _resetBtn.Text = "?  Reset a valores AK"
-                _resetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                _resetBtn.Font = Enum.Font.GothamSemibold
-                _resetBtn.TextSize = 12
-                Instance.new("UICorner", _resetBtn).CornerRadius = UDim.new(0, 6)
-                _resetBtn.MouseButton1Click:Connect(function()
-                    _GCS.scaleX = 0.030; _GCS.scaleY = 0.055; _GCS.scaleZ = 0.055
-                    _GCS.gripX  = -0.55; _GCS.gripY  = -0.23; _GCS.gripZ  = -0.15
-                    _GCS.rotX   =  2;    _GCS.rotY   = -96;   _GCS.rotZ   =  2
-                    _applyGunCustomizer()
-                    CreateCustomNotification("GUN CUSTOMIZER", "Reset a valores AK ?", 2)
-                end)
-            end
-        end
-        -- ==============================================================
-        --  FIN GUN CUSTOMIZER
-        -- ==============================================================
 
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
         do
