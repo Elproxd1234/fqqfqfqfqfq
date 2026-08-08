@@ -37494,7 +37494,7 @@ function CreatePremiumTab()
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
                 texId  = "rbxassetid://15409041564",
-                scale  = Vector3.new(0.08, 0.08, 0.08),
+                scale  = Vector3.new(1, 1, 1),
                 -- FIX GRIP: identidad dejaba el scope mal agarrado.
                 -- Unificado con el grip probado en _GUN_SKINS (Items Fake).
                 grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
