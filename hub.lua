@@ -37456,19 +37456,26 @@ function CreatePremiumTab()
                 name   = "Luger",
                 meshId = "http://www.roblox.com/asset/?id=95356090",
                 texId  = "http://www.roblox.com/asset/?id=126534866",
-                scale  = Vector3.new(1.7999999523162842, 1.7999999523162842, 1.7999999523162842),
-                -- FIX GRIP: Z=+0.5 empujaba el arma hacia adentro del torso.
-                -- Cambiado a Z=-0.5 para que quede adelante de la mano apuntando al frente.
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
             {
                 name   = "Harvester",
                 meshId = "rbxassetid://7775027413",
                 texId  = "http://www.roblox.com/asset/?id=7775245551",
-                scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
-                -- FIX GRIP: mismo mesh que Harvester knife (_KNIFE_SKINS) -- sincronizado con Y=-1
-                grip   = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
             {
@@ -37476,8 +37483,13 @@ function CreatePremiumTab()
                 name   = "Bacon",
                 meshId = "http://www.roblox.com/asset/?id=79401392",
                 texId  = "rbxassetid://178240361",
-                scale  = Vector3.new(1.5, 1.5, 1.5),
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
             {
@@ -37485,8 +37497,13 @@ function CreatePremiumTab()
                 name   = "ElderwoodGun",
                 meshId = "rbxassetid://4210029922",
                 texId  = "rbxassetid://4210038158",
-                scale  = Vector3.new(0.035, 0.035, 0.035),
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
             {
@@ -37494,10 +37511,13 @@ function CreatePremiumTab()
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
                 texId  = "rbxassetid://15409041564",
-                scale  = Vector3.new(1, 1, 1),
-                -- FIX GRIP: identidad dejaba el scope mal agarrado.
-                -- Unificado con el grip probado en _GUN_SKINS (Items Fake).
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
             {
@@ -37505,8 +37525,13 @@ function CreatePremiumTab()
                 name   = "XenoShot",
                 meshId = "rbxassetid://96867436912658",
                 texId  = "rbxassetid://103568875118220",
-                scale  = Vector3.new(0.035, 0.055, 0.020),
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
 
