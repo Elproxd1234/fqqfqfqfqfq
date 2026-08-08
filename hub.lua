@@ -37527,8 +37527,13 @@ function CreatePremiumTab()
                 name   = "USP",
                 meshId = "rbxassetid://76131983147025",
                 texId  = "rbxassetid://96289683042320",
-                scale  = Vector3.new(1.5, 1.5, 1.5),
-                grip   = CFrame.new(0, -0.5, -0.3) * CFrame.Angles(math.rad(-90), 0, 0),
+                scale  = Vector3.new(0.030, 0.055, 0.055),
+                grip   = CFrame.new(-0.55, -0.23, -0.15) *
+                         CFrame.fromEulerAnglesXYZ(
+                             math.rad(2),
+                             math.rad(-96),
+                             math.rad(2)
+                         ),
                 dualGun = true,
             },
         }
