@@ -38201,6 +38201,134 @@ function CreatePremiumTab()
             CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
         end)
 
+        -- ==============================================================
+        --  GUN CUSTOMIZER (Premium) -- Tamaño, Grip y Giro en tiempo real
+        --  Valores default = AK: scale(0.030,0.055,0.055), grip(-0.55,-0.23,-0.15), rot(2,-96,2)
+        -- ==============================================================
+        do
+            CreateSection(leftColumn, "", "?? GUN CUSTOMIZER", ThemeColors.Primary)
+
+            -- Estado del customizer (persistente en _G)
+            _G._gunCustomizerState = _G._gunCustomizerState or {
+                scaleX  = 0.030,  scaleY  = 0.055,  scaleZ  = 0.055,
+                gripX   = -0.55,  gripY   = -0.23,  gripZ   = -0.15,
+                rotX    =  2,     rotY    = -96,     rotZ    =  2,
+            }
+            local _GCS = _G._gunCustomizerState
+
+            -- Funcion que aplica el customizer a la gun actualmente equipada
+            local function _applyGunCustomizer()
+                local tool = _findGun and _findGun()
+                if not tool then return end
+                -- Aplicar Scale
+                pcall(function()
+                    local handle = tool:FindFirstChild("Handle")
+                    if handle then
+                        -- SpecialMesh
+                        local sm = handle:FindFirstChildOfClass("SpecialMesh")
+                        if sm then
+                            sm.Scale = Vector3.new(_GCS.scaleX, _GCS.scaleY, _GCS.scaleZ)
+                        end
+                        -- MeshPart directo (AK y otros MeshPart guns)
+                        if handle:IsA("MeshPart") then
+                            handle.Size = Vector3.new(_GCS.scaleX, _GCS.scaleY, _GCS.scaleZ)
+                        end
+                    end
+                end)
+                -- Aplicar Grip + Giro
+                pcall(function()
+                    tool.Grip = CFrame.new(_GCS.gripX, _GCS.gripY, _GCS.gripZ) *
+                        CFrame.fromEulerAnglesXYZ(
+                            math.rad(_GCS.rotX),
+                            math.rad(_GCS.rotY),
+                            math.rad(_GCS.rotZ)
+                        )
+                end)
+            end
+
+            -- Helper para crear un mini-label descriptivo antes del slider
+            local function _gcLabel(parent, txt)
+                local lbl = Instance.new("TextLabel", parent)
+                lbl.Size = UDim2.new(1, -8, 0, 18)
+                lbl.BackgroundTransparency = 1
+                lbl.Text = txt
+                lbl.TextColor3 = ThemeColors.Primary
+                lbl.Font = Enum.Font.GothamSemibold
+                lbl.TextSize = 10
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.TextYAlignment = Enum.TextYAlignment.Center
+            end
+
+            -- -- SCALE --
+            _gcLabel(leftColumn, "  ? Tamaño (Scale) — default AK: 0.030 / 0.055 / 0.055")
+            CreateSlider(leftColumn, "Scale X (×1000)", 1, 200, math.floor(_GCS.scaleX * 1000 + 0.5), function(v)
+                _GCS.scaleX = v / 1000
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Scale Y (×1000)", 1, 200, math.floor(_GCS.scaleY * 1000 + 0.5), function(v)
+                _GCS.scaleY = v / 1000
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Scale Z (×1000)", 1, 200, math.floor(_GCS.scaleZ * 1000 + 0.5), function(v)
+                _GCS.scaleZ = v / 1000
+                _applyGunCustomizer()
+            end)
+
+            -- -- GRIP POSITION --
+            _gcLabel(leftColumn, "  ? Grip Pos — default AK: -0.55 / -0.23 / -0.15")
+            CreateSlider(leftColumn, "Grip X (×100)", -200, 200, math.floor(_GCS.gripX * 100 + 0.5), function(v)
+                _GCS.gripX = v / 100
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Grip Y (×100)", -200, 200, math.floor(_GCS.gripY * 100 + 0.5), function(v)
+                _GCS.gripY = v / 100
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Grip Z (×100)", -200, 200, math.floor(_GCS.gripZ * 100 + 0.5), function(v)
+                _GCS.gripZ = v / 100
+                _applyGunCustomizer()
+            end)
+
+            -- -- ROTATION / GIRO --
+            _gcLabel(leftColumn, "  ? Giro (°) — default AK: 2 / -96 / 2")
+            CreateSlider(leftColumn, "Rot X (grado)", -180, 180, _GCS.rotX, function(v)
+                _GCS.rotX = v
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Rot Y (grado)", -180, 180, _GCS.rotY, function(v)
+                _GCS.rotY = v
+                _applyGunCustomizer()
+            end)
+            CreateSlider(leftColumn, "Rot Z (grado)", -180, 180, _GCS.rotZ, function(v)
+                _GCS.rotZ = v
+                _applyGunCustomizer()
+            end)
+
+            -- Botón: resetear a valores del AK
+            do
+                local _resetBtn = Instance.new("TextButton", leftColumn)
+                _resetBtn.Size = UDim2.new(1, -8, 0, 30)
+                _resetBtn.BackgroundColor3 = ThemeColors.Primary
+                _resetBtn.BackgroundTransparency = 0.7
+                _resetBtn.BorderSizePixel = 0
+                _resetBtn.Text = "?  Reset a valores AK"
+                _resetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                _resetBtn.Font = Enum.Font.GothamSemibold
+                _resetBtn.TextSize = 12
+                Instance.new("UICorner", _resetBtn).CornerRadius = UDim.new(0, 6)
+                _resetBtn.MouseButton1Click:Connect(function()
+                    _GCS.scaleX = 0.030; _GCS.scaleY = 0.055; _GCS.scaleZ = 0.055
+                    _GCS.gripX  = -0.55; _GCS.gripY  = -0.23; _GCS.gripZ  = -0.15
+                    _GCS.rotX   =  2;    _GCS.rotY   = -96;   _GCS.rotZ   =  2
+                    _applyGunCustomizer()
+                    CreateCustomNotification("GUN CUSTOMIZER", "Reset a valores AK ?", 2)
+                end)
+            end
+        end
+        -- ==============================================================
+        --  FIN GUN CUSTOMIZER
+        -- ==============================================================
+
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
         do
             local _knifeNames = {}
