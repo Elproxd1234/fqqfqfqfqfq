@@ -37692,6 +37692,20 @@ function CreatePremiumTab()
                 ),
                 dualGun = true,
             },
+            {
+                -- USP: MeshPart, grip identico al Bacon (mirada al frente), GunClient compatible
+                name   = "USP",
+                meshId = "rbxassetid://111298369807853",
+                texId  = "rbxassetid://96289683042320",
+                scale  = Vector3.new(1.5, 1.5, 1.5),
+                grip   = CFrame.new(
+                    0, -0.759000003, -0.314999998,
+                    1, 0, 0,
+                    0, 0, -1,
+                    0, 1, 0
+                ),
+                dualGun = true,
+            },
         }
         -- FIX: exponer la lista en _G para que _dualStartArm pueda referenciarla
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
