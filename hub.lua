@@ -5504,7 +5504,7 @@ function _KnifeSA_getBestTarget()
     elseif knifeSAState.target == "From Mouse" then
         local mousePos = UserInputService:GetMouseLocation()
         local best, bestDist = nil, math.huge
-        local fovR = knifeSAState.mouseFovRadius or 90  -- 90px = radio del circulo FOV visual
+        local fovR = knifeSAState.mouseFovRadius or 9999
         for _, p in pairs(_cachedPlayers) do
             if p ~= LocalPlayer and p.Character then
                 local hrp = p.Character:FindFirstChild("HumanoidRootPart")
@@ -6557,14 +6557,14 @@ do
     local COL_READY  = Color3.fromRGB(0,  230, 80)    -- verde  (tira!)
     local COL_WARN   = Color3.fromRGB(255, 210, 0)    -- amarillo (casi)
     local COL_BAD    = Color3.fromRGB(220, 50,  50)   -- rojo (no conviene)
-    local COL_RING   = Color3.fromRGB(255, 200, 0)    -- amarillo (anillo - estilo FOV classico)
+    local COL_RING   = Color3.fromRGB(0,  200, 255)   -- azul neon (anillo)
 
-    -- Angulos del cono (optimizado: +-20 grados = 40 deg total, mas preciso)
-    local CONE_HALF_DEG = 20   -- grados a cada lado del centro
+    -- Angulos del cono (igual que la imagen: +-25 grados = 50 deg total)
+    local CONE_HALF_DEG = 25   -- grados a cada lado del centro
     local CONE_HALF_RAD = math.rad(CONE_HALF_DEG)
 
-    -- Radio visual del circulo en pixeles (mas grande = mas visible)
-    local RING_SIZE = 180
+    -- Radio visual del circulo en pixeles
+    local RING_SIZE = 160
 
     local function _ksaDestroyOverlay()
         if _ksaGui then
@@ -6593,7 +6593,7 @@ do
         -- Frame raiz: se posiciona debajo del personaje en el loop
         local root = Instance.new("Frame", gui)
         root.Name                 = "Root"
-        root.AnchorPoint          = Vector2.new(0.5, 0.5)  -- ancla en el centro del frame (para seguir el mouse)
+        root.AnchorPoint          = Vector2.new(0.5, 0)   -- ancla en el borde superior del frame, asi "cuelga" debajo del HRP
         root.BackgroundTransparency = 1
         root.Size                 = UDim2.new(0, RING_SIZE + 60, 0, RING_SIZE + 60)
         root.Position             = UDim2.new(0.5, 0, 0.5, 0)  -- posicion inicial; el loop la sobreescribe cada frame
@@ -6612,8 +6612,8 @@ do
         ringCorner.CornerRadius = UDim.new(1, 0)
         local ringStroke = Instance.new("UIStroke", ring)
         ringStroke.Color        = COL_RING
-        ringStroke.Thickness    = 2.0
-        ringStroke.Transparency = 0.05
+        ringStroke.Thickness    = 2.5
+        ringStroke.Transparency = 0.1
 
         -- ---- Cruz de miras (lineas horizontales) ----
         local function makeLine(parent, hor, size, offset)
@@ -6656,10 +6656,10 @@ do
             return lbl
         end
         makeLabel(root, "0°",    0.5, 1,   0.5, 0.00)   -- arriba centro
-        makeLabel(root, "20°",   1,   1,   0.21, 0.04)  -- arriba izq
-        makeLabel(root, "20°",   0,   1,   0.79, 0.04)  -- arriba der
-        makeLabel(root, "90°",   1,   0.5, 0.00, 0.5)   -- izquierda
-        makeLabel(root, "90°",   0,   0.5, 1.00, 0.5)   -- derecha
+        makeLabel(root, "25°",   1,   1,   0.21, 0.04)  -- arriba izq
+        makeLabel(root, "25°",   0,   1,   0.79, 0.04)  -- arriba der
+        makeLabel(root, "180°",  1,   0.5, 0.00, 0.5)   -- izquierda
+        makeLabel(root, "180°",  0,   0.5, 1.00, 0.5)   -- derecha
 
         -- ---- Canvas para el cono SVG-like con Frame triangular ----
         -- Dibujamos el cono como dos lineas desde el centro hacia el borde
@@ -6679,9 +6679,9 @@ do
         lineL.Size                 = UDim2.new(0, halfR - 4, 0, 2)
         lineL.Position             = UDim2.new(0.5, 0, 0.5, 0)
         lineL.BackgroundColor3     = COL_RING
-        lineL.BackgroundTransparency = 0.10
+        lineL.BackgroundTransparency = 0.15
         lineL.BorderSizePixel      = 0
-        lineL.Rotation             = -CONE_HALF_DEG  -- -20 deg (izquierda del 0)
+        lineL.Rotation             = -CONE_HALF_DEG  -- -25 deg (izquierda del 0)
         lineL.ZIndex               = 21
 
         local lineR = Instance.new("Frame", coneContainer)
@@ -6690,18 +6690,18 @@ do
         lineR.Size                 = UDim2.new(0, halfR - 4, 0, 2)
         lineR.Position             = UDim2.new(0.5, 0, 0.5, 0)
         lineR.BackgroundColor3     = COL_RING
-        lineR.BackgroundTransparency = 0.10
+        lineR.BackgroundTransparency = 0.15
         lineR.BorderSizePixel      = 0
-        lineR.Rotation             = CONE_HALF_DEG   -- +20 deg (derecha del 0)
+        lineR.Rotation             = CONE_HALF_DEG   -- +25 deg (derecha del 0)
         lineR.ZIndex               = 21
 
-        -- Punto central (crosshair del aim)
+        -- Punto central (personaje)
         local center = Instance.new("Frame", ring)
         center.Name                = "Center"
         center.AnchorPoint         = Vector2.new(0.5, 0.5)
-        center.Size                = UDim2.new(0, 5, 0, 5)
+        center.Size                = UDim2.new(0, 8, 0, 8)
         center.Position            = UDim2.new(0.5, 0, 0.5, 0)
-        center.BackgroundColor3    = Color3.fromRGB(255, 255, 255)
+        center.BackgroundColor3    = COL_RING
         center.BackgroundTransparency = 0
         center.BorderSizePixel     = 0
         center.ZIndex              = 23
@@ -6711,17 +6711,13 @@ do
         local targetDot = Instance.new("Frame", ring)
         targetDot.Name             = "TargetDot"
         targetDot.AnchorPoint      = Vector2.new(0.5, 0.5)
-        targetDot.Size             = UDim2.new(0, 12, 0, 12)
+        targetDot.Size             = UDim2.new(0, 10, 0, 10)
         targetDot.Position         = UDim2.new(0.5, 0, 0, 0)  -- arriba por defecto
         targetDot.BackgroundColor3 = COL_BAD
         targetDot.BackgroundTransparency = 0
         targetDot.BorderSizePixel  = 0
         targetDot.ZIndex           = 24
         Instance.new("UICorner", targetDot).CornerRadius = UDim.new(1,0)
-        local targetDotStroke = Instance.new("UIStroke", targetDot)
-        targetDotStroke.Color       = Color3.fromRGB(255,255,255)
-        targetDotStroke.Thickness   = 1.2
-        targetDotStroke.Transparency = 0.2
 
         -- Label de estado debajo del circulo
         local statusLbl = Instance.new("TextLabel", root)
@@ -6742,10 +6738,10 @@ do
         titleLbl.BackgroundTransparency = 1
         titleLbl.AnchorPoint      = Vector2.new(0.5, 1)
         titleLbl.Position         = UDim2.new(0.5, 0, 0, -2)
-        titleLbl.Size             = UDim2.new(0, 180, 0, 18)
-        titleLbl.Text             = "? KNIFE SA | FOV 40deg"
+        titleLbl.Size             = UDim2.new(0, 150, 0, 18)
+        titleLbl.Text             = "? KNIFE SILENT AIM"
         titleLbl.TextColor3       = COL_RING
-        titleLbl.TextSize         = 10
+        titleLbl.TextSize         = 11
         titleLbl.Font             = Enum.Font.GothamBold
         titleLbl.ZIndex           = 22
 
@@ -6765,21 +6761,15 @@ do
         return gui
     end
 
-    -- Loop de actualizacion del overlay (20 Hz - optimizado para no usar CPU innecesaria)
+    -- Loop de actualizacion del overlay (~20 Hz)
     local _ksaOverlayConn = nil
     local _ksaLastColor   = nil
-    local _ksaLoopTick    = 0  -- contador para throttle
 
     local function _ksaStartLoop(gui)
         local cam = workspace.CurrentCamera
         local rs  = game:GetService("RunService")
 
         _ksaOverlayConn = rs.Heartbeat:Connect(function()
-            -- Throttle: solo actualizar cada 3 frames (~20Hz en 60fps)
-            _ksaLoopTick = _ksaLoopTick + 1
-            if _ksaLoopTick < 3 then return end
-            _ksaLoopTick = 0
-
             if not KnifeSAState.enabled or not gui or not gui.Parent then
                 if _ksaOverlayConn then _ksaOverlayConn:Disconnect(); _ksaOverlayConn = nil end
                 return
@@ -6797,27 +6787,25 @@ do
                 return
             end
 
-            -- Posicionar el circulo centrado en el mouse (FOV circle clasico)
-            -- En mobile usa el centro de pantalla; en PC sigue el mouse
+            -- Posicionar el circulo debajo del personaje en pantalla
+            -- Usamos WorldToViewportPoint para convertir la posicion 3D del HRP a 2D
             do
                 local _cam = workspace.CurrentCamera
                 local _vp  = _cam.ViewportSize
-                local _isMobile = game:GetService("UserInputService").TouchEnabled
-                local _mx, _my
-                if _isMobile then
-                    -- Mobile: centro de pantalla
-                    _mx = _vp.X * 0.5
-                    _my = _vp.Y * 0.5
+                -- Punto de referencia: los pies del personaje (HRP.Position - Y del HRP)
+                -- Para obtener los "pies" bajamos un poco desde el HRP
+                local _feetPos = myHRP.Position - Vector3.new(0, 3.2, 0)
+                local _screenPos, _onScreen = _cam:WorldToViewportPoint(_feetPos)
+                if _onScreen then
+                    -- Convertir pixeles de viewport a escala 0-1 del ScreenGui
+                    local _sx = _screenPos.X / _vp.X
+                    local _sy = _screenPos.Y / _vp.Y
+                    -- Offset vertical: 20px extra debajo de los pies
+                    _ksaRefs._root.Position = UDim2.new(_sx, 0, _sy, 20)
                 else
-                    -- PC: posicion del mouse
-                    local _mpos = game:GetService("UserInputService"):GetMouseLocation()
-                    _mx = _mpos.X
-                    _my = _mpos.Y
+                    -- Personaje fuera de pantalla: ocultar overlay
+                    _ksaRefs._root.Position = UDim2.new(2, 0, 2, 0)  -- fuera de pantalla
                 end
-                -- Convertir pixeles a escala 0-1
-                local _sx = _mx / _vp.X
-                local _sy = _my / _vp.Y
-                _ksaRefs._root.Position = UDim2.new(_sx, 0, _sy, 0)
             end
 
             if not target or not target.Character then
@@ -6865,37 +6853,20 @@ do
             local absAngle = math.abs(angleDeg)
             local color, statusText, ringCol
 
-            -- Calcular distancia en pantalla del target al mouse (para From Mouse mode)
-            local _pxDist = 0
-            do
-                local _cam2 = workspace.CurrentCamera
-                local _vp2  = _cam2.ViewportSize
-                local _sp2  = _cam2:WorldToViewportPoint(tHRP.Position)
-                local _isMob2 = game:GetService("UserInputService").TouchEnabled
-                local _mx2, _my2
-                if _isMob2 then
-                    _mx2 = _vp2.X * 0.5; _my2 = _vp2.Y * 0.5
-                else
-                    local _mp2 = game:GetService("UserInputService"):GetMouseLocation()
-                    _mx2 = _mp2.X; _my2 = _mp2.Y
-                end
-                _pxDist = math.sqrt((_sp2.X - _mx2)^2 + (_sp2.Y - _my2)^2)
-            end
-
             if absAngle <= CONE_HALF_DEG then
                 -- Dentro del cono = VERDE = buena punteria!
                 color      = COL_READY
-                statusText = string.format("TIRAR! %.1f deg / %.0f studs", absAngle, dist)
+                statusText = string.format("? TIRAR! %.1f° / %.0f studs", absAngle, dist)
                 ringCol    = COL_READY
             elseif absAngle <= CONE_HALF_DEG * 2.5 then
                 -- Angulo medio = AMARILLO = casi
                 color      = COL_WARN
-                statusText = string.format("Casi... %.1f deg | %dpx", absAngle, math.floor(_pxDist))
+                statusText = string.format("? Casi... %.1f° / %.0f studs", absAngle, dist)
                 ringCol    = COL_WARN
             else
                 -- Muy desviado = ROJO = no conviene
                 color      = COL_BAD
-                statusText = string.format("Alejate %.1f deg | %.0f st", absAngle, dist)
+                statusText = string.format("? No tirar %.1f° / %.0f studs", absAngle, dist)
                 ringCol    = COL_RING
             end
 
