@@ -6655,11 +6655,11 @@ do
             lbl.ZIndex      = 22
             return lbl
         end
-        makeLabel(root, "0°",    0.5, 1,   0.5, 0.00)   -- arriba centro
-        makeLabel(root, "25°",   1,   1,   0.21, 0.04)  -- arriba izq
-        makeLabel(root, "25°",   0,   1,   0.79, 0.04)  -- arriba der
-        makeLabel(root, "180°",  1,   0.5, 0.00, 0.5)   -- izquierda
-        makeLabel(root, "180°",  0,   0.5, 1.00, 0.5)   -- derecha
+        makeLabel(root, "0?",    0.5, 1,   0.5, 0.00)   -- arriba centro
+        makeLabel(root, "25?",   1,   1,   0.21, 0.04)  -- arriba izq
+        makeLabel(root, "25?",   0,   1,   0.79, 0.04)  -- arriba der
+        makeLabel(root, "180?",  1,   0.5, 0.00, 0.5)   -- izquierda
+        makeLabel(root, "180?",  0,   0.5, 1.00, 0.5)   -- derecha
 
         -- ---- Canvas para el cono SVG-like con Frame triangular ----
         -- Dibujamos el cono como dos lineas desde el centro hacia el borde
@@ -6856,17 +6856,17 @@ do
             if absAngle <= CONE_HALF_DEG then
                 -- Dentro del cono = VERDE = buena punteria!
                 color      = COL_READY
-                statusText = string.format("? TIRAR! %.1f° / %.0f studs", absAngle, dist)
+                statusText = string.format("? TIRAR! %.1f? / %.0f studs", absAngle, dist)
                 ringCol    = COL_READY
             elseif absAngle <= CONE_HALF_DEG * 2.5 then
                 -- Angulo medio = AMARILLO = casi
                 color      = COL_WARN
-                statusText = string.format("? Casi... %.1f° / %.0f studs", absAngle, dist)
+                statusText = string.format("? Casi... %.1f? / %.0f studs", absAngle, dist)
                 ringCol    = COL_WARN
             else
                 -- Muy desviado = ROJO = no conviene
                 color      = COL_BAD
-                statusText = string.format("? No tirar %.1f° / %.0f studs", absAngle, dist)
+                statusText = string.format("? No tirar %.1f? / %.0f studs", absAngle, dist)
                 ringCol    = COL_RING
             end
 
@@ -38317,11 +38317,19 @@ function CreatePremiumTab()
             {
                 -- USP: grip reconstruido desde cero con angulos explicitos
                 name   = "usp",
-                meshId = "rbxassetid://111298369807853",
+                meshId = "rbxassetid://134394025639309",
                 texId  = "rbxassetid://129462008300983",
-                scale  = Vector3.new(0.035, 0.035, 0.035),
-                grip   = CFrame.new(-0.567565918, -0.124303818, -0.0424308777)
-                       * CFrame.Angles(0, math.rad(180), math.rad(90)),
+                scale  = Vector3.new(0.007, 0.007, 0.007),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
+                dualGun = true,
+            },
+            {
+                -- Scopeta
+                name   = "scopeta",
+                meshId = "rbxassetid://71470025203613",
+                texId  = "rbxassetid://131252913061296",
+                scale  = Vector3.new(0.007, 0.007, 0.007),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
                 dualGun = true,
             },
 
@@ -47896,7 +47904,7 @@ function CreateCombatTab()
 
         local function _dualMatchKeywords(tool, nameSet)
             if not tool then return false end
-            -- Comparacion de nombre EXACTO — no matchea nada con string.find parcial
+            -- Comparacion de nombre EXACTO ? no matchea nada con string.find parcial
             return nameSet[tool.Name] == true
         end
 
@@ -47914,7 +47922,7 @@ function CreateCombatTab()
         if _G._dualGunState   then _dualCleanState(_G._dualGunState)   end
         _G._dualKnifeState = _G._dualKnifeState or {}
         _G._dualGunState   = _G._dualGunState   or {}
-        -- Asegurar campos requeridos sin pisar enabled (puede venir de sesión anterior)
+        -- Asegurar campos requeridos sin pisar enabled (puede venir de sesi?n anterior)
         local function _dualEnsureFields(st)
             if st.isNextSlash  == nil then st.isNextSlash  = true  end
             if st.isAttacking  == nil then st.isAttacking  = false end
@@ -47926,7 +47934,7 @@ function CreateCombatTab()
 
         -- FIX AUTO SAFE: sincronizar .enabled desde _toggleStates guardado en disco.
         -- Sin esto, aunque _toggleStates["Dual Knife"] sea true tras cargar config,
-        -- el task.defer de reconstrucción no re-activa porque ks.enabled sigue nil.
+        -- el task.defer de reconstrucci?n no re-activa porque ks.enabled sigue nil.
         do
             local _ts = _G._toggleStates or {}
             if _ts["Dual Knife"] == true then
@@ -47983,7 +47991,7 @@ function CreateCombatTab()
                 local char = LocalPlayer.Character
                 if not char then return end
                 -- FIX: buscar la tool que matchea los keywords del modo activo,
-                -- NO la primera tool genérica (evita clonar la Gun cuando Dual Knife está activo)
+                -- NO la primera tool gen?rica (evita clonar la Gun cuando Dual Knife est? activo)
                 local tool = nil
                 for _, t in ipairs(char:GetChildren()) do
                     if t:IsA("Tool") and _dualMatchKeywords(t, keywordList) then
@@ -48020,14 +48028,14 @@ function CreateCombatTab()
                     local w = existing:FindFirstChild("MirrorWeld")
                     if w then
                         if keywordList == _dualGunKeywords then
-                            -- DUAL GUN: detección de agarre del HUB_celeste.
+                            -- DUAL GUN: detecci?n de agarre del HUB_celeste.
                             -- grip.C0/C1 del RightGrip ya refleja el skin aplicado
                             -- por _scApply (tool.Grip = skin.grip -> Roblox propaga al Motor6D).
                             local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
                             w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
                             w.C1 = grip.C1
                         else
-                            -- DUAL KNIFE: lógica original — skin knife override si aplica,
+                            -- DUAL KNIFE: l?gica original ? skin knife override si aplica,
                             -- fallback a grip.C0 espejado + C1 identidad.
                             local _usedSkinGrip = false
                             local sc = _G._skinChangerState
@@ -48093,7 +48101,7 @@ function CreateCombatTab()
                 local isDualKnife = (keywordList == _dualKnifeKeywords)
 
                 if isDualGun then
-                    -- DUAL GUN: detección de agarre del HUB_celeste.
+                    -- DUAL GUN: detecci?n de agarre del HUB_celeste.
                     -- grip.C0/C1 del RightGrip ya tiene el grip del skin activo.
                     local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
                     weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
@@ -48120,7 +48128,7 @@ function CreateCombatTab()
                         end
                     end)
                 else
-                    -- DUAL KNIFE: lógica original — skin knife override si aplica,
+                    -- DUAL KNIFE: l?gica original ? skin knife override si aplica,
                     -- fallback a grip.C0 espejado + C1 identidad.
                     local _usedSkinGrip = false
                     if isDualKnife then
@@ -48375,7 +48383,7 @@ function CreateCombatTab()
             _dkKillNativeSlash()
 
             local track = _dkAnimTracks[slot]
-            -- Si el track no existe o ya no es válido (tras respawn), recargar
+            -- Si el track no existe o ya no es v?lido (tras respawn), recargar
             if not _dkIsTrackValid(track) then
                 _dkAnimTracks = {}
                 _dkPreloadTracks()
@@ -48385,8 +48393,8 @@ function CreateCombatTab()
 
             if track.IsPlaying then
                 pcall(function() track:Stop(0) end)
-                -- FIX: eliminado _w() — introducía un yield que dejaba pasar la animación nativa
-                -- del servidor antes del Play. Stop(0) es instantáneo; no necesita espera.
+                -- FIX: eliminado _w() ? introduc?a un yield que dejaba pasar la animaci?n nativa
+                -- del servidor antes del Play. Stop(0) es instant?neo; no necesita espera.
             end
             -- Segunda pasada sin yield (atrapa lo que el servidor pudo disparar en este frame)
             _dkKillNativeSlash()
@@ -48700,7 +48708,7 @@ function CreateCombatTab()
 
         -- FIX TAB REBUILD: si los duales estaban activos cuando el tab se reconstruye,
         -- re-iniciar las conexiones ahora mismo (sin esperar que el usuario los toque).
-        -- Todas las funciones locales ya están declaradas en este punto.
+        -- Todas las funciones locales ya est?n declaradas en este punto.
         task.defer(function()
             local ks = _G._dualKnifeState
             local gs = _G._dualGunState
