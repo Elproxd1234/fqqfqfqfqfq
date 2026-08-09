@@ -1041,6 +1041,8 @@ local _autoRestoreOnReexec = {
     [" Bindable Secure Auto (boton pantalla)"] = true,
     ["Bindable Boton Booster"]               = true,
     ["Show Bindable Button (Speed Glitch)"]  = true,
+    -- FIX: Grab Gun bindable debe respetar el estado guardado al re-ejecutar
+    ["Grab Gun Bindable Button"]             = true,
 }
 
 -- Cargar configuracion guardada ANTES de crear la UI
@@ -32161,8 +32163,20 @@ function CreateWorldUI_AutoGrabGun()
     end
 
     -- TOGGLE: Grab Gun Bindable Button
+    -- FIX: sincronizar GrabState.bindable desde el estado guardado en disco antes de
+    -- pasar initialValue al toggle, para que no se active si el usuario lo desactivo.
+    -- WorldSystem.grab.bindable siempre arranca en false (recien inicializado), pero
+    -- _G._toggleStates ya tiene el valor real cargado por _loadConfig().
+    do
+        local _savedBindable = _G._toggleStates and _G._toggleStates["Grab Gun Bindable Button"]
+        if _savedBindable ~= nil then
+            GrabState.bindable = _savedBindable
+            WorldSystem.grab.bindable = _savedBindable
+        end
+    end
     CreateAuroraToggle(rightColumn, "Grab Gun Bindable Button", function(enabled)
         GrabState.bindable = enabled
+        WorldSystem.grab.bindable = enabled
         if enabled then
             MakeGrabBindableBtn()
             CreateCustomNotification("GRAB GUN", "Boton bindable creado", 2)
@@ -38557,45 +38571,28 @@ function CreatePremiumTab()
                     end
                 end
             end
-            -- SONIDO CUSTOM: si la skin tiene soundId, reproducirlo al disparar
-            if skin and skin.soundId and skin.soundId ~= "" then
-                local _sndHandle = tool:FindFirstChild("Handle")
-                if _sndHandle then
-                    -- Limpiar sonido anterior si existe
-                    local _oldSnd = _sndHandle:FindFirstChild("_SC_CustomShot")
-                    if _oldSnd then pcall(function() _oldSnd:Destroy() end) end
-                    -- Crear nuevo sonido
-                    local _snd = Instance.new("Sound", _sndHandle)
-                    _snd.Name = "_SC_CustomShot"
-                    _snd.SoundId = skin.soundId
-                    _snd.Volume = 1
-                    _snd.RollOffMaxDistance = 80
-                    -- Hookear Activated de la tool (disparo local, funciona en PC y mobile)
-                    local _sndConn
-                    _sndConn = tool.Activated:Connect(function()
-                        pcall(function()
-                            if _snd and _snd.Parent then
-                                _snd:Stop()
-                                _snd:Play()
-                            end
-                        end)
-                    end)
-                    -- Limpiar cuando la tool sale del char
-                    tool.AncestryChanged:Connect(function()
-                        if not tool.Parent then
-                            pcall(function() _sndConn:Disconnect() end)
-                            pcall(function() if _snd and _snd.Parent then _snd:Destroy() end end)
+            -- SONIDO CUSTOM: si la skin tiene soundId, reemplazar el Gunshot de la gun
+            pcall(function()
+                local _wsChar = workspace:FindFirstChild(LocalPlayer.Name)
+                local _harvester = _wsChar and _wsChar:FindFirstChild("Harvester")
+                local _sounds = _harvester and _harvester:FindFirstChild("Sounds")
+                local _gunshot = _sounds and _sounds:FindFirstChild("Gunshot")
+                if _gunshot and _gunshot:IsA("Sound") then
+                    if skin and skin.soundId and skin.soundId ~= "" then
+                        -- Guardar original si no lo hicimos ya
+                        if not _skinState._origGunshot then
+                            _skinState._origGunshot = _gunshot.SoundId
                         end
-                    end)
+                        _gunshot.SoundId = skin.soundId
+                    else
+                        -- Restaurar original
+                        if _skinState._origGunshot then
+                            _gunshot.SoundId = _skinState._origGunshot
+                            _skinState._origGunshot = nil
+                        end
+                    end
                 end
-            else
-                -- Si cambiamos a una skin sin sonido, limpiar el anterior
-                local _sndHandle2 = tool:FindFirstChild("Handle")
-                if _sndHandle2 then
-                    local _oldSnd2 = _sndHandle2:FindFirstChild("_SC_CustomShot")
-                    if _oldSnd2 then pcall(function() _oldSnd2:Destroy() end) end
-                end
-            end
+            end)
         end
 
         -- Oyente automatico
@@ -38621,56 +38618,49 @@ function CreatePremiumTab()
                 pcall(function() _skinState._charPickupConn:Disconnect() end)
                 _skinState._charPickupConn = nil
             end
+        end
 
-            -- FIX MOBILE: en celu la gun llega via DescendantAdded del workspace,
-            -- no necesariamente como ChildAdded del char. Usamos DescendantAdded
-            -- para capturar cualquier Tool que aparezca (gun en char o en workspace).
-            local function _scTryApplyGun()
-                if not _skinState.enabled or _skinState.mode ~= "gun" then return end  -- FIX: respetar modo
-                task.wait(0.15)
-                if not _skinState.enabled or _skinState.mode ~= "gun" then return end  -- re-check post-wait
-                -- FIX MOBILE: buscar tambien en workspace[playerName] ademas de char/backpack
-                local gun = _findGun and _findGun()
-                if not gun then
-                    local wsChar = workspace:FindFirstChild(LocalPlayer.Name)
-                    if wsChar then gun = _findGunIn and _findGunIn(wsChar) end
-                end
-                if gun then _scApply(gun, _scGetSkin(), true) end
+        -- FIX SCOPE: funciones movidas fuera del do para ser accesibles desde el selector
+        local function _scTryApplyGun()
+            if not _skinState.enabled or _skinState.mode ~= "gun" then return end
+            task.wait(0.15)
+            if not _skinState.enabled or _skinState.mode ~= "gun" then return end
+            local gun = _findGun and _findGun()
+            if not gun then
+                local wsChar = workspace:FindFirstChild(LocalPlayer.Name)
+                if wsChar then gun = _findGunIn and _findGunIn(wsChar) end
             end
+            if gun then _scApply(gun, _scGetSkin(), true) end
+        end
 
-            local function _scSetupListener(char)
-                -- Listener en el char (PC y mobile - tool equipada directamente)
-                if _skinState._charPickupConn then
-                    pcall(function() _skinState._charPickupConn:Disconnect() end)
+        local function _scSetupListener(char)
+            if _skinState._charPickupConn then
+                pcall(function() _skinState._charPickupConn:Disconnect() end)
+            end
+            _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    task.spawn(_scTryApplyGun)
                 end
-                _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
+            end)
+            if _skinState._wsConn then
+                pcall(function() _skinState._wsConn:Disconnect() end)
+            end
+            _skinState._wsConn = workspace.DescendantAdded:Connect(function(obj)
+                if not _skinState.enabled then return end
+                if obj:IsA("Tool") then
+                    local n = obj.Name:lower()
+                    if n:find("gun") or n == "gun" or n:find("sheriff") or n:find("revolver") then
                         task.spawn(_scTryApplyGun)
                     end
-                end)
-                -- Listener en DescendantAdded del workspace (mobile / MM2 gun model)
-                -- Solo re-aplicar si es una Tool que puede ser la gun.
-                -- FIX: guardamos la conexion para poder limpiarla al reconstruir el tab.
-                if _skinState._wsConn then
-                    pcall(function() _skinState._wsConn:Disconnect() end)
                 end
-                _skinState._wsConn = workspace.DescendantAdded:Connect(function(obj)
-                    if not _skinState.enabled then return end
-                    if obj:IsA("Tool") then
-                        local n = obj.Name:lower()
-                        if n:find("gun") or n == "gun" or n:find("sheriff") or n:find("revolver") then
-                            task.spawn(_scTryApplyGun)
-                        end
-                    end
-                end)
-                -- Re-check extra con delay por si la gun tarda en cargarse en mobile
-                -- FIX MOBILE v4: m?s delays cubre executors lentos (Delta, Arceus X)
-                task.delay(0.5,  _scTryApplyGun)
-                task.delay(1.2,  _scTryApplyGun)
-                task.delay(2.5,  _scTryApplyGun)
-                task.delay(4.0,  _scTryApplyGun)
-            end
+            end)
+            task.delay(0.5,  _scTryApplyGun)
+            task.delay(1.2,  _scTryApplyGun)
+            task.delay(2.5,  _scTryApplyGun)
+            task.delay(4.0,  _scTryApplyGun)
+        end
 
+        do
             local _scChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
             _scSetupListener(_scChar)
             _skinState._charConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
@@ -39006,7 +38996,7 @@ function CreatePremiumTab()
                 CreateCustomNotification("?? KNIFE SKIN", sel .. " aplicada!", 3)
             end)
         end  -- cierra do knife selector
-        end  -- cierra do skin changer
+    end  -- cierra do SKIN CHANGER (abierto en línea 38252)
     -- -- FIN SKIN CHANGER ------------------------------------------
 
     -- --------------------------------------------------------------------
@@ -39054,8 +39044,8 @@ function CreatePremiumTab()
             Settings.cursor.rotation.enabled = enabled
             if Settings.cursor.enabled then UpdateCustomCursor() end
         end, Settings.cursor.rotation and Settings.cursor.rotation.enabled or false)
-    end
     -- -- FIN CUSTOM MIRAS ------------------------------------------
+    end  -- cierra do CUSTOM MIRAS
 
 end  -- cierra CreatePremiumTab
 
