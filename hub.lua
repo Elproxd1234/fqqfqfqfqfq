@@ -18317,6 +18317,9 @@ function CreateMainUI_GameInfo()
             if not (_cpanel and _cpanel.Parent) then
                 _cpConn:Disconnect(); return
             end
+            -- Panel is hidden (Enabled=false); skip all work
+            local _cpSgRef = _cpanel.Parent and _cpanel.Parent.Parent
+            if _cpSgRef and not _cpSgRef.Enabled then return end
             _cpTick = _cpTick + 1
             if _cpTick < 6 then return end  -- ~10Hz
             _cpTick = 0
@@ -18658,8 +18661,13 @@ function CreateMainUI_GameInfo()
         -- -- Display loop: Heartbeat, redibuja solo cuando cambia el segundo o el rol
         -- -- Display loop: Heartbeat, redibuja solo cuando cambia el segundo
         -- FIX: solo muestra el TIEMPO (sin rol) en el overlay principal
+        local _hbTimerTick = 0
         local _hbConn = RunService.Heartbeat:Connect(function()
             if not lbl or not lbl.Parent then _hbConn:Disconnect(); return end
+            -- Throttle: timer updates every second, no need to run 60fps
+            _hbTimerTick = _hbTimerTick + 1
+            if _hbTimerTick < 8 then return end  -- ~7Hz, fine for 1s countdown
+            _hbTimerTick = 0
             if T.frozen then return end
             if not T.active then
                 if lbl.Text ~= "--:--" then
@@ -23438,11 +23446,16 @@ function _restoreBelowMapPose(char)
             pcall(function() _gBelowFloatConn:Disconnect() end)
             _gBelowFloatConn = nil
         end
-        _gBelowFloatConn = RunService.Heartbeat:Connect(function()
+        local _gBelowTick = 0
+        _gBelowFloatConn = RunService.Heartbeat:Connect(function(dt)
             if not _gFarmRunning or _autoFarmMode ~= "BelowMap" then
                 if _gBelowFloatConn then _gBelowFloatConn:Disconnect(); _gBelowFloatConn = nil end
                 return
             end
+            -- 10Hz is plenty for platform stand enforcement
+            _gBelowTick = _gBelowTick + dt
+            if _gBelowTick < 0.10 then return end
+            _gBelowTick = 0
             local c   = LocalPlayer.Character
             local h   = c and c:FindFirstChildOfClass("Humanoid")
             if h and h.Health > 0 then
@@ -23609,8 +23622,13 @@ function StartAutoFarm()
     local player = LocalPlayer
 
     -- Loop principal: solo firetouchinterest, sin mover el personaje en absoluto
-    _farmNcConn = RunService.Heartbeat:Connect(function()
+    local _farmNcTick = 0
+    _farmNcConn = RunService.Heartbeat:Connect(function(dt)
         if not _gFarmRunning then return end
+        -- Throttle: coin scan doesn't need 60fps
+        _farmNcTick = _farmNcTick + dt
+        if _farmNcTick < 0.10 then return end
+        _farmNcTick = 0
         local character = player.Character
         if not character then return end
         local rootPart = character:FindFirstChild("HumanoidRootPart")
@@ -32288,8 +32306,13 @@ function CreateWorldUI_FreezeCharacter()
         _freezeApplyTransparency(FS.transparency)
 
         if FS.heartConn then pcall(function() FS.heartConn:Disconnect() end) end
-        FS.heartConn = RunService.Heartbeat:Connect(function()
+        local _fsTick = 0
+        FS.heartConn = RunService.Heartbeat:Connect(function(dt)
             if not FS.enabled then return end
+            -- 20Hz is plenty for position lock (server reconciles anyway)
+            _fsTick = _fsTick + dt
+            if _fsTick < 0.05 then return end
+            _fsTick = 0
             local c = _freezeGetChar()
             if not c then return end
             local r = c:FindFirstChild("HumanoidRootPart")
@@ -56415,17 +56438,11 @@ particles = {}
         local _cornerDur  = 1.2
         local _cornerElapsed = 0
         local _cornerConn
-        _cornerConn = RunService.Heartbeat:Connect(function(dt)
-            _cornerElapsed = _cornerElapsed + dt
-            local t = math.min(_cornerElapsed / _cornerDur, 1)
-            local e = t < 0.5 and (2*t*t) or (1 - (-2*t+2)^2/2)
-            local radius = 0.5 * (1 - e)
-            _ovalCorner.CornerRadius = UDim.new(radius, 0)
-            if t >= 1 then
-                _ovalCorner.CornerRadius = UDim.new(0, 0)
-                _cornerConn:Disconnect()
-            end
-        end)
+        -- Replace manual per-frame corner tween with TweenService (zero CPU overhead)
+        _ovalCorner.CornerRadius = UDim.new(0.5, 0)
+        TweenService:Create(_ovalCorner, TweenInfo.new(_cornerDur, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+            CornerRadius = UDim.new(0, 0),
+        }):Play()
         TweenService:Create(_oval, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
             BackgroundColor3 = _loaderAccent,
             BackgroundTransparency = 0.05,
@@ -56488,11 +56505,16 @@ particles = {}
         local _barGradConn
         local _barGradOffset = 0
         local _barGradSpeed  = 0.35
+        local _barGradDt = 0
         _barGradConn = RunService.Heartbeat:Connect(function(dt)
             if not _barFill or not _barFill.Parent then
                 _barGradConn:Disconnect()
                 return
             end
+            -- Throttle: shimmer animation needs ~30Hz max, not 60fps
+            _barGradDt = _barGradDt + dt
+            if _barGradDt < 0.033 then return end
+            dt = _barGradDt; _barGradDt = 0
             _barGradOffset = (_barGradOffset + dt * _barGradSpeed) % 1
             local o = _barGradOffset
             local function lerpC(a, b, t) return Color3.new(a.R+(b.R-a.R)*t, a.G+(b.G-a.G)*t, a.B+(b.B-a.B)*t) end
