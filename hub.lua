@@ -18819,8 +18819,8 @@ function CreateMainUI_GameInfo()
                 _notifyRolState.gui = sg
             end
 
-            -- Heartbeat: usa GetPlayerRole(LocalPlayer) -- funcion canonica de Visuals
-            -- Nunca lee backpack/knife directamente (evita falso Murderer)
+            -- FIX: Solo actualiza cuando el rol REALMENTE cambia. No resetea _nrLastRole
+            -- durante la ronda (evita spam de Innocent/Murderer entre ticks).
             _nrLastRole = ""
             _hbTnr = 0
             _notifyRolState.conn = RunService.Heartbeat:Connect(function()
@@ -18829,74 +18829,74 @@ function CreateMainUI_GameInfo()
                 if _hbTnr < 30 then return end  -- ~2Hz
                 _hbTnr = 0
 
-                -- Ocultar label mientras el timer de ronda este corriendo (900s)
+                -- Ocultar label mientras el timer de ronda este corriendo
+                -- Solo actua UNA VEZ (cuando pasa de visible a oculto)
                 if _G._roundTimerRunning then
-                    pcall(function()
-                        local cg = game:GetService("CoreGui")
-                        local existingSgHide = cg:FindFirstChild("BYPAS_NotifyRol")
-                                           or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
-                        if existingSgHide then
-                            local pillHide = existingSgHide:FindFirstChild("Pill")
-                            local lblHide  = pillHide and pillHide:FindFirstChild("Display")
-                                          or existingSgHide:FindFirstChildOfClass("TextLabel")
-                            if lblHide and lblHide.Text ~= "" then
-                                -- Slide-out hacia arriba al ocultar (inverso del slide-down de entrada)
-                                local _ts4 = TweenService or game:GetService("TweenService")
-                                if pillHide then
-                                    _ts4:Create(pillHide, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                                        Position = UDim2.new(0.5, 0, 0.50, -30),
-                                        BackgroundTransparency = 1,
-                                    }):Play()
-                                    _ts4:Create(lblHide, TweenInfo.new(0.15), {TextTransparency = 1}):Play()
-                                    local stk = pillHide:FindFirstChildOfClass("UIStroke")
-                                    if stk then _ts4:Create(stk, TweenInfo.new(0.20), {Transparency = 1.0}):Play() end
-                                end
-                                task.delay(0.30, function() if lblHide then lblHide.Text = "" end end)
-                            end
-                        end
-                    end)
-                    _nrLastRole = ""  -- resetear para forzar refresh cuando el timer pare
-                    return
-                end
-
-                -- Usar _roleCache.localRole DIRECTAMENTE -- unico source-of-truth
-                -- seteado exclusivamente por el evento RoundStart del servidor
-                -- NUNCA GetPlayerRole(LocalPlayer) aqui: llama _refreshRoleCache
-                -- que puede ejecutar el fallback de knife/gun
-                role = _roleCache.localRole
-                if not role or role == "" or role == "Dead" then role = "Innocent" end
-
-                if role ~= _nrLastRole then
-                    _nrLastRole = role
-                    local cg = game:GetService("CoreGui")
-                    local existingSg = cg:FindFirstChild("BYPAS_NotifyRol")
-                                    or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
-                    if existingSg then
+                    if _nrLastRole ~= "__hidden__" then
                         pcall(function()
-                            local c2 = _roleColors[role] or Color3.fromRGB(200,200,200)
-                            -- Buscar label dentro del pill (nueva estructura) o directo (compatibilidad)
-                            local pill2 = existingSg:FindFirstChild("Pill")
-                            local lbl2 = pill2 and pill2:FindFirstChild("Display")
-                                      or existingSg:FindFirstChildOfClass("TextLabel")
-                            if lbl2 then
-                                lbl2.Text       = "ROL: " .. role:upper()
-                                lbl2.TextColor3 = c2
-                            end
-                            -- Actualizar color del stroke del pill
-                            local _ts3 = TweenService or game:GetService("TweenService")
-                            if pill2 then
-                                local stroke2 = pill2:FindFirstChildOfClass("UIStroke")
-                                if stroke2 then
-                                    _ts3:Create(stroke2, TweenInfo.new(0.3), {Color = c2}):Play()
+                            local cg = game:GetService("CoreGui")
+                            local existingSgHide = cg:FindFirstChild("BYPAS_NotifyRol")
+                                               or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
+                            if existingSgHide then
+                                local pillHide = existingSgHide:FindFirstChild("Pill")
+                                local lblHide  = pillHide and pillHide:FindFirstChild("Display")
+                                              or existingSgHide:FindFirstChildOfClass("TextLabel")
+                                if lblHide and lblHide.Text ~= "" then
+                                    local _ts4 = TweenService or game:GetService("TweenService")
+                                    if pillHide then
+                                        _ts4:Create(pillHide, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                                            Position = UDim2.new(0.5, 0, 0.50, -30),
+                                            BackgroundTransparency = 1,
+                                        }):Play()
+                                        _ts4:Create(lblHide, TweenInfo.new(0.15), {TextTransparency = 1}):Play()
+                                        local stk = pillHide:FindFirstChildOfClass("UIStroke")
+                                        if stk then _ts4:Create(stk, TweenInfo.new(0.20), {Transparency = 1.0}):Play() end
+                                    end
+                                    task.delay(0.30, function() if lblHide then lblHide.Text = "" end end)
                                 end
                             end
                         end)
-                    else
-                        _showRolOnScreen(role)
+                        _nrLastRole = "__hidden__"  -- marca: ya oculto, no volver a animar
                     end
+                    return
                 end
 
-                -- FIX: no recrear la GUI en cada tick, solo actualizar el texto existente
+                -- Fuera de ronda: si veniamos ocultos, limpiar la marca para permitir refresh
+                if _nrLastRole == "__hidden__" then _nrLastRole = "" end
+
+                -- Leer rol del cache (unico source-of-truth del servidor)
+                local role = _roleCache.localRole
+                if not role or role == "" or role == "Dead" then role = "Innocent" end
+
+                -- Salir si el rol es identico al que ya se muestra (evita spam)
+                if role == _nrLastRole then return end
+
+                -- Cambio real: actualizar texto y color
+                _nrLastRole = role
+                local cg = game:GetService("CoreGui")
+                local existingSg = cg:FindFirstChild("BYPAS_NotifyRol")
+                                or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
+                if existingSg then
+                    pcall(function()
+                        local c2 = _roleColors[role] or Color3.fromRGB(200,200,200)
+                        local pill2 = existingSg:FindFirstChild("Pill")
+                        local lbl2 = pill2 and pill2:FindFirstChild("Display")
+                                  or existingSg:FindFirstChildOfClass("TextLabel")
+                        if lbl2 then
+                            lbl2.Text       = "ROL: " .. role:upper()
+                            lbl2.TextColor3 = c2
+                        end
+                        local _ts3 = TweenService or game:GetService("TweenService")
+                        if pill2 then
+                            local stroke2 = pill2:FindFirstChildOfClass("UIStroke")
+                            if stroke2 then
+                                _ts3:Create(stroke2, TweenInfo.new(0.3), {Color = c2}):Play()
+                            end
+                        end
+                    end)
+                else
+                    _showRolOnScreen(role)
+                end
             end)
 
             -- Registrar callback de RoundStart para notificacion + actualizar overlay
@@ -18905,7 +18905,9 @@ function CreateMainUI_GameInfo()
             _roundStartRoleCallbacks[cbId] = function(role)
                 if not _notifyRolState.enabled then return end
                 if not role or role == "" then role = "Innocent" end
-                _nrLastRole = ""  -- forzar refresh
+                -- Actualizar _nrLastRole ANTES de mostrar para que el Heartbeat
+                -- no detecte un "cambio" adicional en el proximo tick
+                _nrLastRole = role
                 _showRolOnScreen(role)
                 if role == "Murderer" then
                     _playMurderSound()
