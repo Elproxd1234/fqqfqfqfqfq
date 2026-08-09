@@ -38331,6 +38331,7 @@ function CreatePremiumTab()
                 scale  = Vector3.new(0.007, 0.007, 0.007),
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
                 dualGun = true,
+                soundId = "rbxassetid://6012216349",
             },
 
         }
@@ -38554,6 +38555,45 @@ function CreatePremiumTab()
                             end)
                         end
                     end
+                end
+            end
+            -- SONIDO CUSTOM: si la skin tiene soundId, reproducirlo al disparar
+            if skin and skin.soundId and skin.soundId ~= "" then
+                local _sndHandle = tool:FindFirstChild("Handle")
+                if _sndHandle then
+                    -- Limpiar sonido anterior si existe
+                    local _oldSnd = _sndHandle:FindFirstChild("_SC_CustomShot")
+                    if _oldSnd then pcall(function() _oldSnd:Destroy() end) end
+                    -- Crear nuevo sonido
+                    local _snd = Instance.new("Sound", _sndHandle)
+                    _snd.Name = "_SC_CustomShot"
+                    _snd.SoundId = skin.soundId
+                    _snd.Volume = 1
+                    _snd.RollOffMaxDistance = 80
+                    -- Hookear Activated de la tool (disparo local, funciona en PC y mobile)
+                    local _sndConn
+                    _sndConn = tool.Activated:Connect(function()
+                        pcall(function()
+                            if _snd and _snd.Parent then
+                                _snd:Stop()
+                                _snd:Play()
+                            end
+                        end)
+                    end)
+                    -- Limpiar cuando la tool sale del char
+                    tool.AncestryChanged:Connect(function()
+                        if not tool.Parent then
+                            pcall(function() _sndConn:Disconnect() end)
+                            pcall(function() if _snd and _snd.Parent then _snd:Destroy() end end)
+                        end
+                    end)
+                end
+            else
+                -- Si cambiamos a una skin sin sonido, limpiar el anterior
+                local _sndHandle2 = tool:FindFirstChild("Handle")
+                if _sndHandle2 then
+                    local _oldSnd2 = _sndHandle2:FindFirstChild("_SC_CustomShot")
+                    if _oldSnd2 then pcall(function() _oldSnd2:Destroy() end) end
                 end
             end
         end
