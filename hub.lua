@@ -27540,6 +27540,15 @@ function CreateVisualsTab()
     -- Solo limpiar conexiones que el tab propio pudo haber creado en ejecuciones anteriores
     -- (trackerConn/_radarConn son conexiones del radar local, NO del instanceLoop global)
     _makeTwoColumns()
+    -- FIX VISUALS SCROLL: forzar que el scroll este habilitado al entrar a Visuals
+    if leftColumn then
+        pcall(function()
+            leftColumn.ScrollingEnabled = true
+            leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
+            leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
+            leftColumn.CanvasPosition = Vector2.new(0, 0)
+        end)
+    end
 
     _G.ESPState = _G.ESPState or {
         enabled = {},
@@ -32524,13 +32533,29 @@ function CreateWorldUI_AutoGrabGun()
             WorldSystem.notif.droppedConn = nil
 
             if on then
+                -- Helper: verifica si un objeto es hijo de un Character de jugador
+                local function _isInPlayerChar(obj)
+                    local par = obj.Parent
+                    if not par then return false end
+                    -- Tool directamente en un Character (par es el Model del personaje)
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and (par == p.Character or par.Parent == p.Character) then
+                            return true
+                        end
+                    end
+                    return false
+                end
+
                 -- Notificar cuando aparece la gun
                 _notifDropConn = workspace.DescendantAdded:Connect(function(obj)
                     if not WorldSystem.notif.droppedGun then return end
                     if not _GUN_NAMES[obj.Name] then return end
                     -- Verificar que sea un Tool o BasePart (no un folder interno)
                     if not (obj:IsA("Tool") or obj:IsA("BasePart") or obj:IsA("Model")) then return end
-                    -- Evitar spam: solo si el gun esta en workspace (no en un personaje)
+                    -- FIX: ignorar si la gun esta dentro del personaje de un jugador
+                    -- (Sheriff/Hero equipando su gun de rol al inicio de ronda)
+                    if _isInPlayerChar(obj) then return end
+                    -- Solo si el gun esta en workspace suelto (no en un personaje)
                     local par = obj.Parent
                     if par == workspace or (par and par.Parent == workspace) then
                         CreateCustomNotification(" GUN DROP", "!Aparecio una Gun en el mapa!", 4)
@@ -32551,6 +32576,8 @@ function CreateWorldUI_AutoGrabGun()
                     if not WorldSystem.notif.droppedGun then return end
                     if not _GUN_NAMES[obj.Name] then return end
                     if not (obj:IsA("Tool") or obj:IsA("BasePart") or obj:IsA("Model")) then return end
+                    -- FIX: ignorar si la gun viene de/va a un personaje (equip/unequip de rol)
+                    if _isInPlayerChar(obj) then return end
                     local par = obj.Parent
                     if par == workspace or (par and par.Parent == workspace) then
                         CreateCustomNotification(" GUN DROP", "La Gun fue recogida", 2)
@@ -32566,7 +32593,13 @@ function CreateWorldUI_AutoGrabGun()
         -- -- 2. Gun Pickup Notify --------------------------------------------
         -- Detecta cuando el LocalPlayer agarra la gun (Tool entra en su Character)
         -- y cuando la suelta, notificando en ambos casos.
+        -- FIX: Solo notifica si el jugador NO es Sheriff/Hero con su gun de rol,
+        -- o si la gun es un pickup real del suelo (GunDrop/DropGun).
         local _pickupConn = nil
+        -- Guns de rol nativas: el Sheriff/Hero las recibe al inicio de ronda, NO son pickup
+        local _ROLE_GUN_NAMES = {SheriffGun=true, HeroGun=true, Gun=true}
+        -- Solo estas son pickup real del suelo
+        local _DROP_GUN_NAMES = {GunDrop=true, DropGun=true}
 
         CreateAuroraToggle(rightColumn, "Gun Pickup Notify", function(on)
             WorldSystem.notif.gunPickupNotify = on
@@ -32579,6 +32612,13 @@ function CreateWorldUI_AutoGrabGun()
                     char.ChildAdded:Connect(function(obj)
                         if not WorldSystem.notif.gunPickupNotify then return end
                         if not (obj:IsA("Tool") and _GUN_NAMES[obj.Name]) then return end
+                        -- FIX: ignorar si es la gun nativa del rol Sheriff/Hero
+                        -- (SheriffGun, HeroGun, Gun asignada por el juego al inicio de ronda)
+                        local localRole = _roleCache and _roleCache.localRole or ""
+                        if _ROLE_GUN_NAMES[obj.Name] and
+                           (localRole == "Sheriff" or localRole == "Hero") then
+                            return  -- gun de rol, no es un pickup del suelo
+                        end
                         CreateCustomNotification(" GUN", "!Agarraste la Gun!", 3)
                         pcall(function()
                             local snd = Instance.new("Sound", workspace)
@@ -32592,6 +32632,12 @@ function CreateWorldUI_AutoGrabGun()
                     char.ChildRemoved:Connect(function(obj)
                         if not WorldSystem.notif.gunPickupNotify then return end
                         if not (obj:IsA("Tool") and _GUN_NAMES[obj.Name]) then return end
+                        -- FIX: ignorar cuando el Sheriff/Hero desequipa su gun de rol
+                        local localRole = _roleCache and _roleCache.localRole or ""
+                        if _ROLE_GUN_NAMES[obj.Name] and
+                           (localRole == "Sheriff" or localRole == "Hero") then
+                            return  -- desequipar gun de rol no es "soltar" el arma
+                        end
                         CreateCustomNotification(" GUN", "Soltaste la Gun", 2)
                     end)
                 end
@@ -37669,6 +37715,15 @@ function CreatePremiumTab()
     -- ================================================================
 
     _makeTwoColumns()
+    -- FIX PREMIUM SCROLL: forzar que el scroll este habilitado al entrar a Premium
+    if leftColumn then
+        pcall(function()
+            leftColumn.ScrollingEnabled = true
+            leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
+            leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
+            leftColumn.CanvasPosition = Vector2.new(0, 0)
+        end)
+    end
 
  CreateSection(leftColumn, "", "EXPERIMENTAL FEATURES", ThemeColors.Aurora3)
 
@@ -38996,7 +39051,7 @@ function CreatePremiumTab()
                 CreateCustomNotification("?? KNIFE SKIN", sel .. " aplicada!", 3)
             end)
         end  -- cierra do knife selector
-    end  -- cierra do SKIN CHANGER (abierto en línea 38252)
+    end  -- cierra do SKIN CHANGER (abierto en l?nea 38252)
     -- -- FIN SKIN CHANGER ------------------------------------------
 
     -- --------------------------------------------------------------------
