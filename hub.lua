@@ -38393,11 +38393,11 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- Scopeta
+                -- Scopeta (scale reducido: mesh tiene dimensiones internas grandes)
                 name   = "scopeta",
                 meshId = "rbxassetid://71470025203613",
                 texId  = "rbxassetid://131252913061296",
-                scale  = Vector3.new(0.007, 0.007, 0.007),
+                scale  = Vector3.new(0.0025, 0.0025, 0.0025),
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
                 dualGun = true,
                 soundId = "rbxassetid://6012216349",
