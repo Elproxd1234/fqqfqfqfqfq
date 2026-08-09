@@ -17976,20 +17976,46 @@ function CreateMainUI_GameInfo()
     do
         local _isMobile = _G._isMobileHub or false
 
-        -- Contenedor centrado sobre el contenido (dentro del wrapper para quedar sobre las columnas)
-        local _cpWrapper = contentContainer:FindFirstChild("TwoColumnWrapper") or contentContainer
         -- Limpiar panel previo si existe (re-open tab)
+        local _cpWrapper = contentContainer:FindFirstChild("TwoColumnWrapper") or contentContainer
         local _prevPanel = _cpWrapper:FindFirstChild("MainCenterPanel")
         if _prevPanel then _prevPanel:Destroy() end
+        -- Limpiar ScreenGui flotante anterior
+        pcall(function()
+            local cg = game:GetService("CoreGui")
+            local prev = cg:FindFirstChild("BYPAS_MainCenterPanel")
+                      or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_MainCenterPanel")
+            if prev then prev:Destroy() end
+        end)
 
-        local _cpanel = Instance.new("Frame", _cpWrapper)
+        -- ScreenGui flotante: panel fijo en la parte SUPERIOR de la pantalla
+        local _cpSg = Instance.new("ScreenGui")
+        _cpSg.Name = "BYPAS_MainCenterPanel"
+        _cpSg.ResetOnSpawn = false
+        _cpSg.IgnoreGuiInset = true
+        _cpSg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        _cpSg.DisplayOrder = 8500
+        pcall(function() _cpSg.Parent = game:GetService("CoreGui") end)
+        if not _cpSg.Parent then _cpSg.Parent = LocalPlayer.PlayerGui end
+
+        local _cpanel = Instance.new("Frame", _cpSg)
         _cpanel.Name = "MainCenterPanel"
+        -- Centrado horizontalmente, fijo 6px desde el borde superior de la pantalla
         _cpanel.AnchorPoint = Vector2.new(0.5, 0)
-        _cpanel.Position = UDim2.new(0.5, 0, 0, 2)
+        _cpanel.Position = UDim2.new(0.5, 0, 0, 6)
         _cpanel.BackgroundColor3 = Color3.fromRGB(5, 14, 30)
         _cpanel.BackgroundTransparency = 0.18
         _cpanel.BorderSizePixel = 0
         _cpanel.ZIndex = 60
+
+        -- Destruir el ScreenGui cuando el tab cambie o el hub se cierre
+        if contentContainer then
+            contentContainer.AncestryChanged:Connect(function(_, newParent)
+                if not newParent then
+                    pcall(function() _cpSg:Destroy() end)
+                end
+            end)
+        end
         Instance.new("UICorner", _cpanel).CornerRadius = UDim.new(0, 14)
 
         local _cpStroke = Instance.new("UIStroke", _cpanel)
