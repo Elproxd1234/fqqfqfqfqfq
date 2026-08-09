@@ -43011,12 +43011,84 @@ function CreateCombatTab()
             _G._ShootMurderBindable = _smBind
         end
 
-        -- Funcion central de un solo disparo (TP detras ? shoot ? TP vuelta)
+        -- ================================================================
+        -- SHOOT MURDER v2 (CORREGIDO)
+        -- Logica:
+        --   1. Verificar que sos Sheriff (tenes la gun equipada o en backpack)
+        --   2. TP detras del murder (bien posicionado mirando al murder)
+        --   3. Disparar via Silent Aim (FireServer con CFrames correctos)
+        --   4. Iniciar listener: cuando una bala/proyectil del murder se
+        --      acerque a tu HRP (<= 20 studs), TP de vuelta a savedCF
+        --   5. Si no detecta bala en 3s, TP de vuelta igualmente
+        -- ================================================================
         local _smCooldown = 0
+        local _smBulletConn = nil  -- conexion del listener de bala
+
+        -- Helper: detectar si somos Sheriff (tenemos gun equipada o en backpack)
+        local function _isSheriff()
+            local myChar = LocalPlayer.Character
+            local myBP   = LocalPlayer.Backpack
+            -- Verificar rol en cache del hub
+            if _roleCache and (_roleCache.localRole == "Sheriff" or _roleCache.localRole == "Hero") then
+                return true
+            end
+            -- Verificar por presencia de gun
+            if myChar then
+                local g = _findGunIn and _findGunIn(myChar)
+                if g then return true end
+            end
+            if myBP then
+                local g = _findGunIn and _findGunIn(myBP)
+                if g then return true end
+            end
+            return false
+        end
+
+        -- Helper: construir CFrames de disparo correctos para MM2
+        local function _buildShootCF(originPos, targetPos)
+            local dir = targetPos - originPos
+            if dir.Magnitude < 0.01 then return nil, nil end
+            local dirU = dir.Unit
+            local upV  = math.abs(dirU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
+            local oCF  = CFrame.lookAt(originPos, targetPos, upV)
+            local bkDir = (originPos - targetPos)
+            local bkU   = bkDir.Magnitude > 0.01 and bkDir.Unit or -dirU
+            local bkUp  = math.abs(bkU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
+            local tCF   = CFrame.lookAt(targetPos, targetPos + bkU, bkUp)
+            return oCF, tCF
+        end
+
+        -- Helper: TP seguro que tambien anula la velocidad
+        local function _safeTeleport(hrp, cf)
+            pcall(function()
+                hrp.CFrame = cf
+                hrp.AssemblyLinearVelocity  = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+            end)
+        end
+
+        -- Detener listener de bala activo
+        local function _stopBulletListener()
+            if _smBulletConn then
+                pcall(function() _smBulletConn:Disconnect() end)
+                _smBulletConn = nil
+            end
+        end
+
+        -- Funcion central de un solo disparo
         local function _doShootMurderOnce()
             local now = tick()
-            if now - _smCooldown < 0.6 then return end
+            if now - _smCooldown < 0.8 then return end
             _smCooldown = now
+
+            -- Detener listener anterior si quedo activo
+            _stopBulletListener()
+
+            -- === 1. VERIFICAR ROL SHERIFF ===
+            if not _isSheriff() then
+                CreateCustomNotification("SHOOT MURDER", "No eres Sheriff (sin gun).", 2)
+                return
+            end
 
             local myChar = LocalPlayer.Character
             local myHRP  = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -43025,6 +43097,7 @@ function CreateCombatTab()
                 CreateCustomNotification("SHOOT MURDER", "Sin personaje.", 2); return
             end
 
+            -- === 2. ENCONTRAR MURDER ===
             local murder = findMurderer and findMurderer()
             if not murder or not murder.Character then
                 CreateCustomNotification("SHOOT MURDER", "Murder no encontrado.", 2); return
@@ -43036,69 +43109,196 @@ function CreateCombatTab()
                 CreateCustomNotification("SHOOT MURDER", "Murder muerto.", 2); return
             end
 
-            -- Validar que la ronda este activa y el murder no este en lobby
+            -- Validar ronda activa
             if _G._betweenRounds or not _G._roundStartTime
             or (tick() - (_G._roundStartTime or 0)) < 1.5
             or mHRP.Position.Y > 70 then
                 CreateCustomNotification("SHOOT MURDER", "Ronda no activa.", 2); return
             end
 
-            -- Obtener gun equipada
+            -- === 3. OBTENER GUN (equipar si esta en backpack) ===
             local gun = _findGunIn and _findGunIn(myChar)
             if not gun then
-                CreateCustomNotification("SHOOT MURDER", "No tienes la gun equipada.", 2); return
+                -- Intentar equipar desde backpack
+                local gunBP = _findGunIn and _findGunIn(LocalPlayer.Backpack)
+                if gunBP then
+                    pcall(function() myHum:EquipTool(gunBP) end)
+                    task.wait(0.08)
+                    gun = _findGunIn and _findGunIn(myChar)
+                end
+            end
+            if not gun then
+                CreateCustomNotification("SHOOT MURDER", "No tienes gun disponible.", 2); return
             end
 
-            -- Guardar posicion original para el TP de vuelta
+            -- === 4. GUARDAR POSICION ORIGINAL ===
             local savedCF = myHRP.CFrame
 
-            -- TP detras del murder (4 studs atras de su LookVector)
-            local mCF = mHRP.CFrame
-            pcall(function()
-                myHRP.CFrame = CFrame.new(
-                    mCF.Position - mCF.LookVector * 4,
-                    mHRP.Position
-                )
-            end)
-            task.wait(0.12)
+            -- === 5. TP DETRAS DEL MURDER ===
+            -- Posicionarse 4 studs atras del murder, mirando hacia el murder
+            local mCF      = mHRP.CFrame
+            local behindPos = mCF.Position + mCF.LookVector * 4  -- detras segun donde mira el murder
+            -- Asegurarse de quedar a la misma altura del HRP del murder
+            behindPos = Vector3.new(behindPos.X, mHRP.Position.Y, behindPos.Z)
+            -- CFrame mirando al murder
+            local tpCF = CFrame.lookAt(behindPos, mHRP.Position)
+            _safeTeleport(myHRP, tpCF)
+            task.wait(0.10)
 
-            -- Disparar
-            local mHead  = murder.Character:FindFirstChild("Head") or mHRP
-            local shootRem = getShootRemote and getShootRemote(gun)
-            if shootRem and shootRem:IsA("RemoteEvent") then
-                local barrelAtt = getGunAttachment and getGunAttachment(gun, myHRP)
-                local _cam = workspace.CurrentCamera
-                local originPos = (barrelAtt and barrelAtt.WorldPosition)
-                               or (_cam and _cam.CFrame.Position)
-                               or (myHRP.Position + Vector3.new(0, 1.5, 0))
-                local aimPos = mHead.Position
-                local dir = aimPos - originPos
-                if dir.Magnitude > 0.01 then
-                    local up = math.abs(dir.Unit.Y) > 0.95 and Vector3.xAxis or Vector3.yAxis
-                    local oCF = CFrame.lookAt(originPos, aimPos, up)
-                    local bkDir = (originPos - aimPos)
-                    local bUp = math.abs(bkDir.Unit.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
-                    local tCF = CFrame.lookAt(aimPos, aimPos + bkDir.Unit, bUp)
-                    pcall(function() shootRem:FireServer(oCF, tCF) end)
-                    task.wait(0.05)
-                    pcall(function() shootRem:FireServer(oCF, tCF) end)
-                end
-            else
-                -- Fallback: metodo camara
-                local cam = _Camera
-                local origCamCF = cam and cam.CFrame
-                pcall(function() if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, mHead.Position) end end)
-                _fireGunMM2(gun)
-                task.wait(0.05)
-                _fireGunMM2(gun)
-                pcall(function() if cam and origCamCF then cam.CFrame = origCamCF end end)
+            -- Re-obtener referencias por si el murder se movio
+            mHRP = murder.Character and murder.Character:FindFirstChild("HumanoidRootPart")
+            if not mHRP then
+                _safeTeleport(myHRP, savedCF)
+                CreateCustomNotification("SHOOT MURDER", "Murder desaparecio.", 1.5); return
             end
 
-            CreateCustomNotification("SHOOT MURDER", "Disparado -> " .. murder.Name, 2)
-            task.wait(0.08)
+            -- === 6. DISPARAR CON SILENT AIM ===
+            local mHead = murder.Character:FindFirstChild("Head") or mHRP
+            local barrelAtt = getGunAttachment and getGunAttachment(gun, myHRP)
+            local _cam = workspace.CurrentCamera
+            local originPos = (barrelAtt and barrelAtt.WorldPosition)
+                           or (_cam and _cam.CFrame.Position)
+                           or (myHRP.Position + Vector3.new(0, 1.5, 0))
 
-            -- TP de vuelta a la posicion guardada
-            pcall(function() myHRP.CFrame = savedCF end)
+            -- Usar prediccion de posicion si esta activa (similar a _saGetTargetCF)
+            local aimPos = mHead.Position
+            if CombatTabState and CombatTabState.saUsePrediction and _unifiedBalisticSolver then
+                local tPart = mHead
+                local flags = {
+                    usePrediction = true,
+                    predictJump   = CombatTabState.saPredJump   or false,
+                    predictAccel  = CombatTabState.saPredAccel  or true,
+                    predictTrend  = CombatTabState.saPredTrend  or false,
+                    predictLag    = CombatTabState.saPredLag    or false,
+                    predictStrafe = CombatTabState.saPredStrafe or false,
+                }
+                local predicted = pcall(function()
+                    return _unifiedBalisticSolver(tPart, mHRP, flags, murder)
+                end)
+                if predicted and typeof(predicted) == "Vector3"
+                    and (predicted - mHRP.Position).Magnitude < 60 then
+                    aimPos = predicted
+                end
+            end
+
+            local oCF, tCF = _buildShootCF(originPos, aimPos)
+            local shootRem = getShootRemote and getShootRemote(gun)
+
+            if oCF and tCF and shootRem and shootRem:IsA("RemoteEvent") then
+                -- Disparar (doble disparo para mayor seguridad)
+                pcall(function() shootRem:FireServer(oCF, tCF) end)
+                task.wait(0.04)
+                -- Re-calcular por si se movio un poco
+                originPos = (barrelAtt and barrelAtt.WorldPosition)
+                         or (myHRP.Position + Vector3.new(0, 1.5, 0))
+                local mHead2 = murder.Character and murder.Character:FindFirstChild("Head")
+                if mHead2 then
+                    local oCF2, tCF2 = _buildShootCF(originPos, mHead2.Position)
+                    if oCF2 and tCF2 then
+                        pcall(function() shootRem:FireServer(oCF2, tCF2) end)
+                    end
+                end
+            elseif _fireGunMM2 then
+                -- Fallback via camara
+                local cam = _Camera
+                local origCamCF = cam and cam.CFrame
+                pcall(function()
+                    if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, mHead.Position) end
+                end)
+                _fireGunMM2(gun)
+                task.wait(0.04)
+                _fireGunMM2(gun)
+                pcall(function()
+                    if cam and origCamCF then cam.CFrame = origCamCF end
+                end)
+            end
+
+            CreateCustomNotification("SHOOT MURDER", "Bala redirigida -> " .. murder.Name, 2)
+
+            -- === 7. LISTENER: TP VUELTA CUANDO SE DETECTA BALA DEL MURDER ===
+            -- Monitorea proyectiles/bala que vengan hacia mi HRP.
+            -- Si alguna parte con nombre de bala/proyectil se acerca <= 15 studs, TP vuelta.
+            -- Fallback automatico a los 2.5 segundos.
+            local _listenStart = tick()
+            local _myHRPRef    = myHRP  -- captura por closure
+            local _savedCFRef  = savedCF
+
+            -- Callback que ejecuta el TP de vuelta (una sola vez)
+            local _tpBackDone = false
+            local function _doTpBack(reason)
+                if _tpBackDone then return end
+                _tpBackDone = true
+                _stopBulletListener()
+                _safeTeleport(_myHRPRef, _savedCFRef)
+                -- Pequena notificacion solo en modo debug (opcional)
+                -- CreateCustomNotification("SHOOT MURDER", "Vuelta: " .. (reason or ""), 1)
+            end
+
+            -- Bullet names tipicos de MM2 (proyectiles del servidor)
+            local _bulletKeywords = {
+                "bullet", "projectile", "proj", "shot", "pellet",
+                "Bullet", "Projectile", "Shot",
+            }
+            local function _isBulletPart(part)
+                if not part:IsA("BasePart") then return false end
+                local n = part.Name:lower()
+                for _, kw in ipairs(_bulletKeywords) do
+                    if n:find(kw:lower()) then return true end
+                end
+                return false
+            end
+
+            -- Heartbeat listener: revisa distancia de proyectiles + timeout
+            local _hbCount = 0
+            _smBulletConn = RunService.Heartbeat:Connect(function()
+                _hbCount = _hbCount + 1
+
+                -- Fallback timeout: 2.5 segundos
+                if tick() - _listenStart > 2.5 then
+                    _doTpBack("timeout")
+                    return
+                end
+
+                -- Solo chequear cada 3 frames (aprox 18Hz) para no cargar el hilo
+                if _hbCount % 3 ~= 0 then return end
+
+                if not _myHRPRef or not _myHRPRef.Parent then
+                    _doTpBack("hrp_lost")
+                    return
+                end
+
+                local myPos = _myHRPRef.Position
+
+                -- Buscar proyectiles en workspace que se acerquen
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if _isBulletPart(obj) then
+                        local dist = (obj.Position - myPos).Magnitude
+                        if dist <= 20 then
+                            -- Bala detectada cerca: TP de vuelta!
+                            _doTpBack("bullet_detected")
+                            return
+                        end
+                    end
+                end
+
+                -- Tambien chequear si el murder disparo (gun remote fired recientemente)
+                -- via el snap de velocidad del HRP del murder (bala generada)
+                if murder and murder.Character then
+                    local mHRP2 = murder.Character:FindFirstChild("HumanoidRootPart")
+                    if mHRP2 then
+                        -- Si el murder tiene velocity en direccion a mi posicion,
+                        -- y la distancia es chica, asumir bala en camino
+                        local mVel = mHRP2.AssemblyLinearVelocity or Vector3.zero
+                        local toMe = (myPos - mHRP2.Position)
+                        local dist2 = toMe.Magnitude
+                        -- Si el murder esta muy cerca (<8 studs) tp de vuelta igual
+                        if dist2 < 8 then
+                            _doTpBack("too_close")
+                            return
+                        end
+                    end
+                end
+            end)
         end
 
         -- Conectar BindableEvent a la misma funcion
