@@ -17941,30 +17941,101 @@ _gameInfoState = {
     pctGui         = nil,
 }
 
+-- Tabla de posiciones Y relativas por nombre de overlay (centrado en pantalla)
+-- Layout vertical centrado:
+--   Timer  -> 0.33 (arriba, un poco separado)
+--   ROL    -> 0.50 (centro exacto, manejado por NotifyRol aparte)
+--   Pct    -> 0.58 (justo debajo del ROL)
+local _overlayYScale = {
+    Timer = 0.33,
+    Pct   = 0.58,
+}
+
 function _createOverlayLabel(name, posY, textSize, font)
+    -- ==============================================================
+    -- OVERLAY FLOTANTE ANIMADO v3 - CENTRADO EN PANTALLA
+    -- Aparece desde arriba (slide-down) con fade-in suave.
+    -- Pill semi-transparente centrada horizontalmente.
+    -- posY ignorado: se usa _overlayYScale[name] para posicion relativa.
+    -- ==============================================================
     local pg = LocalPlayer:WaitForChild("PlayerGui")
     local sg = Instance.new("ScreenGui")
-    sg.Name = "BYPAS_" .. name
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 99
+    sg.Name            = "BYPAS_" .. name
+    sg.ResetOnSpawn    = false
+    sg.DisplayOrder    = 9900
+    sg.IgnoreGuiInset  = true
+    sg.ZIndexBehavior  = Enum.ZIndexBehavior.Global
     pcall(function() sg.Parent = game:GetService("CoreGui") end)
     if not sg.Parent then sg.Parent = pg end
 
-    local lbl = Instance.new("TextLabel", sg)
-    lbl.Name = "Display"
-    -- Esquina superior derecha, ancho compacto, posY en offset vertical
-    lbl.Size        = UDim2.new(0, 160, 0, textSize + 10)
-    lbl.AnchorPoint = Vector2.new(1, 0)
-    lbl.Position    = UDim2.new(1, -8, 0, posY)
+    local yScale    = _overlayYScale[name] or 0.50
+    local pillH     = textSize + 18
+    local pillW     = name == "Timer" and 200 or 180
+
+    -- Pill centrada horizontalmente, empieza 30px arriba de su posicion final
+    local pill = Instance.new("Frame", sg)
+    pill.Name                   = "Pill"
+    pill.Size                   = UDim2.new(0, pillW, 0, pillH)
+    pill.AnchorPoint            = Vector2.new(0.5, 0.5)
+    pill.Position               = UDim2.new(0.5, 0, yScale, -30)  -- empieza 30px arriba
+    pill.BackgroundColor3       = Color3.fromRGB(5, 12, 28)
+    pill.BackgroundTransparency = 1   -- empieza transparente
+    pill.BorderSizePixel        = 0
+    pill.ZIndex                 = 99
+    Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 12)
+
+    -- Borde brillante cyan
+    local stroke = Instance.new("UIStroke", pill)
+    stroke.Color           = Color3.fromRGB(0, 210, 255)
+    stroke.Thickness       = 1.5
+    stroke.Transparency    = 1.0   -- empieza invisible
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    -- Label de texto centrado dentro del pill
+    local lbl = Instance.new("TextLabel", pill)
+    lbl.Name                   = "Display"
+    lbl.Size                   = UDim2.new(1, 0, 1, 0)
+    lbl.Position               = UDim2.new(0, 0, 0, 0)
+    lbl.AnchorPoint            = Vector2.new(0, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text = ""
-    lbl.Font = font or Enum.Font.GothamBold
-    lbl.TextSize = textSize
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lbl.TextStrokeTransparency = 0.15
-    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    lbl.TextXAlignment = Enum.TextXAlignment.Right
-    lbl.ZIndex = 99
+    lbl.Text                   = ""
+    lbl.Font                   = font or Enum.Font.GothamBold
+    lbl.TextSize               = textSize
+    lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+    lbl.TextTransparency       = 1   -- empieza invisible (fade-in)
+    lbl.TextStrokeTransparency = 0.20
+    lbl.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
+    lbl.TextXAlignment         = Enum.TextXAlignment.Center
+    lbl.TextYAlignment         = Enum.TextYAlignment.Center
+    lbl.ZIndex                 = 100
+
+    -- Animacion de entrada: slide-down desde arriba + fade-in
+    local _ts = TweenService or game:GetService("TweenService")
+    local targetPos = UDim2.new(0.5, 0, yScale, 0)
+
+    task.spawn(function()
+        task.wait(0.05)
+        -- Slide-down + fade-in del fondo
+        _ts:Create(pill, TweenInfo.new(0.40, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Position               = targetPos,
+            BackgroundTransparency = 0.25,
+        }):Play()
+        -- Brillo del borde
+        _ts:Create(stroke, TweenInfo.new(0.40, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+            Transparency = 0.0,
+        }):Play()
+        -- Fade-in del texto un poco despues
+        task.wait(0.12)
+        _ts:Create(lbl, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            TextTransparency = 0,
+        }):Play()
+        task.wait(0.55)
+        -- Asentar el stroke a valor normal
+        _ts:Create(stroke, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+            Transparency = 0.35,
+        }):Play()
+    end)
+
     return sg, lbl
 end
 
@@ -17995,6 +18066,7 @@ function CreateMainUI_GameInfo()
         _cpSg.IgnoreGuiInset = true
         _cpSg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         _cpSg.DisplayOrder = 8500
+        _cpSg.Enabled = false  -- Panel superior oculto; los toggles muestran overlays flotantes propios
         pcall(function() _cpSg.Parent = game:GetService("CoreGui") end)
         if not _cpSg.Parent then _cpSg.Parent = LocalPlayer.PlayerGui end
 
@@ -18671,7 +18743,8 @@ function CreateMainUI_GameInfo()
                 local safeRole = (role and role ~= "") and role or "Innocent"
                 local color = _roleColors[safeRole] or Color3.fromRGB(200, 200, 200)
 
-                -- FIX: usar solo _roleCache.localRole, no leer UI del juego (puede dar rol incorrecto)
+                -- OVERLAY FLOTANTE ANIMADO: pill CENTRADO en pantalla, slide-down desde arriba
+                -- Posicion: Y=0.50 (centro) entre Timer(0.33) y Pct(0.58)
                 local sg = Instance.new("ScreenGui")
                 sg.Name            = "BYPAS_NotifyRol"
                 sg.ResetOnSpawn    = false
@@ -18681,29 +18754,65 @@ function CreateMainUI_GameInfo()
                 pcall(function() sg.Parent = game:GetService("CoreGui") end)
                 if not sg.Parent then sg.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-                -- Sin fondo -- solo texto centrado en pantalla
-                local lbl = Instance.new("TextLabel", sg)
-                lbl.Size                    = UDim2.new(0, 160, 0, 22)
-                lbl.AnchorPoint             = Vector2.new(1, 0)
-                lbl.Position                = UDim2.new(1, -8, 0, 42)
-                lbl.BackgroundTransparency  = 1
-                lbl.Text                    = "ROL: " .. safeRole:upper()
-                lbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
-                lbl.TextSize                = 14
-                lbl.TextColor3              = color
-                lbl.TextStrokeTransparency  = 0.15
-                lbl.TextStrokeColor3        = Color3.fromRGB(0, 0, 0)
-                lbl.TextXAlignment          = Enum.TextXAlignment.Right
-                lbl.TextYAlignment          = Enum.TextYAlignment.Center
-                lbl.ZIndex                  = 98
+                -- Pill centrada horizontalmente, empieza 30px arriba de su posicion final
+                local pill = Instance.new("Frame", sg)
+                pill.Name                   = "Pill"
+                pill.Size                   = UDim2.new(0, 200, 0, 40)
+                pill.AnchorPoint            = Vector2.new(0.5, 0.5)
+                pill.Position               = UDim2.new(0.5, 0, 0.50, -30)  -- arriba inicialmente
+                pill.BackgroundColor3       = Color3.fromRGB(5, 12, 28)
+                pill.BackgroundTransparency = 1
+                pill.BorderSizePixel        = 0
+                pill.ZIndex                 = 99
+                Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 12)
 
-                -- Pulso de color para llamar la atencion
+                local stroke = Instance.new("UIStroke", pill)
+                stroke.Color           = color
+                stroke.Thickness       = 1.8
+                stroke.Transparency    = 1.0   -- empieza invisible
+                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+                local lbl = Instance.new("TextLabel", pill)
+                lbl.Name                   = "Display"
+                lbl.Size                   = UDim2.new(1, 0, 1, 0)
+                lbl.Position               = UDim2.new(0, 0, 0, 0)
+                lbl.BackgroundTransparency = 1
+                lbl.Text                   = "ROL: " .. safeRole:upper()
+                lbl.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+                lbl.TextSize               = 18
+                lbl.TextColor3             = color
+                lbl.TextTransparency       = 1   -- empieza invisible
+                lbl.TextStrokeTransparency = 0.20
+                lbl.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
+                lbl.TextXAlignment         = Enum.TextXAlignment.Center
+                lbl.TextYAlignment         = Enum.TextYAlignment.Center
+                lbl.ZIndex                 = 100
+
+                -- Animacion de entrada: slide-down + fade-in
+                local _ts2 = TweenService or game:GetService("TweenService")
                 task.spawn(function()
-                    while lbl and lbl.Parent do
-                        TweenService:Create(lbl, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.4}):Play()
-                        task.wait(1)
-                        TweenService:Create(lbl, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
-                        task.wait(1)
+                    task.wait(0.05)
+                    -- Slide-down al centro exacto
+                    _ts2:Create(pill, TweenInfo.new(0.40, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                        Position               = UDim2.new(0.5, 0, 0.50, 0),
+                        BackgroundTransparency = 0.25,
+                    }):Play()
+                    _ts2:Create(stroke, TweenInfo.new(0.40, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                        Transparency = 0.0,
+                    }):Play()
+                    task.wait(0.12)
+                    _ts2:Create(lbl, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        TextTransparency = 0,
+                    }):Play()
+                    task.wait(0.55)
+                    _ts2:Create(stroke, TweenInfo.new(0.5), {Transparency = 0.30}):Play()
+
+                    -- Pulso suave del borde del color del rol
+                    while lbl and lbl.Parent and _notifyRolState.enabled do
+                        _ts2:Create(stroke, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.65}):Play()
+                        task.wait(1.4)
+                        _ts2:Create(stroke, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.05}):Play()
+                        task.wait(1.4)
                     end
                 end)
 
@@ -18727,8 +18836,23 @@ function CreateMainUI_GameInfo()
                         local existingSgHide = cg:FindFirstChild("BYPAS_NotifyRol")
                                            or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
                         if existingSgHide then
-                            local lblHide = existingSgHide:FindFirstChildOfClass("TextLabel")
-                            if lblHide and lblHide.Text ~= "" then lblHide.Text = "" end
+                            local pillHide = existingSgHide:FindFirstChild("Pill")
+                            local lblHide  = pillHide and pillHide:FindFirstChild("Display")
+                                          or existingSgHide:FindFirstChildOfClass("TextLabel")
+                            if lblHide and lblHide.Text ~= "" then
+                                -- Slide-out hacia arriba al ocultar (inverso del slide-down de entrada)
+                                local _ts4 = TweenService or game:GetService("TweenService")
+                                if pillHide then
+                                    _ts4:Create(pillHide, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                                        Position = UDim2.new(0.5, 0, 0.50, -30),
+                                        BackgroundTransparency = 1,
+                                    }):Play()
+                                    _ts4:Create(lblHide, TweenInfo.new(0.15), {TextTransparency = 1}):Play()
+                                    local stk = pillHide:FindFirstChildOfClass("UIStroke")
+                                    if stk then _ts4:Create(stk, TweenInfo.new(0.20), {Transparency = 1.0}):Play() end
+                                end
+                                task.delay(0.30, function() if lblHide then lblHide.Text = "" end end)
+                            end
                         end
                     end)
                     _nrLastRole = ""  -- resetear para forzar refresh cuando el timer pare
@@ -18749,11 +18873,22 @@ function CreateMainUI_GameInfo()
                                     or LocalPlayer.PlayerGui:FindFirstChild("BYPAS_NotifyRol")
                     if existingSg then
                         pcall(function()
-                            local lbl2 = existingSg:FindFirstChildOfClass("TextLabel")
+                            local c2 = _roleColors[role] or Color3.fromRGB(200,200,200)
+                            -- Buscar label dentro del pill (nueva estructura) o directo (compatibilidad)
+                            local pill2 = existingSg:FindFirstChild("Pill")
+                            local lbl2 = pill2 and pill2:FindFirstChild("Display")
+                                      or existingSg:FindFirstChildOfClass("TextLabel")
                             if lbl2 then
-                                local c2 = _roleColors[role] or Color3.fromRGB(200,200,200)
                                 lbl2.Text       = "ROL: " .. role:upper()
                                 lbl2.TextColor3 = c2
+                            end
+                            -- Actualizar color del stroke del pill
+                            local _ts3 = TweenService or game:GetService("TweenService")
+                            if pill2 then
+                                local stroke2 = pill2:FindFirstChildOfClass("UIStroke")
+                                if stroke2 then
+                                    _ts3:Create(stroke2, TweenInfo.new(0.3), {Color = c2}):Play()
+                                end
                             end
                         end)
                     else
@@ -18815,11 +18950,9 @@ function CreateMainUI_GameInfo()
 
         if not on then return end
 
-        sg, lbl = _createOverlayLabel("Pct", 68, 13, Enum.Font.GothamBold)
-        -- Label combinado: "MURDER% XX%" en una sola linea, esquina derecha
-        lbl.Size     = UDim2.new(0, 160, 0, 18)
-        lbl.Position = UDim2.new(1, -8, 0, 68)
-        lbl.TextSize = 13
+        sg, lbl = _createOverlayLabel("Pct", 68, 14, Enum.Font.GothamBold)
+        -- Centrado en pantalla (posicion definida por _overlayYScale.Pct = 0.58)
+        lbl.TextSize = 14
         _gameInfoState.pctGui = sg
 
         lastPct = "..."
