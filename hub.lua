@@ -6593,7 +6593,7 @@ do
         -- Frame raiz: se posiciona debajo del personaje en el loop
         local root = Instance.new("Frame", gui)
         root.Name                 = "Root"
-        root.AnchorPoint          = Vector2.new(0.5, 0)   -- ancla en el borde superior del frame, asi "cuelga" debajo del HRP
+        root.AnchorPoint          = Vector2.new(0.5, 0.5) -- centrado en los pies del personaje
         root.BackgroundTransparency = 1
         root.Size                 = UDim2.new(0, RING_SIZE + 60, 0, RING_SIZE + 60)
         root.Position             = UDim2.new(0.5, 0, 0.5, 0)  -- posicion inicial; el loop la sobreescribe cada frame
@@ -6801,7 +6801,7 @@ do
                     local _sx = _screenPos.X / _vp.X
                     local _sy = _screenPos.Y / _vp.Y
                     -- Offset vertical: 20px extra debajo de los pies
-                    _ksaRefs._root.Position = UDim2.new(_sx, 0, _sy, 20)
+                    _ksaRefs._root.Position = UDim2.new(_sx, 0, _sy, 0)
                 else
                     -- Personaje fuera de pantalla: ocultar overlay
                     _ksaRefs._root.Position = UDim2.new(2, 0, 2, 0)  -- fuera de pantalla
