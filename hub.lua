@@ -1509,7 +1509,7 @@ lastEvasionTime = 0
 
 function CreatePremiumToggle(parent, titleText, subtitleText, callback, defaultState)
     local mainFrame = Instance.new("Frame", parent)
-    mainFrame.Size = UDim2.new(1, 0, 0, subtitleText and subtitleText ~= "" and 44 or 36)
+    mainFrame.Size = UDim2.new(1, 0, 0, subtitleText and subtitleText ~= "" and 56 or 48)
     mainFrame.BackgroundTransparency = 1   -- sin fondo
     mainFrame.BorderSizePixel = 0
 
@@ -1530,7 +1530,7 @@ function CreatePremiumToggle(parent, titleText, subtitleText, callback, defaultS
 
     local titleLabel = Instance.new("TextLabel", mainFrame)
     titleLabel.Name = "Title"
-    titleLabel.Size = UDim2.new(1, -80, subtitleText and subtitleText ~= "" and 0.55 or 1, 0)
+    titleLabel.Size = UDim2.new(1, -100, subtitleText and subtitleText ~= "" and 0.55 or 1, 0)
     titleLabel.Position = UDim2.new(0, 12, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = titleText
@@ -1554,9 +1554,9 @@ function CreatePremiumToggle(parent, titleText, subtitleText, callback, defaultS
         subLabel.TextTruncate = Enum.TextTruncate.AtEnd
     end
 
-    local TRACK_W, TRACK_H = 80, 22
-    local THUMB_W, THUMB_H = 30, 16
-    local THUMB_PAD = 3
+    local TRACK_W, TRACK_H = 96, 30
+    local THUMB_W, THUMB_H = 38, 22
+    local THUMB_PAD = 4
 
     local track = Instance.new("Frame", mainFrame)
     track.Size = UDim2.new(0, TRACK_W, 0, TRACK_H)
