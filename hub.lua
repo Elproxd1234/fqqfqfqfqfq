@@ -54,6 +54,12 @@ if _G._hubScriptExecuted then
                    or _cg:FindFirstChild("f")
                    or (gethui and gethui():FindFirstChild("f"))
     if _existing then
+        -- FIX TAMAÑO REOPEN MOBILE: ajustar escala antes de reactivar
+        pcall(function()
+            local _mf = _existing:FindFirstChildOfClass("Frame") or (_existing:GetChildren()[1])
+            local _uiSc = _mf and _mf:FindFirstChildOfClass("UIScale")
+            if _uiSc and _getTargetScale then _uiSc.Scale = _getTargetScale() end
+        end)
         _existing.Enabled = true
         _G._hubHidden = false
         warn("[ZerqonHUB] Hub reactivado.")
@@ -55868,7 +55874,7 @@ _getHubSize = function()
 end
 
 uiScale = Instance.new("UIScale", mainFrame)
-uiScale.Scale = 1.0
+uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() de abajo
 
 -- ================================================================
 -- == ESCALA AUTOMATICA POR DISPOSITIVO
@@ -58238,11 +58244,8 @@ particles = {}
         mainFrame.Visible = true
         mainFrame.BackgroundTransparency = 1
         local uiScaleEntry = mainFrame:FindFirstChildOfClass("UIScale")
-        -- Aplicar hubScale guardado en settings (default 70%)
-        local _savedHubScale = (_G._hubSettings and _G._hubSettings.hubScale or 70) / 100
-        local _targetScale = _savedHubScale
         if uiScaleEntry then
-            uiScaleEntry.Scale = _targetScale  -- directo, sin animaci?n de escala
+            uiScaleEntry.Scale = _getTargetScale()  -- respeta mobile vs PC correctamente
         end
         task.wait(0)
 
@@ -58283,10 +58286,6 @@ particles = {}
 
         mainFrame.Visible = true
         mainFrame.BackgroundTransparency = 1
-        if mainFrame:FindFirstChildOfClass("UIScale") then
-            local _hs2 = _G._hubSettings and _G._hubSettings.hubScale or 70
-            mainFrame:FindFirstChildOfClass("UIScale").Scale = _hs2 / 100
-        end
         print("3: Hub completamente visible")
         -- AUTO-ABRIR MAIN al iniciar
         task.defer(function()
