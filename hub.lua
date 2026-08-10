@@ -4815,6 +4815,10 @@ function ApplyTheme(themeName)
                     _p = _p.Parent
                     if _p == mainFrame then break end
                 end
+                -- Saltar el fondo de imagen del hub (HubBackground): nunca remap su color
+                if objName == "HubBackground" then return end
+                -- Saltar el header rectangular del hub
+                if objName == "HubHeaderBar" then return end
 
                 if obj:IsA("Frame") or obj:IsA("ScrollingFrame") or obj:IsA("TextButton") or obj:IsA("ImageButton") then
                     -- Saltar botones de pestana protegidos
@@ -4890,6 +4894,21 @@ function ApplyTheme(themeName)
         if orb1 and orb1.Parent then TweenService:Create(orb1, ti, {BackgroundColor3 = newT.Aurora1}):Play() end
         if orb2 and orb2.Parent then TweenService:Create(orb2, ti, {BackgroundColor3 = newT.Aurora2}):Play() end
         if orb3 and orb3.Parent then TweenService:Create(orb3, ti, {BackgroundColor3 = newT.Aurora3}):Play() end
+    end)
+    -- Siempre restaurar el fondo de imagen del hub al final del tema
+    pcall(function()
+        local _bg = _G._hubBgMainImageRef
+        if not (_bg and _bg.Parent) then
+            _bg = mainFrame and mainFrame:FindFirstChild("HubBackground")
+            _G._hubBgMainImageRef = _bg
+        end
+        if _bg then
+            _bg.ImageTransparency = 0
+            _bg.ImageColor3 = Color3.new(1, 1, 1)
+        end
+        if mainFrame and mainFrame.Parent then
+            mainFrame.BackgroundTransparency = 1
+        end
     end)
 end
 
@@ -40104,8 +40123,8 @@ function CreateExclusiveTab()
                 do
                     dock.Position = UDim2.new(0.65, 0, 0.14, 0)
                     dock.Size = UDim2.new(0.35, 0, 0.86, 0)
-                    contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
-                    contentContainer.Size = UDim2.new(0.65, 0, 0.86, 0)
+                    contentContainer.Position = UDim2.new(0, 0, 0, 36)
+                    contentContainer.Size = UDim2.new(0.65, 0, 1, -36)
                     if dockLayout then
                         dockLayout.FillDirection       = Enum.FillDirection.Vertical
                         dockLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -40867,404 +40886,6 @@ function CreateExclusiveTab()
         end)
     end
 
-    -- ================================================================
-    -- CUSTOM COLOR PICKER CON SLIDER DE BRILLO
-    -- Permite cambiar el color base del hub via hex + slider claro/oscuro
-    -- ================================================================
-    do
-        local cpSec = CreateBorderedSectionGlobal(rightColumn, " COLOR PERSONALIZADO")
-
-        -- Estado interno del color picker
-        _G._hubSettings.customColorHex   = _G._hubSettings.customColorHex   or "FF0000"
-        _G._hubSettings.customColorBright = _G._hubSettings.customColorBright or 50  -- 0=oscuro, 100=claro
-
-        -- Funcion: convertir hex string a r,g,b (0-1)
-        local function hexToRGB(hex)
-            hex = hex:gsub("#",""):upper()
-            if #hex ~= 6 then return nil end
-            local r = tonumber(hex:sub(1,2),16)
-            local g = tonumber(hex:sub(3,4),16)
-            local b = tonumber(hex:sub(5,6),16)
-            if not (r and g and b) then return nil end
-            return r/255, g/255, b/255
-        end
-
-        -- Funcion: aplicar brillo (0=negro, 50=color puro, 100=blanco) a un Color3
-        local function applyBrightness(r, g, b, bright)
-            -- bright: 0..50 -> mezclar con negro; 50..100 -> mezclar con blanco
-            local t = bright / 100  -- 0..1
-            if t <= 0.5 then
-                -- oscuro: lerp de negro (t=0) a color puro (t=0.5)
-                local f = t / 0.5
-                return r*f, g*f, b*f
-            else
-                -- claro: lerp de color puro (t=0.5) a blanco (t=1)
-                local f = (t - 0.5) / 0.5
-                return r + (1-r)*f, g + (1-g)*f, b + (1-b)*f
-            end
-        end
-
-        -- Funcion: aplicar el color actual al hub usando ApplyTheme
-        local function _applyCustomColor()
-            local r, g, b = hexToRGB(_G._hubSettings.customColorHex)
-            if not r then
-                CreateCustomNotification("COLOR", "Hex invalido! Ej: FF0000", 2)
-                return
-            end
-            local bright = _G._hubSettings.customColorBright or 50
-
-            local function c3(cr, cg, cb)
-                return Color3.new(math.clamp(cr,0,1), math.clamp(cg,0,1), math.clamp(cb,0,1))
-            end
-
-            -- bright=50 -> color puro | bright<50 -> oscuro | bright>50 -> claro
-            local bR, bG, bB           = applyBrightness(r, g, b, bright)
-            -- Fondos: bastante mas oscuros
-            local darkR, darkG, darkB  = applyBrightness(r, g, b, math.max(4,  bright - 38))
-            -- Fondo intermedio (Secondary)
-            local midR,  midG,  midB   = applyBrightness(r, g, b, math.max(8,  bright - 25))
-            -- Acento: ligeramente mas brillante
-            local accR,  accG,  accB   = applyBrightness(r, g, b, math.min(96, bright + 12))
-            -- Aurora2: mas saturado/brillante
-            local a2R,   a2G,   a2B    = applyBrightness(r, g, b, math.min(98, bright + 20))
-            -- Aurora3: rosa/claro (badge, textos de acento)
-            local a3R,   a3G,   a3B    = applyBrightness(r, g, b, math.min(99, bright + 40))
-            -- Aurora4: muy claro, casi blanco tintado
-            local a4R,   a4G,   a4B    = applyBrightness(r, g, b, math.min(99, bright + 55))
-            -- Texto primario: siempre muy claro
-            local txR,   txG,   txB    = applyBrightness(r, g, b, math.min(99, bright + 60))
-            -- Texto secundario: claro pero un poco menos
-            local ts2R,  ts2G,  ts2B   = applyBrightness(r, g, b, math.min(97, bright + 48))
-
-            -- Construir el tema dinamico con todos los keys que ApplyTheme necesita
-            local dynamicTheme = {
-                Primary         = c3(bR,   bG,   bB),
-                Secondary       = c3(midR,  midG,  midB),
-                Accent          = c3(accR,  accG,  accB),
-                Background      = c3(darkR, darkG, darkB),
-                BackgroundLight = c3(midR,  midG,  midB),
-                TextPrimary     = c3(txR,   txG,   txB),
-                TextSecondary   = c3(ts2R,  ts2G,  ts2B),
-                Aurora1         = c3(bR,   bG,   bB),
-                Aurora2         = c3(a2R,  a2G,  a2B),
-                Aurora3         = c3(a3R,  a3G,  a3B),
-                Aurora4         = c3(a4R,  a4G,  a4B),
-            }
-
-            -- Registrar en Themes para que ApplyTheme lo encuentre
-            Themes["__CustomColor"] = dynamicTheme
-
-            -- Guardar transparencias ANTES del remap para restaurarlas despues
-            local _savedMainT    = mainFrame        and mainFrame.BackgroundTransparency
-            local _savedContentT = contentContainer and contentContainer.BackgroundTransparency
-
-            -- Guardar ImageColor3 de TODOS los ImageLabel/Button con imagen rbxassetid
-            -- para restaurarlos despues (ApplyTheme los corrompe a negro)
-            local _savedImgColors = {}
-            pcall(function()
-                if mainFrame and mainFrame.Parent then
-                    for _, obj in ipairs(mainFrame:GetDescendants()) do
-                        pcall(function()
-                            if (obj:IsA("ImageLabel") or obj:IsA("ImageButton"))
-                            and obj.Image ~= ""
-                            and obj.Image:find("rbxassetid://") then
-                                _savedImgColors[obj] = obj.ImageColor3
-                            end
-                        end)
-                    end
-                end
-            end)
-
-            -- Usar ApplyTheme: hace el remap completo sobre todos los descendants
-            ApplyTheme("__CustomColor")
-
-            -- ApplyTheme tweenea BackgroundColor3 pero puede corromper:
-            -- 1) Transparencias de mainFrame/contentContainer (quedan invisibles)
-            -- 2) ImageColor3 de ImageLabels con imagen rbxassetid (quedan negros/invisibles)
-            -- Restaurar todo en el siguiente frame.
-            task.defer(function()
-                pcall(function()
-                    if mainFrame and mainFrame.Parent then
-                        mainFrame.BackgroundTransparency = _savedMainT or 0.82
-                    end
-                    if contentContainer and contentContainer.Parent then
-                        contentContainer.BackgroundTransparency = _savedContentT or 0.55
-                        contentContainer.BackgroundColor3 = dynamicTheme.Background
-                    end
-                    -- Actualizar el borde del hub al nuevo color primario
-                    if glowBorder and glowBorder.Parent then
-                        glowBorder.Color = dynamicTheme.Primary
-                    end
-                    -- Actualizar el borde del contentContainer
-                    pcall(function()
-                        local _cc = mainFrame:FindFirstChild("ContentContainer")
-                        if _cc then
-                            local _st = _cc:FindFirstChildOfClass("UIStroke")
-                            if _st then _st.Color = dynamicTheme.Primary end
-                        end
-                    end)
-                    -- RESTAURAR ImageColor3 de todos los ImageLabels con rbxassetid.
-                    -- ApplyTheme los mapea al color mas cercano del tema (frecuentemente
-                    -- negro/oscuro), haciendo que las imagenes desaparezcan visualmente.
-                    for obj, savedColor in pairs(_savedImgColors) do
-                        pcall(function()
-                            if obj and obj.Parent then
-                                obj.ImageColor3 = savedColor
-                            end
-                        end)
-                    end
-                end)
-            end)
-
-            CreateCustomNotification("COLOR", "Color del hub actualizado!", 1.5)
-        end
-
-        -- ---- ROW: input hex + preview ----
-        local hexRow = Instance.new("Frame", cpSec)
-        hexRow.Name                   = "HexRow"
-        hexRow.Size                   = UDim2.new(1, -8, 0, 38)
-        hexRow.BackgroundTransparency = 1
-        hexRow.BorderSizePixel        = 0
-
-        -- Etiqueta HEX
-        local hexLbl = Instance.new("TextLabel", hexRow)
-        hexLbl.Size                   = UDim2.new(0, 32, 1, 0)
-        hexLbl.Position               = UDim2.new(0, 0, 0, 0)
-        hexLbl.BackgroundTransparency = 1
-        hexLbl.Text                   = "#"
-        hexLbl.TextColor3             = Color3.fromRGB(255, 255, 255)
-        hexLbl.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-        hexLbl.TextSize               = 13
-        hexLbl.ZIndex                 = 13
-
-        -- TextBox para el valor hex
-        local hexBox = Instance.new("TextBox", hexRow)
-        hexBox.Name                   = "HexInput"
-        hexBox.Size                   = UDim2.new(0, 82, 0, 30)
-        hexBox.Position               = UDim2.new(0, 18, 0.5, -15)
-        hexBox.BackgroundColor3       = Color3.fromRGB(30, 10, 15)
-        hexBox.BackgroundTransparency = 0.2
-        hexBox.BorderSizePixel        = 0
-        hexBox.Text                   = _G._hubSettings.customColorHex
-        hexBox.TextColor3             = Color3.fromRGB(255, 255, 255)
-        hexBox.PlaceholderText        = "FF0000"
-        hexBox.PlaceholderColor3      = Color3.fromRGB(160, 80, 80)
-        hexBox.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-        hexBox.TextSize               = 12
-        hexBox.ClearTextOnFocus       = false
-        hexBox.ZIndex                 = 14
-        Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
-        local hexBoxStroke = Instance.new("UIStroke", hexBox)
-        hexBoxStroke.Color     = ThemeColors.Primary
-        hexBoxStroke.Thickness = 1.5
-
-        -- Preview box (muestra el color actual con brillo aplicado)
-        local colorPreview = Instance.new("Frame", hexRow)
-        colorPreview.Name                   = "ColorPreview"
-        colorPreview.Size                   = UDim2.new(0, 30, 0, 30)
-        colorPreview.Position               = UDim2.new(0, 106, 0.5, -15)
-        colorPreview.BackgroundColor3       = Color3.fromRGB(255, 0, 0)
-        colorPreview.BackgroundTransparency = 0
-        colorPreview.BorderSizePixel        = 0
-        colorPreview.ZIndex                 = 13
-        Instance.new("UICorner", colorPreview).CornerRadius = UDim.new(0, 6)
-        Instance.new("UIStroke", colorPreview).Thickness = 1.5
-
-        -- Boton APLICAR
-        local applyBtn = Instance.new("TextButton", hexRow)
-        applyBtn.Name                   = "ApplyColorBtn"
-        applyBtn.Size                   = UDim2.new(0, 70, 0, 30)
-        applyBtn.Position               = UDim2.new(0, 142, 0.5, -15)
-        applyBtn.BackgroundColor3       = ThemeColors.Primary
-        applyBtn.BackgroundTransparency = 0.2
-        applyBtn.BorderSizePixel        = 0
-        applyBtn.Text                   = " Aplicar"
-        applyBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
-        applyBtn.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-        applyBtn.TextSize               = 11
-        applyBtn.AutoButtonColor        = false
-        applyBtn.ZIndex                 = 14
-        Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 6)
-        local applyStroke = Instance.new("UIStroke", applyBtn)
-        applyStroke.Color = ThemeColors.Primary; applyStroke.Thickness = 1.5
-
-        -- Funcion para actualizar el preview cuando cambia hex o brillo
-        local function _updatePreview()
-            local r, g, b = hexToRGB(hexBox.Text)
-            if not r then
-                colorPreview.BackgroundColor3 = Color3.fromRGB(60,20,20)
-                return
-            end
-            _G._hubSettings.customColorHex = hexBox.Text:upper():gsub("#","")
-            local bright = _G._hubSettings.customColorBright or 50
-            local fr, fg, fb = applyBrightness(r, g, b, bright)
-            colorPreview.BackgroundColor3 = Color3.new(math.clamp(fr,0,1), math.clamp(fg,0,1), math.clamp(fb,0,1))
-        end
-
-        -- Inicializar preview
-        _updatePreview()
-
-        hexBox.FocusLost:Connect(function()
-            local raw = hexBox.Text:upper():gsub("#",""):gsub("%s","")
-            if #raw == 6 then
-                hexBox.Text = raw
-                _G._hubSettings.customColorHex = raw
-                _updatePreview()
-            end
-        end)
-
-        applyBtn.MouseEnter:Connect(function()
-            TweenService:Create(applyBtn, TweenInfo.new(0.10), {BackgroundTransparency = 0}):Play()
-        end)
-        applyBtn.MouseLeave:Connect(function()
-            TweenService:Create(applyBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.2}):Play()
-        end)
-        applyBtn.Activated:Connect(function()
-            _updatePreview()
-            _applyCustomColor()
-        end)
-
-        -- ---- SLIDER DE BRILLO: Oscuro <-> Claro ----
-        local brightLabel = Instance.new("TextLabel", cpSec)
-        brightLabel.Size                   = UDim2.new(1, -8, 0, 18)
-        brightLabel.BackgroundTransparency = 1
-        brightLabel.Text                   = "Brillo: Oscuro  ?-------------?  Claro"
-        brightLabel.TextColor3             = Color3.fromRGB(200, 200, 220)
-        brightLabel.FontFace               = Font.fromEnum(Enum.Font.Gotham)
-        brightLabel.TextSize               = 10
-        brightLabel.TextXAlignment         = Enum.TextXAlignment.Left
-        brightLabel.ZIndex                 = 13
-        local _bPad = Instance.new("UIPadding", brightLabel)
-        _bPad.PaddingLeft = UDim.new(0, 2)
-
-        -- Track del slider de brillo (gradiente negro -> color -> blanco)
-        local brightTrackOuter = Instance.new("Frame", cpSec)
-        brightTrackOuter.Name                   = "BrightSliderOuter"
-        brightTrackOuter.Size                   = UDim2.new(1, -8, 0, 28)
-        brightTrackOuter.BackgroundTransparency = 1
-        brightTrackOuter.BorderSizePixel        = 0
-
-        local brightTrack = Instance.new("Frame", brightTrackOuter)
-        brightTrack.Name                   = "BrightTrack"
-        brightTrack.Size                   = UDim2.new(1, -20, 0, 12)
-        brightTrack.Position               = UDim2.new(0, 10, 0.5, -6)
-        brightTrack.BackgroundColor3       = Color3.fromRGB(30, 10, 15)
-        brightTrack.BackgroundTransparency = 0
-        brightTrack.BorderSizePixel        = 0
-        brightTrack.ZIndex                 = 12
-        Instance.new("UICorner", brightTrack).CornerRadius = UDim.new(1, 0)
-
-        -- Gradiente dentro del track (negro -> rojo -> blanco)
-        local brightGrad = Instance.new("UIGradient", brightTrack)
-        brightGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0,   0)),
-            ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
-        })
-        brightGrad.Rotation = 0
-
-        -- Thumb del slider
-        local initRatio = (_G._hubSettings.customColorBright or 50) / 100
-        local brightThumb = Instance.new("Frame", brightTrack)
-        brightThumb.Name              = "BrightThumb"
-        brightThumb.Size              = UDim2.new(0, 18, 0, 18)
-        brightThumb.AnchorPoint       = Vector2.new(0.5, 0.5)
-        brightThumb.Position          = UDim2.new(initRatio, 0, 0.5, 0)
-        brightThumb.BackgroundColor3  = Color3.fromRGB(255, 255, 255)
-        brightThumb.BorderSizePixel   = 0
-        brightThumb.ZIndex            = 14
-        Instance.new("UICorner", brightThumb).CornerRadius = UDim.new(1, 0)
-        local thumbStroke = Instance.new("UIStroke", brightThumb)
-        thumbStroke.Color = ThemeColors.Primary; thumbStroke.Thickness = 2
-
-        -- Label del valor de brillo
-        local brightValLbl = Instance.new("TextLabel", brightTrackOuter)
-        brightValLbl.Size                   = UDim2.new(0, 30, 1, 0)
-        brightValLbl.Position               = UDim2.new(1, -30, 0, 0)
-        brightValLbl.BackgroundTransparency = 1
-        brightValLbl.Text                   = tostring(_G._hubSettings.customColorBright or 50)
-        brightValLbl.TextColor3             = Color3.fromRGB(255, 255, 255)
-        brightValLbl.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-        brightValLbl.TextSize               = 10
-        brightValLbl.ZIndex                 = 13
-
-        -- Logica de drag del slider de brillo
-        local _brightDragging = false
-        local function _updateBrightSlider(inputX)
-            local trackAbsPos  = brightTrack.AbsolutePosition
-            local trackAbsSize = brightTrack.AbsoluteSize
-            local relX = math.clamp((inputX - trackAbsPos.X) / trackAbsSize.X, 0, 1)
-            local brightVal = math.floor(relX * 100 + 0.5)
-            _G._hubSettings.customColorBright = brightVal
-            brightThumb.Position = UDim2.new(relX, 0, 0.5, 0)
-            brightValLbl.Text    = tostring(brightVal)
-            -- Actualizar gradiente con el color hex actual
-            local r, g, b = hexToRGB(_G._hubSettings.customColorHex or "FF0000")
-            if r then
-                brightGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(math.floor(r*255), math.floor(g*255), math.floor(b*255))),
-                    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
-                })
-            end
-            _updatePreview()
-        end
-
-        brightTrack.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _brightDragging = true
-                _updateBrightSlider(inp.Position.X)
-            end
-        end)
-        brightTrack.InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _brightDragging = false
-            end
-        end)
-        brightThumb.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _brightDragging = true
-            end
-        end)
-        brightThumb.InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _brightDragging = false
-            end
-        end)
-        game:GetService("UserInputService").InputChanged:Connect(function(inp)
-            if _brightDragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
-            or inp.UserInputType == Enum.UserInputType.Touch) then
-                _updateBrightSlider(inp.Position.X)
-            end
-        end)
-
-        -- Hint de uso
-        local hintLbl = Instance.new("TextLabel", cpSec)
-        hintLbl.Size                   = UDim2.new(1, -8, 0, 16)
-        hintLbl.BackgroundTransparency = 1
-        hintLbl.Text                   = "  Escribe el hex > mueve el slider > presiona Aplicar"
-        hintLbl.TextColor3             = Color3.fromRGB(140, 140, 160)
-        hintLbl.FontFace               = Font.fromEnum(Enum.Font.Gotham)
-        hintLbl.TextSize               = 9
-        hintLbl.TextXAlignment         = Enum.TextXAlignment.Left
-        hintLbl.ZIndex                 = 13
-
-        -- Inicializar el gradiente con el color guardado
-        pcall(function()
-            local r, g, b = hexToRGB(_G._hubSettings.customColorHex or "FF0000")
-            if r then
-                brightGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(math.floor(r*255), math.floor(g*255), math.floor(b*255))),
-                    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
-                })
-            end
-        end)
-    end
 
     -- -- NOTIFICACIONES -------------------------------------------
     local notifSec = CreateBorderedSectionGlobal(rightColumn, " NOTIFICACIONES")
@@ -54189,7 +53810,8 @@ minimizeBtn.Activated:Connect(function()
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
                 end
                     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-                    mainFrame.BackgroundTransparency = 0.82
+                    mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
+                    pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
                 end
                 local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
                 if uiScale then uiScale.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
@@ -54462,7 +54084,8 @@ closeBtn.Activated:Connect(function()
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
                 end
                     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-                    mainFrame.BackgroundTransparency = 0.82
+                    mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
+                    pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
                 end
                 local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
                 if uiScale then
@@ -55775,7 +55398,8 @@ function abrirHub()
                 if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
             end
             mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-            mainFrame.BackgroundTransparency = 0.82
+            mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
+            pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
         end
         local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
         if uiScale then
@@ -55879,6 +55503,91 @@ mainFrame.ClipsDescendants = true
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================
+-- == FONDO PERSONALIZADO DEL HUB (imagen de fondo)
+-- ================================================================
+do
+    local hubBgImage = Instance.new("ImageLabel", mainFrame)
+    hubBgImage.Name = "HubBackground"
+    hubBgImage.Size = UDim2.new(1, 0, 1, 0)
+    hubBgImage.Position = UDim2.new(0, 0, 0, 0)
+    hubBgImage.AnchorPoint = Vector2.new(0, 0)
+    hubBgImage.ZIndex = 1
+    hubBgImage.Image = "rbxassetid://105280213845048"
+    hubBgImage.ImageTransparency = 0
+    hubBgImage.BackgroundTransparency = 1
+    hubBgImage.ScaleType = Enum.ScaleType.Crop
+    Instance.new("UICorner", hubBgImage).CornerRadius = UDim.new(0, 8)
+    -- Hacer el fondo del frame transparente para que solo se vea la imagen
+    mainFrame.BackgroundTransparency = 1
+    -- Guardar referencia global para que _applyHubBackground pueda acceder
+    _G._hubBgMainImageRef = hubBgImage
+end
+
+-- ================================================================
+-- == HEADER RECTANGULAR (barra de titulo encima del fondo)
+-- Queda encima de la imagen (ZIndex 2) pero debajo de todo el
+-- contenido (toggles ZIndex 20+), visible a traves del hub.
+-- ================================================================
+do
+    local _newHeader = Instance.new("Frame", mainFrame)
+    _newHeader.Name = "HubHeaderBar"
+    _newHeader.Size = UDim2.new(1, 0, 0, 36)
+    _newHeader.Position = UDim2.new(0, 0, 0, 0)
+    _newHeader.AnchorPoint = Vector2.new(0, 0)
+    _newHeader.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
+    _newHeader.BackgroundTransparency = 0.25
+    _newHeader.BorderSizePixel = 0
+    _newHeader.ZIndex = 2
+
+    local _nhCorner = Instance.new("UICorner", _newHeader)
+    _nhCorner.CornerRadius = UDim.new(0, 8)
+
+    local _nhStroke = Instance.new("UIStroke", _newHeader)
+    _nhStroke.Color = Color3.fromRGB(210, 85, 100)
+    _nhStroke.Thickness = 1.2
+    _nhStroke.Transparency = 0.3
+    _nhStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    -- Linea separadora inferior sutil
+    local _nhDivider = Instance.new("Frame", _newHeader)
+    _nhDivider.Name = "Divider"
+    _nhDivider.Size = UDim2.new(0.85, 0, 0, 1)
+    _nhDivider.Position = UDim2.new(0.075, 0, 1, -1)
+    _nhDivider.BackgroundColor3 = Color3.fromRGB(210, 85, 100)
+    _nhDivider.BackgroundTransparency = 0.5
+    _nhDivider.BorderSizePixel = 0
+    _nhDivider.ZIndex = 3
+
+    -- Punto decorativo izquierdo
+    local _nhDot = Instance.new("Frame", _newHeader)
+    _nhDot.Size = UDim2.new(0, 6, 0, 6)
+    _nhDot.Position = UDim2.new(0, 12, 0.5, -3)
+    _nhDot.BackgroundColor3 = Color3.fromRGB(255, 120, 140)
+    _nhDot.BackgroundTransparency = 0.1
+    _nhDot.BorderSizePixel = 0
+    _nhDot.ZIndex = 3
+    Instance.new("UICorner", _nhDot).CornerRadius = UDim.new(1, 0)
+
+    -- Titulo
+    local _nhTitle = Instance.new("TextLabel", _newHeader)
+    _nhTitle.Size = UDim2.new(0.7, 0, 1, 0)
+    _nhTitle.Position = UDim2.new(0.15, 0, 0, 0)
+    _nhTitle.BackgroundTransparency = 1
+    _nhTitle.Text = "Zerqon Hub"
+    _nhTitle.TextColor3 = Color3.fromRGB(255, 200, 210)
+    _nhTitle.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+    _nhTitle.TextSize = 14
+    _nhTitle.TextXAlignment = Enum.TextXAlignment.Center
+    _nhTitle.TextYAlignment = Enum.TextYAlignment.Center
+    _nhTitle.TextStrokeTransparency = 0.6
+    _nhTitle.TextStrokeColor3 = Color3.fromRGB(255, 100, 120)
+    _nhTitle.ZIndex = 3
+
+    -- Guardar referencia global por si se necesita referenciar
+    _G._hubHeaderBarRef = _newHeader
+end
+
+-- ================================================================
 -- == DETECCION DE DISPOSITIVO: PC vs CELULAR
 -- El frame base es SIEMPRE 750x420 (el contenido interno esta disenado
 -- para ese tama?o). En celular, UIScale lo reduce para que entre en
@@ -55955,9 +55664,24 @@ end
 -- == FIN GUARDIAN DE FORMA DEL HUB
 -- ================================================================
 
--- Fondo: sin imagen rbxassetid, fondo rosa limpio
-_G._hubBgMainImageRef = nil
-_G._applyHubBackground = function(id) end  -- stub de compatibilidad
+-- Fondo: referencia guardada en el bloque do de arriba; aplicar ID si se provee uno
+_G._applyHubBackground = function(id)
+    local ref = _G._hubBgMainImageRef
+    if not ref or not ref.Parent then
+        -- Intentar encontrarlo en mainFrame si la referencia se perdio
+        ref = mainFrame and mainFrame:FindFirstChild("HubBackground")
+        _G._hubBgMainImageRef = ref
+    end
+    if ref then
+        if id and id ~= "" then
+            ref.Image = id
+            ref.ImageTransparency = 0
+        else
+            ref.Image = "rbxassetid://105280213845048"
+            ref.ImageTransparency = 0
+        end
+    end
+end
 _G._hubWaveContainer = nil
 
 -- Borde del mainFrame activado (dise?o CustomBlueGui)
@@ -56669,20 +56393,20 @@ particles = {}
     -- ============================================================
     header = Instance.new("Frame", mainFrame)
     header.Name = "TopBar"
-    header.Size = UDim2.new(1, 0, 0.14, 8)
+    header.Size = UDim2.new(1, 0, 0, 36)
     header.Position = UDim2.new(0, 0, 0, 0)
-    header.BackgroundColor3 = Color3.fromRGB(115, 20, 32)  -- CAPYBARA: rojo oscuro
-    header.BackgroundTransparency = 0.05
+    header.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
+    header.BackgroundTransparency = 1  -- fondo del header invisible
     header.BorderSizePixel = 0
     header.ZIndex = 10
     header.Active = true
-    header.ClipsDescendants = true
+    header.ClipsDescendants = false  -- no recortar el boton de salida
     local _hdrCorner = Instance.new("UICorner", header)
     _hdrCorner.CornerRadius = UDim.new(0, 10)
     local _hdrStroke = Instance.new("UIStroke", header)
-    _hdrStroke.Color = Color3.fromRGB(145, 30, 45)  -- CAPYBARA: rojo logo
-    _hdrStroke.Thickness = 2
-    _hdrStroke.Transparency = 0
+    _hdrStroke.Color = Color3.fromRGB(145, 30, 45)
+    _hdrStroke.Thickness = 0  -- borde invisible
+    _hdrStroke.Transparency = 1
     _hdrStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- Contenedor centrado para los dos textos del header
@@ -56693,11 +56417,12 @@ particles = {}
     _hdCenter.BorderSizePixel = 0
     _hdCenter.ZIndex = 12
 
-    -- T?tulo principal centrado
+    -- T?tulo principal centrado (oculto)
     local _hdLabel = Instance.new("TextLabel", _hdCenter)
     _hdLabel.Size = UDim2.new(1, 0, 0.55, 0)
     _hdLabel.Position = UDim2.new(0, 0, 0.05, 0)
     _hdLabel.BackgroundTransparency = 1
+    _hdLabel.Visible = false
     _hdLabel.Text = "Murderer Mystery 2"
     _hdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     _hdLabel.FontFace = Font.fromEnum(Enum.Font.GothamBold)
@@ -56725,11 +56450,12 @@ particles = {}
         end
     end)
 
-    -- Subt?tulo centrado debajo del t?tulo
+    -- Subt?tulo centrado debajo del t?tulo (oculto)
     local _hdSub = Instance.new("TextLabel", _hdCenter)
     _hdSub.Size = UDim2.new(1, 0, 0.38, 0)
     _hdSub.Position = UDim2.new(0, 0, 0.60, 0)
     _hdSub.BackgroundTransparency = 1
+    _hdSub.Visible = false
     _hdSub.Text = "Zerqon Hub"
     _hdSub.TextColor3 = Color3.fromRGB(255, 190, 200)
     _hdSub.FontFace = Font.fromEnum(Enum.Font.Gotham)
@@ -57015,10 +56741,10 @@ particles = {}
     -- ContentContainer: panel izquierdo del hub (contenido de tabs)
     contentContainer = Instance.new("Frame", mainFrame)
     contentContainer.Name = "ContentContainer"
-    contentContainer.Size = UDim2.new(0.65, 0, 0.86, 8)
-    contentContainer.Position = UDim2.new(0, 0, 0.14, -8)
+    contentContainer.Size = UDim2.new(0.65, 0, 1, -36)
+    contentContainer.Position = UDim2.new(0, 0, 0, 36)
     contentContainer.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
-    contentContainer.BackgroundTransparency = 0.55
+    contentContainer.BackgroundTransparency = 1
     contentContainer.BorderSizePixel = 0
     contentContainer.ClipsDescendants = true
     contentContainer.ZIndex = 50
@@ -57397,8 +57123,8 @@ particles = {}
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
     tabDockFrame.BackgroundTransparency = 1
-    tabDockFrame.Position = UDim2.new(0.65, 0, 0.14, 0)
-    tabDockFrame.Size = UDim2.new(0.35, 0, 0.86, 0)
+    tabDockFrame.Position = UDim2.new(0.65, 0, 0, 36)
+    tabDockFrame.Size = UDim2.new(0.35, 0, 1, -36)
     tabDockFrame.Visible  = true
 
     local _dockStroke = Instance.new("UIStroke", tabDockFrame)
@@ -57433,8 +57159,8 @@ particles = {}
     dockPad.PaddingRight  = UDim.new(0, 0)
 
     -- Panel izquierdo: contentContainer (?rea de contenido de tabs)
-    contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
-    contentContainer.Size = UDim2.new(0.65, 0, 0.86, 0)
+    contentContainer.Position = UDim2.new(0, 0, 0, 36)
+    contentContainer.Size = UDim2.new(0.65, 0, 1, -36)
     contentContainer.Visible  = false
 
     -- Mismos colores que CreateAuroraToggle
@@ -57547,7 +57273,7 @@ particles = {}
             local wasVisible = contentContainer.Visible
             if not wasVisible then
                 contentContainer.Visible = true
-                contentContainer.Position = UDim2.new(0.02, 0, 0.16, 0)
+                contentContainer.Position = UDim2.new(0, 0, 0, 36)
             end
             SetActiveTab(i)
             _G._tabContentActive = true
@@ -57634,7 +57360,7 @@ particles = {}
             if fpsConn then fpsConn:Disconnect(); fpsConn = nil end
             if tabDockFrame then tabDockFrame.BackgroundTransparency = 1 end
             if contentContainer.Visible then
-                contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
+                contentContainer.Position = UDim2.new(0, 0, 0, 36)
             end
         else
             TweenService:Create(serverPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0, 20, 1.5, 0)}):Play()
@@ -57644,7 +57370,7 @@ particles = {}
             -- Restaurar dock de tabs
             if tabDockFrame then TweenService:Create(tabDockFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.55}):Play() end
             if contentContainer.Visible then
-                TweenService:Create(contentContainer, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.02, 0, 0.16, 0)}):Play()
+                TweenService:Create(contentContainer, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 36)}):Play()
             end
         end
     end
@@ -57925,7 +57651,6 @@ particles = {}
                 local _uiSF = mainFrame:FindFirstChildOfClass("UIScale")
                 if _uiSF then _uiSF.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
                 if header then header.Position = UDim2.new(0, 0, 0, 0) end
-                if sidebar then sidebar.Position = UDim2.new(0, 0, 0, 32) end
             end)
             _G._hubReady = true
             _G._hubAlreadyBuilt = true
@@ -57967,8 +57692,7 @@ particles = {}
             if _uiSR then
                 TweenService:Create(_uiSR, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = (_getTargetScale and _getTargetScale() or 0.70)}):Play()
             end
-            header.Position  = UDim2.new(0.02, 0, 0.02, 0)
-            sidebar.Position = UDim2.new(0, 0, 0, 32)
+            header.Position  = UDim2.new(0, 0, 0, 0)
             TweenService:Create(glowBorder, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Thickness = 0, Transparency = 1.0}):Play()
             _G._hubReady = true
             mainFrame.BackgroundTransparency = 1
@@ -57979,7 +57703,7 @@ particles = {}
                 _G._tabContentActive = false
                 -- AUTO-ABRIR MAIN al iniciar
                 contentContainer.Visible = true
-                contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
+                contentContainer.Position = UDim2.new(0, 0, 0, 36)
                 pcall(function() SetActiveTab(1) end)  -- 1 = MAIN
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo
             task.delay(0.6, function()
@@ -58358,8 +58082,7 @@ particles = {}
         end
         task.wait(0)
 
-        header.Position  = UDim2.new(0.02, 0, 0.02, 0)
-        sidebar.Position = UDim2.new(0, 0, 0, 32)
+        header.Position  = UDim2.new(0, 0, 0, 0)
 
         TweenService:Create(glowBorder, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
             Thickness = 0,
@@ -58405,7 +58128,7 @@ particles = {}
         task.defer(function()
             _G._tabContentActive = false
             contentContainer.Visible = true
-            contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
+            contentContainer.Position = UDim2.new(0, 0, 0, 36)
             pcall(function() SetActiveTab(1) end)  -- 1 = MAIN
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo.
             -- Si no habia ninguno guardado, aplicar Glitch (index 1) por defecto.
@@ -58470,7 +58193,6 @@ particles = {}
                 local _uiS = mainFrame:FindFirstChildOfClass("UIScale")
                 if _uiS then _uiS.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
                 if header then header.Position = UDim2.new(0, 0, 0, 0) end
-                if sidebar then sidebar.Position = UDim2.new(0, 0, 0, 32) end
             end)
             _G._hubReady = true
             _G._hubAlreadyBuilt = true
@@ -58480,7 +58202,7 @@ particles = {}
                 _G._tabContentActive = false
                 -- AUTO-ABRIR MAIN al iniciar
                 contentContainer.Visible = true
-                contentContainer.Position = UDim2.new(0, 0, 0.14, 0)
+                contentContainer.Position = UDim2.new(0, 0, 0, 36)
                 pcall(function() SetActiveTab(1) end)  -- 1 = MAIN
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo
             task.delay(0.6, function()
@@ -60035,11 +59757,12 @@ function CreateUseTab()
     do
         _G._hubBackgrounds = { current = 0 }
         _G._restoreBackground = nil
-        -- Limpiar cualquier fondo guardado de ejecuciones previas
+        -- Limpiar overlays/particulas de fondo de ejecuciones previas
+        -- (NO destruir "HubBackground": es la imagen principal rbxassetid del hub)
         pcall(function()
             if mainFrame then
                 for _, c in ipairs(mainFrame:GetChildren()) do
-                    if c.Name == "HubBackground" or c.Name == "HubBackgroundOverlay"
+                    if c.Name == "HubBackgroundOverlay"
                     or c.Name == "HubBgParticle" or c.Name == "HubBgFlash" then
                         c:Destroy()
                     end
