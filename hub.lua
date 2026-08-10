@@ -43747,8 +43747,16 @@ function CreateCombatTab()
                 if not _msCircleFrame or not _msCircleFrame.Parent then return end
 
                 -- Mover el circulito al cursor (siempre, visual smooth)
+                -- FIX: IgnoreGuiInset=true -> coordenadas absolutas de pantalla
+                -- GetMouseLocation() ya devuelve coordenadas sin inset, compensacion exacta via GuiService
                 local mPos = UserInputService:GetMouseLocation()
-                _msCircleFrame.Position = UDim2.new(0, mPos.X, 0, mPos.Y - 28)
+                local _guiInset = Vector2.new(0, 0)
+                pcall(function()
+                    local gs = game:GetService("GuiService")
+                    local inset = gs:GetGuiInset()
+                    _guiInset = Vector2.new(inset.X, inset.Y)
+                end)
+                _msCircleFrame.Position = UDim2.new(0, mPos.X, 0, mPos.Y - _guiInset.Y)
 
                 -- OPT LAG FIX: raycast hover check cada 2 frames (30Hz es suficiente para detectar hover)
                 _msLoopTick = _msLoopTick + 1; if _msLoopTick < 2 then return end; _msLoopTick = 0
@@ -55624,8 +55632,28 @@ uiScale.Scale = 1.0
 -- PC:      usa el slider hubScale (70-130%, default 130%).
 -- ================================================================
 _getTargetScale = function()
-    -- Escala fija 70% para todos los dispositivos (PC y Mobile)
-    return 0.70
+    -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
+    -- En PC usar escala fija agrandada (85%) para mejor visibilidad
+    local _vpNow = workspace.CurrentCamera.ViewportSize
+    local _isMobileNow = false
+    pcall(function()
+        local _uis = game:GetService("UserInputService")
+        _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
+    end)
+    if _isMobileNow then
+        -- Calcular escala para que el hub de 750px quepa con margen de 8px a cada lado
+        local _availW = _vpNow.X - 16
+        local _availH = _vpNow.Y - 16
+        local _scaleByW = _availW / 750
+        local _scaleByH = _availH / 420
+        -- Usar la escala mas pequena para que entre en ambas dimensiones
+        local _autoScale = math.min(_scaleByW, _scaleByH)
+        -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
+        return math.clamp(_autoScale, 0.45, 0.95)
+    else
+        -- PC: escala base 85% (mas grande que el 70% anterior)
+        return 0.85
+    end
 end
 do
     uiScale.Scale = _getTargetScale()
