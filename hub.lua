@@ -55819,7 +55819,7 @@ uiScale.Scale = 1.0
 -- ================================================================
 _getTargetScale = function()
     -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
-    -- En PC usar escala fija agrandada (85%) para mejor visibilidad
+    -- PC: usar hubScale guardado (slider 70-130%) para preservar tamaño al reabrir
     local _vpNow = workspace.CurrentCamera.ViewportSize
     local _isMobileNow = false
     pcall(function()
@@ -55837,7 +55837,13 @@ _getTargetScale = function()
         -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
         return math.clamp(_autoScale, 0.45, 0.95)
     else
-        -- PC: escala base 85% (mas grande que el 70% anterior)
+        -- FIX TAMAÑO REOPEN: usar hubScale guardado para que al cerrar y abrir
+        -- el hub mantenga el tamaño que el usuario habia configurado con el slider.
+        local _savedScale = _G._hubSettings and _G._hubSettings.hubScale
+        if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
+            return _savedScale / 100
+        end
+        -- Fallback: escala base 85% si no hay valor guardado
         return 0.85
     end
 end
