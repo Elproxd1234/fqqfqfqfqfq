@@ -29701,7 +29701,7 @@ end
 function CreateAuroraToggle(parent, nombre, callback, initialValue)
     local actualParent = _currentMainSectionFrame or parent
     local _trackedCol = (actualParent == leftColumn or (actualParent and actualParent.Parent == leftColumn)) and leftColumn or rightColumn
-    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 58
+    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 26
 
     _G._toggleStates = _G._toggleStates or {}
     local savedState = _G._toggleStates[nombre]
@@ -29732,19 +29732,18 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     local _knobOffL    = 4
     local _labelTxtSz  = 16
     local _labelWScale = 0.60
-    local _rowH        = 58
-    local _toggleRightOff = -8
+    local _rowH        = 26
+    local _toggleRightOff = -6
 
-    -- Marco principal ? fondo azul transl?cido con borde azul (dise?o foto)
+    -- Marco principal: fila compacta casi transparente, fondo barely visible
     local container = Instance.new("Frame", actualParent)
     container.Name                   = "AuroraToggleRow_" .. nombre
     container.Size                   = UDim2.new(1, 0, 0, _rowH)
-    container.BackgroundColor3       = Color3.fromRGB(180, 55, 70)  -- celeste
-    container.BackgroundTransparency = 0.78
+    container.BackgroundColor3       = Color3.fromRGB(30, 6, 10)
+    container.BackgroundTransparency = 0.55
     container.BorderSizePixel        = 0
     container.ZIndex                 = 20
-
-
+    -- Sin UICorner ni UIStroke en el row (imagen de referencia no tiene)
 
     -- Etiqueta de texto (mitad izquierda)
     local label = Instance.new("TextLabel", container)
@@ -29752,15 +29751,15 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     label.Position         = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text             = nombre
-    label.TextSize         = _labelTxtSz + 2
-    label.FontFace         = Font.fromEnum(Enum.Font.GothamBold)
+    label.TextSize         = 12
+    label.FontFace         = Font.fromEnum(Enum.Font.Gotham)
     label.TextColor3       = Color3.fromRGB(255, 255, 255)
     label.TextXAlignment   = Enum.TextXAlignment.Left
     label.TextYAlignment   = Enum.TextYAlignment.Center
     label.TextTruncate     = Enum.TextTruncate.AtEnd
     label.ZIndex           = 22
     label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
-    label.TextStrokeTransparency = 0.4
+    label.TextStrokeTransparency = 0.5
 
     -- Registro de traduccion
     if _LangObjects then
@@ -29771,38 +29770,28 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         end
     end
 
-    -- Fondo del toggle (recuadro grisaceo a la derecha)
+    -- Indicador cuadrado compacto directamente en el row (sin caja contenedora grande)
     local toggleBg = Instance.new("Frame", container)
     toggleBg.Name                   = "ToggleBackground"
-    toggleBg.Size                   = UDim2.new(0, _toggleBgW, 0, _toggleBgH)
+    toggleBg.Size                   = UDim2.new(0, 22, 0, 18)
     toggleBg.AnchorPoint            = Vector2.new(1, 0.5)
     toggleBg.Position               = UDim2.new(1, _toggleRightOff, 0.5, 0)
-    toggleBg.BackgroundColor3       = Color3.fromRGB(115, 20, 32)
-    toggleBg.BackgroundTransparency = 0.3
+    toggleBg.BackgroundColor3       = estado and Color3.fromRGB(0, 200, 80) or Color3.fromRGB(220, 30, 30)
+    toggleBg.BackgroundTransparency = 0
     toggleBg.BorderSizePixel        = 0
     toggleBg.ZIndex                 = 21
 
     local toggleBgCorner = Instance.new("UICorner", toggleBg)
-    toggleBgCorner.CornerRadius = UDim.new(0, 8)
+    toggleBgCorner.CornerRadius = UDim.new(0, 4)
 
     local toggleBgStroke = Instance.new("UIStroke", toggleBg)
-    toggleBgStroke.Color = Color3.fromRGB(145, 30, 45)
-    toggleBgStroke.Thickness = 1.5
-    toggleBgStroke.Transparency = 0
+    toggleBgStroke.Color = Color3.fromRGB(255, 255, 255)
+    toggleBgStroke.Thickness = 1
+    toggleBgStroke.Transparency = 0.6
     toggleBgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-    -- Indicador cuadrado redondeado (rojo=off, verde=on)
-    local indicator = Instance.new("Frame", toggleBg)
-    indicator.Name             = "Knob"
-    indicator.Size             = UDim2.new(0, _knobSize, 0, _knobSize)
-    indicator.AnchorPoint      = Vector2.new(0, 0.5)
-    indicator.Position         = estado and UDim2.new(1, _knobOffR, 0.5, 0) or UDim2.new(0, _knobOffL, 0.5, 0)
-    indicator.BackgroundColor3 = estado and C_IND_ON or C_IND_OFF
-    indicator.BorderSizePixel  = 0
-    indicator.ZIndex           = 23
-
-    local indCorner = Instance.new("UICorner", indicator)
-    indCorner.CornerRadius = UDim.new(0, 6)
+    -- Knob = mismo frame (el indicador ES el toggleBg en este estilo)
+    local indicator = toggleBg
 
     -- Boton invisible sobre todo el row
     local clickRow = Instance.new("TextButton", container)
@@ -29814,14 +29803,14 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
 
     -- Funcion de actualizacion visual
     local function ApplyState(on, animate)
+        local _onColor  = Color3.fromRGB(0, 200, 80)
+        local _offColor = Color3.fromRGB(220, 30, 30)
         if animate then
             TweenService:Create(indicator, TWEEN_T, {
-                BackgroundColor3 = on and C_IND_ON or C_IND_OFF,
-                Position = on and UDim2.new(1, _knobOffR, 0.5, 0) or UDim2.new(0, _knobOffL, 0.5, 0),
+                BackgroundColor3 = on and _onColor or _offColor,
             }):Play()
         else
-            indicator.BackgroundColor3 = on and C_IND_ON or C_IND_OFF
-            indicator.Position = on and UDim2.new(1, _knobOffR, 0.5, 0) or UDim2.new(0, _knobOffL, 0.5, 0)
+            indicator.BackgroundColor3 = on and _onColor or _offColor
         end
     end
     -- FIX AUTO-RESTORE VISUAL: exponer ApplyState globalmente para que el
@@ -29833,10 +29822,10 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     -- Hover: resaltar fondo del container
     local _hoverTi = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     clickRow.MouseEnter:Connect(function()
-        TweenService:Create(container, _hoverTi, {BackgroundTransparency = 0.25}):Play()
+        TweenService:Create(container, _hoverTi, {BackgroundTransparency = 0.30}):Play()
     end)
     clickRow.MouseLeave:Connect(function()
-        TweenService:Create(container, _hoverTi, {BackgroundTransparency = 0.5}):Play()
+        TweenService:Create(container, _hoverTi, {BackgroundTransparency = 0.55}):Play()
     end)
     -- Logica de toggle
     local function doToggle()
