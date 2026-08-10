@@ -9604,7 +9604,7 @@ function CreateNebulaSelector(parent, titulo, opciones, default, callback)
     local TWEEN_CLOSE = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 
     local ROW_H    = 30
-    local HEADER_H = 40
+    local HEADER_H = 58
     local GAP      = 4
     local MAX_ROWS = 5
 
@@ -9614,7 +9614,7 @@ function CreateNebulaSelector(parent, titulo, opciones, default, callback)
     -- Fondo cabecera: Secondary del hub
     local masterFrame = Instance.new("Frame", parent)
     masterFrame.Name             = "NebulaSelector_" .. titulo
-    masterFrame.Size             = UDim2.new(1, -4, 0, HEADER_H)
+    masterFrame.Size             = UDim2.new(1, 0, 0, HEADER_H)
     masterFrame.AutomaticSize    = Enum.AutomaticSize.None
     masterFrame.BackgroundColor3 = Color3.fromRGB(6, 10, 30)
     masterFrame.BackgroundTransparency = 0.05
@@ -9917,7 +9917,7 @@ function CreatePredSelector(parent, titulo, opciones, default, callback)
 
     local BTN_H      = 34
     local OPT_H      = 36
-    local HEADER_H   = 42
+    local HEADER_H   = 58
 
     local selectedValue = default or opciones[1]
     local isOpen        = false
@@ -9925,7 +9925,7 @@ function CreatePredSelector(parent, titulo, opciones, default, callback)
     -- -- HEADER CONTAINER ----------------------------------------------------
     local headerFrame = Instance.new("Frame", parent)
     headerFrame.Name                   = "PredSelector_" .. titulo
-    headerFrame.Size                   = UDim2.new(1, -4, 0, HEADER_H)
+    headerFrame.Size                   = UDim2.new(1, 0, 0, HEADER_H)
     headerFrame.BackgroundColor3       = COL_BG_HEADER
     headerFrame.BackgroundTransparency = 0.15
     headerFrame.BorderSizePixel        = 0
@@ -12358,12 +12358,12 @@ function CreateSlider(parent, nombre, minVal, maxVal, defaultVal, callback, step
     local C_TRACK_FG = Color3.fromRGB(120, 170, 255)    -- fill iluminado
     local C_THUMB    = Color3.fromRGB(255, 255, 255)    -- knob blanco
     local C_VALBG    = Color3.fromRGB(6, 10, 30)         -- fondo value box oscuro
-    local CONTAINER_H = 46
+    local CONTAINER_H = 58
 
     -- Marco principal azul translucido
     local container = Instance.new("Frame", actualParent)
     container.Name                   = "SliderWrapper_" .. nombre
-    container.Size                   = UDim2.new(1, -4, 0, CONTAINER_H)
+    container.Size                   = UDim2.new(1, 0, 0, CONTAINER_H)
     container.BackgroundColor3       = C_BG_MAIN
     container.BackgroundTransparency = 0.05
     container.BorderSizePixel        = 0
@@ -27867,26 +27867,7 @@ function CreateVisualsTab()
     local ESPState = _G.ESPState
 
     local function MiniHeader(parent, text, color)
-        local lbl = Instance.new("TextLabel", parent)
-        lbl.Size = UDim2.new(1, -6, 0, 18)
-        lbl.BackgroundColor3 = Color3.fromRGB(20, 35, 80)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = text
-        lbl.FontFace = Font.fromEnum(Enum.Font.Montserrat)
-        lbl.TextSize = 10
-        lbl.TextColor3 = color or Color3.fromRGB(210, 210, 215)
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        local p = Instance.new("UIPadding", lbl)
-        p.PaddingLeft = UDim.new(0, 8)
-        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 4)
-        -- Linea de color izquierda
-        local bar = Instance.new("Frame", lbl)
-        bar.Size = UDim2.new(0, 2, 0.7, 0)
-        bar.AnchorPoint = Vector2.new(0, 0.5)
-        bar.Position = UDim2.new(0, 0, 0.5, 0)
-        bar.BackgroundColor3 = color or Color3.fromRGB(50, 60, 150)
-        bar.BorderSizePixel = 0
-        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+        -- Separadores eliminados: opciones van juntas sin texto entre ellas
     end
 
     -- -- makeESPPlayerPin ------------------------------------------------
@@ -57035,10 +57016,11 @@ particles = {}
     tabDockList.ZIndex = 13
     tabDockList.ScrollBarThickness = 0
     tabDockList.ScrollingDirection = Enum.ScrollingDirection.Y
+    tabDockList.ScrollingEnabled = false
     tabDockList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabDockList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    tabDockList.AutomaticCanvasSize = Enum.AutomaticSize.None
     tabDockList.ClipsDescendants = true
-    tabDockList.ElasticBehavior = Enum.ElasticBehavior.Always
+    tabDockList.ElasticBehavior = Enum.ElasticBehavior.Never
     tabDockList.ScrollBarImageTransparency = 1
     local dockLayout = Instance.new("UIListLayout", tabDockList)
     dockLayout.FillDirection = Enum.FillDirection.Vertical
@@ -57075,11 +57057,12 @@ particles = {}
     local function _syncDockPos() end  -- no-op
 
     -- Crear botones de tabs ? estilo "Visual": fondo transparente + borde azul oscuro grueso + texto blanco centrado
+    local _tabScaleH = 1 / #tabNames  -- cada pestaña ocupa 1/N del alto total, sin scroll
     for i = 1, #tabNames do
         -- Contenedor principal del bot?n
         local btn = Instance.new("Frame", tabDockList)
         btn.Name                    = tabNames[i] .. "SideBtn"
-        btn.Size                    = UDim2.new(1, 0, 0, _rowH)
+        btn.Size                    = UDim2.new(1, 0, _tabScaleH, 0)
         btn.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
         btn.BackgroundTransparency  = 0.10
         btn.BorderSizePixel         = 0
@@ -57171,15 +57154,7 @@ particles = {}
             _G._tabContentActive = true
         end)
 
-        -- FIX SCROLL: pasar MouseWheel al tabDockList para poder scrollear la lista de tabs
-        clickRow.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseWheel then
-                tabDockList.CanvasPosition = Vector2.new(
-                    0,
-                    math.clamp(tabDockList.CanvasPosition.Y - input.Position.Z * 36, 0, math.max(0, tabDockList.AbsoluteCanvasSize.Y - tabDockList.AbsoluteSize.Y))
-                )
-            end
-        end)
+        -- Scroll de pestanas desactivado: todas caben en pantalla sin scrollear
 
         sideButtons[i] = btn
         _G._tabBtnRefs[i] = {
