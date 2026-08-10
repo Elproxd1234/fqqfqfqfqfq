@@ -38751,23 +38751,100 @@ function CreatePremiumTab()
                 end
             end
             -- SONIDO CUSTOM: si la skin tiene soundId, reemplazar el Gunshot de la gun
+            -- OPT SOUND v2: busqueda amplia en todas las tools del char + workspace, no solo Harvester
             pcall(function()
-                local _wsChar = workspace:FindFirstChild(LocalPlayer.Name)
-                local _harvester = _wsChar and _wsChar:FindFirstChild("Harvester")
-                local _sounds = _harvester and _harvester:FindFirstChild("Sounds")
-                local _gunshot = _sounds and _sounds:FindFirstChild("Gunshot")
+                -- Helper: buscar el Sound "Gunshot" en cualquier tool equipada
+                local function _findGunshotSound()
+                    local _wsChar = workspace:FindFirstChild(LocalPlayer.Name)
+                    local _char   = LocalPlayer.Character
+                    -- Buscar en workspace.NombreJugador (MM2 guarda la gun ahi)
+                    if _wsChar then
+                        for _, tool in ipairs(_wsChar:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                -- Buscar Sounds/Gunshot
+                                local _sounds = tool:FindFirstChild("Sounds")
+                                local _gs = _sounds and _sounds:FindFirstChild("Gunshot")
+                                if _gs and _gs:IsA("Sound") then return _gs end
+                                -- Buscar Gunshot directo en la tool
+                                _gs = tool:FindFirstChild("Gunshot")
+                                if _gs and _gs:IsA("Sound") then return _gs end
+                                -- Buscar recursivo
+                                for _, d in ipairs(tool:GetDescendants()) do
+                                    if d:IsA("Sound") and (d.Name == "Gunshot" or d.Name:lower():find("shoot") or d.Name:lower():find("fire")) then
+                                        return d
+                                    end
+                                end
+                            end
+                        end
+                        -- Buscar en Harvester (nombre legacy MM2)
+                        local _harvester = _wsChar:FindFirstChild("Harvester")
+                        local _sounds = _harvester and _harvester:FindFirstChild("Sounds")
+                        local _gs = _sounds and _sounds:FindFirstChild("Gunshot")
+                        if _gs and _gs:IsA("Sound") then return _gs end
+                    end
+                    -- Buscar en el personaje local tambien
+                    if _char then
+                        for _, tool in ipairs(_char:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                for _, d in ipairs(tool:GetDescendants()) do
+                                    if d:IsA("Sound") and (d.Name == "Gunshot" or d.Name:lower():find("shoot") or d.Name:lower():find("fire")) then
+                                        return d
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    return nil
+                end
+
+                local _gunshot = _findGunshotSound()
                 if _gunshot and _gunshot:IsA("Sound") then
                     if skin and skin.soundId and skin.soundId ~= "" then
-                        -- Guardar original si no lo hicimos ya
+                        -- Guardar original si no lo hicimos ya (SoundId + Volume)
                         if not _skinState._origGunshot then
-                            _skinState._origGunshot = _gunshot.SoundId
+                            _skinState._origGunshot       = _gunshot.SoundId
+                            _skinState._origGunVolume     = _gunshot.Volume
                         end
                         _gunshot.SoundId = skin.soundId
+                        -- Reproducir muy fuerte: Volume 10 (maximo permitido) para scopeta
+                        _gunshot.Volume  = 10
+                        -- Desactivar RollOff para que se escuche igual de fuerte en cualquier distancia
+                        pcall(function() _gunshot.RollOffMaxDistance = 1e9 end)
+                        pcall(function() _gunshot.RollOffMinDistance = 1   end)
                     else
-                        -- Restaurar original
+                        -- Restaurar original (SoundId + Volume)
                         if _skinState._origGunshot then
                             _gunshot.SoundId = _skinState._origGunshot
-                            _skinState._origGunshot = nil
+                            _gunshot.Volume  = _skinState._origGunVolume or 0.5
+                            pcall(function() _gunshot.RollOffMaxDistance = 10000 end)
+                            _skinState._origGunshot   = nil
+                            _skinState._origGunVolume = nil
+                        end
+                    end
+                else
+                    -- No hay Gunshot en la gun: crear Sound temporal y dispararlo cuando se use
+                    -- Guardar referencia del sound custom en _skinState para limpiarlo al cambiar skin
+                    if skin and skin.soundId and skin.soundId ~= "" then
+                        if not _skinState._customSoundInst then
+                            local _sndParent = workspace
+                            local _wsChar2   = workspace:FindFirstChild(LocalPlayer.Name)
+                            if _wsChar2 then _sndParent = _wsChar2 end
+                            local _snd = Instance.new("Sound", _sndParent)
+                            _snd.Name             = "_ScopetaCustomSound"
+                            _snd.SoundId          = skin.soundId
+                            _snd.Volume           = 10
+                            _snd.RollOffMaxDistance = 1e9
+                            _snd.RollOffMinDistance = 1
+                            _skinState._customSoundInst = _snd
+                        else
+                            _skinState._customSoundInst.SoundId = skin.soundId
+                            _skinState._customSoundInst.Volume  = 10
+                        end
+                    else
+                        -- Limpiar sound custom si existe
+                        if _skinState._customSoundInst then
+                            pcall(function() _skinState._customSoundInst:Destroy() end)
+                            _skinState._customSoundInst = nil
                         end
                     end
                 end
@@ -41128,7 +41205,283 @@ function CreateExclusiveTab()
             end
             CreateCustomNotification("OPT", "Purgados " .. n .. " emitters", 2)
         end)
-    end
+
+        -- ================================================================
+        -- OPT: FREEZE NPCS (congelar entidades no-jugador para ahorrar CPU)
+        -- Pone Humanoid.PlatformStand=true en NPCs del workspace que no sean
+        -- jugadores reales, eliminando su ciclo de PathfindingAgent.
+        -- ================================================================
+        _G._hubSettings.freezeNPCs = _G._hubSettings.freezeNPCs or false
+        local _freezeConns = {}
+        local _frozenNPCs  = {}
+        local function _isFrozenPlayer(model)
+            -- No congelar jugadores reales
+            local players = game:GetService("Players")
+            for _, p in ipairs(players:GetPlayers()) do
+                if p.Character == model then return true end
+            end
+            return false
+        end
+        local function _freezeNPC(model)
+            if _isFrozenPlayer(model) then return end
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            local hrp = model:FindFirstChild("HumanoidRootPart")
+            if hum and not _frozenNPCs[model] then
+                _frozenNPCs[model] = {
+                    walkSpeed  = hum.WalkSpeed,
+                    jumpPower  = hum.JumpPower,
+                    platStand  = hum.PlatformStand,
+                }
+                pcall(function()
+                    hum.WalkSpeed     = 0
+                    hum.JumpPower     = 0
+                    hum.PlatformStand = true
+                end)
+                if hrp then
+                    pcall(function()
+                        hrp.AssemblyLinearVelocity  = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                    end)
+                end
+            end
+        end
+        local function _unfreezeNPC(model)
+            local data = _frozenNPCs[model]
+            if not data then return end
+            _frozenNPCs[model] = nil
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function()
+                    hum.WalkSpeed     = data.walkSpeed
+                    hum.JumpPower     = data.jumpPower
+                    hum.PlatformStand = data.platStand
+                end)
+            end
+        end
+        CreateAuroraToggle(optSec, "Freeze NPCs (CPU +)", function(on)
+            _hs().freezeNPCs = on
+            for _, c in ipairs(_freezeConns) do pcall(function() c:Disconnect() end) end
+            _freezeConns = {}
+            if on then
+                -- Congelar NPCs existentes
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                        _freezeNPC(obj)
+                    end
+                end
+                -- Congelar nuevos NPCs que aparezcan
+                _freezeConns[1] = workspace.DescendantAdded:Connect(function(obj)
+                    if not _hs().freezeNPCs then return end
+                    if obj:IsA("Humanoid") and obj.Parent and obj.Parent:IsA("Model") then
+                        task.defer(function() _freezeNPC(obj.Parent) end)
+                    end
+                end)
+                CreateCustomNotification("OPT", "Freeze NPCs ON — NPCs congelados", 2)
+            else
+                -- Descongelar todos
+                for model in pairs(_frozenNPCs) do
+                    _unfreezeNPC(model)
+                end
+                _frozenNPCs = {}
+                CreateCustomNotification("OPT", "Freeze NPCs OFF — NPCs restaurados", 2)
+            end
+        end, _G._hubSettings.freezeNPCs)
+
+        -- ================================================================
+        -- OPT: DISABLE ANIMATIONS (desactivar animaciones de NPCs/jugadores lejanos)
+        -- Reduce carga de CPU del AnimationController en entidades fuera de vista.
+        -- ================================================================
+        _G._hubSettings.disableNPCAnims = _G._hubSettings.disableNPCAnims or false
+        local _animConns   = {}
+        local _pausedAnims = {}   -- [AnimationTrack] = true
+        CreateAuroraToggle(optSec, "Pause NPC Animations (CPU ++)", function(on)
+            _hs().disableNPCAnims = on
+            for _, c in ipairs(_animConns) do pcall(function() c:Disconnect() end) end
+            _animConns = {}
+            if on then
+                local players = game:GetService("Players")
+                local function _pauseModelAnims(model)
+                    -- No pausar jugadores reales
+                    for _, p in ipairs(players:GetPlayers()) do
+                        if p.Character == model then return end
+                    end
+                    for _, obj in ipairs(model:GetDescendants()) do
+                        if obj:IsA("AnimationTrack") and obj.IsPlaying then
+                            pcall(function()
+                                obj:AdjustSpeed(0)
+                                _pausedAnims[obj] = true
+                            end)
+                        end
+                    end
+                    local animator = model:FindFirstChildOfClass("Animator")
+                        or (model:FindFirstChildOfClass("Humanoid")
+                            and model:FindFirstChildOfClass("Humanoid"):FindFirstChildOfClass("Animator"))
+                    if animator then
+                        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                            pcall(function()
+                                track:AdjustSpeed(0)
+                                _pausedAnims[track] = true
+                            end)
+                        end
+                    end
+                end
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                        _pauseModelAnims(obj)
+                    end
+                end
+                _animConns[1] = workspace.DescendantAdded:Connect(function(obj)
+                    if not _hs().disableNPCAnims then return end
+                    if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                        task.defer(function() _pauseModelAnims(obj) end)
+                    end
+                end)
+                CreateCustomNotification("OPT", "NPC Anims pausadas", 2)
+            else
+                -- Restaurar velocidad de todos los tracks pausados
+                for track in pairs(_pausedAnims) do
+                    pcall(function() track:AdjustSpeed(1) end)
+                end
+                _pausedAnims = {}
+                CreateCustomNotification("OPT", "NPC Anims restauradas", 2)
+            end
+        end, _G._hubSettings.disableNPCAnims)
+
+        -- ================================================================
+        -- OPT: PURGE SCRIPTS DECORATIVOS (LocalScripts decorativos en PlayerGui)
+        -- Destruye LocalScripts con nombres de efectos visuales en PlayerGui
+        -- que consumen CPU sin afectar el gameplay.
+        -- ================================================================
+        local purgeScriptsBtn = Instance.new("TextButton", optSec)
+        purgeScriptsBtn.Size = UDim2.new(1, -8, 0, 30)
+        purgeScriptsBtn.BackgroundColor3 = Color3.fromRGB(20, 40, 80)
+        purgeScriptsBtn.BackgroundTransparency = 0.2
+        purgeScriptsBtn.BorderSizePixel = 0
+        purgeScriptsBtn.Text = "  Purge Visual Scripts"
+        purgeScriptsBtn.TextColor3 = Color3.fromRGB(160, 200, 255)
+        purgeScriptsBtn.FontFace = Font.fromEnum(Enum.Font.GothamSemibold)
+        purgeScriptsBtn.TextSize = 11
+        purgeScriptsBtn.AutoButtonColor = false
+        purgeScriptsBtn.ZIndex = 13
+        Instance.new("UICorner", purgeScriptsBtn).CornerRadius = UDim.new(0, 8)
+        local pssStroke = Instance.new("UIStroke", purgeScriptsBtn)
+        pssStroke.Color = Color3.fromRGB(40, 100, 200)
+        pssStroke.Thickness = 1; pssStroke.Transparency = 0.3
+        purgeScriptsBtn.MouseEnter:Connect(function()
+            TweenService:Create(purgeScriptsBtn, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+        end)
+        purgeScriptsBtn.MouseLeave:Connect(function()
+            TweenService:Create(purgeScriptsBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.2}):Play()
+        end)
+        purgeScriptsBtn.Activated:Connect(function()
+            local _visualKeywords = {
+                "effect","particle","vfx","glow","blur","aura","trail",
+                "snow","rain","fog","cloud","ambient","atmospheric",
+                "decoration","deco","ornament","spark","flame","smoke",
+            }
+            local n = 0
+            local function _isVisualScript(obj)
+                if not (obj:IsA("LocalScript") or obj:IsA("ModuleScript")) then return false end
+                local name = obj.Name:lower()
+                for _, kw in ipairs(_visualKeywords) do
+                    if name:find(kw) then return true end
+                end
+                return false
+            end
+            -- Destruir en PlayerGui (efectos UI)
+            local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            if pg then
+                for _, obj in ipairs(pg:GetDescendants()) do
+                    if _isVisualScript(obj) then
+                        pcall(function() obj:Destroy() end)
+                        n = n + 1
+                    end
+                end
+            end
+            -- Destruir en workspace (efectos de mapa)
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if _isVisualScript(obj) then
+                    pcall(function() obj:Destroy() end)
+                    n = n + 1
+                end
+            end
+            CreateCustomNotification("OPT", "Scripts visuales eliminados: " .. n, 2)
+        end)
+
+        -- ================================================================
+        -- OPT: BOTON LIMPIEZA DE MEMORIA (garbage collect forzado)
+        -- Llama a collectgarbage("collect") para liberar memoria Lua acumulada.
+        -- Util despues de cargar muchos assets o tras rondas largas.
+        -- ================================================================
+        local gcBtn = Instance.new("TextButton", optSec)
+        gcBtn.Size = UDim2.new(1, -8, 0, 30)
+        gcBtn.BackgroundColor3 = Color3.fromRGB(20, 60, 30)
+        gcBtn.BackgroundTransparency = 0.2
+        gcBtn.BorderSizePixel = 0
+        gcBtn.Text = "  Force GC (Limpiar Memoria Lua)"
+        gcBtn.TextColor3 = Color3.fromRGB(140, 255, 160)
+        gcBtn.FontFace = Font.fromEnum(Enum.Font.GothamSemibold)
+        gcBtn.TextSize = 11
+        gcBtn.AutoButtonColor = false
+        gcBtn.ZIndex = 13
+        Instance.new("UICorner", gcBtn).CornerRadius = UDim.new(0, 8)
+        local gcStroke = Instance.new("UIStroke", gcBtn)
+        gcStroke.Color = Color3.fromRGB(60, 180, 80)
+        gcStroke.Thickness = 1; gcStroke.Transparency = 0.3
+        gcBtn.MouseEnter:Connect(function()
+            TweenService:Create(gcBtn, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+        end)
+        gcBtn.MouseLeave:Connect(function()
+            TweenService:Create(gcBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.2}):Play()
+        end)
+        gcBtn.Activated:Connect(function()
+            local before = math.floor(gcinfo() / 1024)
+            collectgarbage("collect")
+            task.wait(0.1)
+            collectgarbage("collect")
+            local after = math.floor(gcinfo() / 1024)
+            local freed = math.max(0, before - after)
+            CreateCustomNotification("OPT", "GC: " .. freed .. " KB liberados (" .. after .. " KB usados)", 3)
+        end)
+
+        -- ================================================================
+        -- OPT: NO POINTLIGHTS (apagar PointLight/SpotLight/SurfaceLight)
+        -- Las luces dinamicas de Roblox son muy costosas en GPU.
+        -- Este toggle las apaga todas para ganar FPS significativos en mapas con efectos de luz.
+        -- ================================================================
+        _G._hubSettings.noLights = _G._hubSettings.noLights or false
+        local _lightConns  = {}
+        local _savedLights = {}  -- [Light] = originalBrightness
+        CreateAuroraToggle(optSec, "No Dynamic Lights (GPU +++)", function(on)
+            _hs().noLights = on
+            for _, c in ipairs(_lightConns) do pcall(function() c:Disconnect() end) end
+            _lightConns = {}
+            if on then
+                local function _killLight(obj)
+                    if obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+                        if not _savedLights[obj] then
+                            _savedLights[obj] = obj.Brightness
+                        end
+                        pcall(function() obj.Brightness = 0; obj.Enabled = false end)
+                    end
+                end
+                for _, obj in ipairs(workspace:GetDescendants()) do _killLight(obj) end
+                _lightConns[1] = workspace.DescendantAdded:Connect(function(obj)
+                    if _hs().noLights then _killLight(obj) end
+                end)
+                CreateCustomNotification("OPT", "Luces dinamicas OFF", 2)
+            else
+                for obj, brightness in pairs(_savedLights) do
+                    if obj and obj.Parent then
+                        pcall(function() obj.Brightness = brightness; obj.Enabled = true end)
+                    end
+                end
+                _savedLights = {}
+                CreateCustomNotification("OPT", "Luces dinamicas restauradas", 2)
+            end
+        end, _G._hubSettings.noLights)
+
+    end  -- cierre de OPTIMIZACIONES (anterior "end" fue el del purgeBtn)
 
     -- BETA LABEL
     do
