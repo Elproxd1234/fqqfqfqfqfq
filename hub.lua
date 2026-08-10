@@ -12338,24 +12338,66 @@ end
 local function _attachScrollPassthrough(...)
     local objs = {...}
     local firstObj = objs[1]
-    local function _pass(i)
-        if i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
-        local p = firstObj and firstObj.Parent
+
+    -- Buscar el ScrollingFrame padre mas cercano
+    local function _findScrollParent(obj)
+        local p = obj and obj.Parent
         while p do
-            if p:IsA("ScrollingFrame") then
-                local newY = math.clamp(
-                    p.CanvasPosition.Y - i.Position.Z * 36,
-                    0,
-                    math.max(0, p.AbsoluteCanvasSize.Y - p.AbsoluteSize.Y)
-                )
-                p.CanvasPosition = Vector2.new(p.CanvasPosition.X, newY)
-                break
-            end
+            if p:IsA("ScrollingFrame") then return p end
             p = p.Parent
         end
     end
+
+    -- PC: pasar MouseWheel al ScrollingFrame padre
+    local function _pass(i)
+        if i.UserInputType ~= Enum.UserInputType.MouseWheel then return end
+        local sf = _findScrollParent(firstObj)
+        if sf then
+            local newY = math.clamp(
+                sf.CanvasPosition.Y - i.Position.Z * 36,
+                0,
+                math.max(0, sf.AbsoluteCanvasSize.Y - sf.AbsoluteSize.Y)
+            )
+            sf.CanvasPosition = Vector2.new(sf.CanvasPosition.X, newY)
+        end
+    end
+
     for _, obj in ipairs(objs) do
         pcall(function() obj.InputChanged:Connect(_pass) end)
+
+        -- MOBILE FIX: propagar TouchPan al ScrollingFrame padre para que
+        -- el TextButton no bloquee el scroll tactil en celular
+        pcall(function()
+            local _touchStartY = nil
+            local _sfRef = nil
+
+            obj.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.Touch then
+                    _touchStartY = i.Position.Y
+                    _sfRef = _findScrollParent(firstObj)
+                end
+            end)
+
+            obj.InputChanged:Connect(function(i)
+                if i.UserInputType ~= Enum.UserInputType.Touch then return end
+                if not _touchStartY or not _sfRef or not _sfRef.Parent then return end
+                local delta = _touchStartY - i.Position.Y
+                _touchStartY = i.Position.Y
+                local newY = math.clamp(
+                    _sfRef.CanvasPosition.Y + delta,
+                    0,
+                    math.max(0, _sfRef.AbsoluteCanvasSize.Y - _sfRef.AbsoluteSize.Y)
+                )
+                _sfRef.CanvasPosition = Vector2.new(_sfRef.CanvasPosition.X, newY)
+            end)
+
+            obj.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.Touch then
+                    _touchStartY = nil
+                    _sfRef = nil
+                end
+            end)
+        end)
     end
 end
 
@@ -30144,24 +30186,9 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     -- FIX MOBILE: Activated responde a touch en celu; MouseButton1Click no siempre lo hace
     clickRow.Activated:Connect(doToggle)
 
-    -- FIX SCROLL: TextButton absorbe MouseWheel e impide scroll del ScrollingFrame padre.
+    -- FIX SCROLL: TextButton absorbe MouseWheel y Touch, impide scroll en PC y mobile.
     clickRow.Selectable = false
-    if _attachScrollPassthrough then
-        _attachScrollPassthrough(clickRow)
-    else
-        clickRow.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseWheel then
-                local p = container.Parent
-                while p do
-                    if p:IsA("ScrollingFrame") then
-                        p.CanvasPosition = Vector2.new(p.CanvasPosition.X, math.clamp(p.CanvasPosition.Y - input.Position.Z * 36, 0, math.max(0, p.AbsoluteCanvasSize.Y - p.AbsoluteSize.Y)))
-                        break
-                    end
-                    p = p.Parent
-                end
-            end
-        end)
-    end
+    _attachScrollPassthrough(clickRow)
 
     return container
 end
