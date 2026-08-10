@@ -53895,26 +53895,24 @@ minimizeBtn.Activated:Connect(function()
                              or game:GetService("CoreGui"):FindFirstChild("f")
                              or (gethui and gethui():FindFirstChild("f"))
             if existingHub and _G._hubHidden then
+                -- FIX TAMAÑO REOPEN MOBILE: ajustar escala ANTES de Enabled=true
+                -- para que el hub nunca aparezca un solo frame al tamaño incorrecto.
+                if mainFrame then
+                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
+                    if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
+                    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+                    mainFrame.BackgroundTransparency = 1
+                    pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
+                    local _uiSc = mainFrame:FindFirstChildOfClass("UIScale")
+                    if _uiSc then _uiSc.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
+                end
                 existingHub.Enabled = true
                 _G._hubHidden = false
-                -- FIX BINDABLES: restaurar con delay para no chocar con la animaci?n de cierre
+                -- FIX BINDABLES: restaurar con delay para no chocar con la animacion de cierre
                 task.spawn(function()
                     task.wait(0.45)
                     pcall(function() if _G._setAllBindablesVisible then _G._setAllBindablesVisible(true) end end)
                 end)
-                -- Reapertura instant?nea (animaci?n eliminada)
-                -- FIX TAMA?O: restaurar Size segun dispositivo antes de restaurar UIScale
-                if mainFrame then
-                    do
-                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
-                    if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
-                end
-                    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-                    mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
-                    pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
-                end
-                local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
-                if uiScale then uiScale.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
             else
                 abrirHub()
             end
@@ -54175,22 +54173,18 @@ closeBtn.Activated:Connect(function()
                              or game:GetService("CoreGui"):FindFirstChild("f")
                              or (gethui and gethui():FindFirstChild("f"))
             if existingHub and _G._hubHidden then
-                existingHub.Enabled = true
-                _G._hubHidden = false
-                -- FIX TAMA?O: restaurar Size segun dispositivo (modificado por tween de cierre)
+                -- FIX TAMAÑO REOPEN MOBILE: ajustar escala ANTES de Enabled=true
                 if mainFrame then
-                    do
                     local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
-                end
                     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-                    mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
+                    mainFrame.BackgroundTransparency = 1
                     pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
+                    local _uiSc = mainFrame:FindFirstChildOfClass("UIScale")
+                    if _uiSc then _uiSc.Scale = (_getTargetScale and _getTargetScale() or 0.70) end
                 end
-                local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
-                if uiScale then
-                    uiScale.Scale = (_getTargetScale and _getTargetScale() or 0.70)
-                end
+                existingHub.Enabled = true
+                _G._hubHidden = false
             else
                 abrirHub()
             end
@@ -55485,27 +55479,32 @@ function abrirHub()
                 pcall(function() child:Destroy() end)
             end
         end
+        -- FIX TAMAÑO REOPEN MOBILE: ajustar tamaño y escala ANTES de Enabled=true
+        -- para que el hub nunca aparezca ni un frame al tamaño incorrecto.
+        local _targetSc = (_getTargetScale and _getTargetScale() or 0.70)
+        if mainFrame then
+            local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
+            if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
+            mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            mainFrame.BackgroundTransparency = 1
+            pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
+            local _uiSc = mainFrame:FindFirstChildOfClass("UIScale")
+            if _uiSc then
+                _uiSc.Scale = _targetSc * 0.7  -- empezar un poco mas chico para la animacion
+            end
+        end
         existingHub.Enabled = true
         _G._hubHidden = false
-        -- FIX BINDABLES: restaurar con delay para no chocar con la animaci?n de cierre
+        -- Animacion de entrada suave desde escala casi correcta
+        local _uiSc2 = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
+        if _uiSc2 then
+            TweenService:Create(_uiSc2, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = _targetSc}):Play()
+        end
+        -- FIX BINDABLES: restaurar con delay para no chocar con la animacion de entrada
         task.spawn(function()
             task.wait(0.45)
             pcall(function() if _G._setAllBindablesVisible then _G._setAllBindablesVisible(true) end end)
         end)
-        -- FIX TAMA?O: restaurar Size segun dispositivo antes del tween de escala
-        if mainFrame then
-            do local _ns = UDim2.new(0, 820, 0, 460)
-                if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
-            end
-            mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-            mainFrame.BackgroundTransparency = 1  -- fondo: imagen HubBackground
-            pcall(function() local bg = mainFrame:FindFirstChild("HubBackground"); if bg then bg.ImageTransparency = 0 end end)
-        end
-        local uiScale = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
-        if uiScale then
-            uiScale.Scale = 0
-            TweenService:Create(uiScale, TweenInfo.new(0.65, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Scale = (_getTargetScale and _getTargetScale() or 0.70)}):Play()
-        end
         -- FIX: recargar el tab activo para restaurar bindables y botones
         task.defer(function()
             if _G._reloadActiveTab then
