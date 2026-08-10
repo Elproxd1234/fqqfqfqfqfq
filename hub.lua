@@ -526,6 +526,9 @@ _G._hubReady = false
 _G._hubAlreadyBuilt = false
 -- GUARD DE DOBLE EJECUCION: evita que abrirHub() corra dos veces en paralelo
 _G._hubRunning = false
+-- FIX DOBLE ACTIVACION BOTONES: guard global para evitar que un mismo toggle
+-- dispare su callback dos veces al construirse multiples tabs en secuencia
+_G._activatedToggles = {}
 -- AUTORESTORE: al inicio siempre es una ejecucion limpia del hub (no un rebuild de pesta?a)
 -- _isTabRebuild se pone en true SOLO durante _reloadActiveTab() para evitar re-ejecutar callbacks
 _G._isTabRebuild = false
@@ -12167,7 +12170,7 @@ function CreateBorderedSectionGlobal(parent, title)
     local section = Instance.new("Frame", targetCol)
     section.Size = UDim2.new(1, 0, 0, 0)
     section.BackgroundColor3 = Color3.fromRGB(100, 18, 30)
-    section.BackgroundTransparency = 0.30  -- fondo oscuro para contraste de texto
+    section.BackgroundTransparency = 0.75  -- TRANSPARENCIA: ver fondo rbx
     section.BorderSizePixel = 0
     section.AutomaticSize = Enum.AutomaticSize.Y
     section.ZIndex = 9  -- FIX: menor que el label del toggle (11)
@@ -12198,7 +12201,7 @@ function CreateSection(parent, icono, titulo, color)
     local section = Instance.new("Frame", targetCol)
     section.Size = UDim2.new(1, 0, 0, 0)
     section.BackgroundColor3 = Color3.fromRGB(100, 18, 30)
-    section.BackgroundTransparency = 0.30  -- fondo oscuro para contraste de texto
+    section.BackgroundTransparency = 0.75  -- TRANSPARENCIA: ver fondo rbx
     section.BorderSizePixel = 0
     section.AutomaticSize = Enum.AutomaticSize.Y
     section.ZIndex = 9  -- FIX: menor que el label del toggle (11) para no taparlo
@@ -12234,7 +12237,7 @@ function CreateNeonSection(parent, titulo)
     section.Name = "NeonSection_" .. tostring(titulo)
     section.Size = UDim2.new(1, 0, 0, 0)
     section.BackgroundColor3 = ThemeColors.Background
-    section.BackgroundTransparency = 0.88
+    section.BackgroundTransparency = 0.92  -- TRANSPARENCIA: ver fondo rbx
     section.BorderSizePixel = 0
     section.AutomaticSize = Enum.AutomaticSize.Y
     section.ZIndex = 12
@@ -29828,7 +29831,12 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         TweenService:Create(container, _hoverTi, {BackgroundTransparency = 0.55}):Play()
     end)
     -- Logica de toggle
+    local _doToggleLastTime = 0  -- FIX DOBLE ACTIVACION: debounce guard
     local function doToggle()
+        -- FIX DOBLE ACTIVACION: ignorar si se llama dos veces en menos de 0.25s
+        local _now = tick()
+        if (_now - _doToggleLastTime) < 0.25 then return end
+        _doToggleLastTime = _now
         -- PASO 1: Invertir el booleano en la tabla de estado
         estado = not estado
         _G._toggleStates[nombre] = estado
@@ -29929,6 +29937,14 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         and not _worldBlockActive
         and not _isNeverRestore
         and (not _wasUserSet or (savedState == true and not _isTabRebuild))
+    if _shouldAutoActivate then
+        -- FIX DOBLE ACTIVACION: si este toggle ya activo su callback, no repetir
+        if _G._activatedToggles and _G._activatedToggles[nombre] then
+            _shouldAutoActivate = nil  -- cancelar
+        else
+            if _G._activatedToggles then _G._activatedToggles[nombre] = true end
+        end
+    end
     if _shouldAutoActivate then
         local lower = nombre:lower()
 
@@ -39253,11 +39269,11 @@ function CreatePremiumTab()
             CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
         end)
 
-        -- SLIDER: Tamaño de la skin de gun SELECCIONADA (independiente por skin)
+        -- SLIDER: Tama?o de la skin de gun SELECCIONADA (independiente por skin)
         -- Cada skin guarda su propio multiplicador en _skinState.scaleOverrides[skinName]
         -- El slider se actualiza al cambiar de skin via _G._scGunSizeSliderUpdate
         do
-            local _gunSizeSlider = CreateSlider(leftColumn, "Tamaño Skin Gun (%)", 10, 300, 100, function(val)
+            local _gunSizeSlider = CreateSlider(leftColumn, "Tama?o Skin Gun (%)", 10, 300, 100, function(val)
                 local _curSkin = _scGetSkin and _scGetSkin()
                 if not _curSkin or _skinState.mode ~= "gun" then return end
                 -- Guardar el multiplicador SOLO para esta skin (no afecta otras)
@@ -39470,8 +39486,8 @@ function CreatePremiumTab()
                 CreateCustomNotification("?? KNIFE SKIN", sel .. " aplicada!", 3)
             end)
 
-            -- SLIDER: Tamaño de la skin de knife SELECCIONADA (independiente por skin)
-            CreateSlider(leftColumn, "Tamaño Skin Knife (%)", 10, 300, 100, function(val)
+            -- SLIDER: Tama?o de la skin de knife SELECCIONADA (independiente por skin)
+            CreateSlider(leftColumn, "Tama?o Skin Knife (%)", 10, 300, 100, function(val)
                 local _curSkin = _scGetSkin and _scGetSkin()
                 if not _curSkin or _skinState.mode ~= "knife" then return end
                 -- Guardar el multiplicador SOLO para esta skin knife
@@ -55438,6 +55454,7 @@ function abrirHub()
         return
     end
     _G._hubReady   = false  -- resetear al (re)abrir
+    _G._activatedToggles = {}  -- FIX: resetear al abrir hub de nuevo
     _G._hubRunning = true   -- bloquear nuevas llamadas mientras se construye este hub
     -- FIX LAG: resetear el flag del loop homePanel para que el nuevo hub pueda iniciarlo
     _G._homePanelLoopActive = false
@@ -55600,7 +55617,7 @@ do
     _newHeader.Position = UDim2.new(0, 0, 0, 0)
     _newHeader.AnchorPoint = Vector2.new(0, 0)
     _newHeader.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
-    _newHeader.BackgroundTransparency = 0.25
+    _newHeader.BackgroundTransparency = 0.50  -- TRANSPARENCIA: ver fondo rbx
     _newHeader.BorderSizePixel = 0
     _newHeader.ZIndex = 2
 
@@ -57188,7 +57205,7 @@ particles = {}
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
     tabDockFrame.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
-    tabDockFrame.BackgroundTransparency = 0.15
+    tabDockFrame.BackgroundTransparency = 0.65  -- TRANSPARENCIA: ver fondo rbx
     tabDockFrame.Position = UDim2.new(0.65, 0, 0, 36)
     tabDockFrame.Size = UDim2.new(0.35, 0, 1, -36)
     tabDockFrame.Visible  = true
@@ -57264,7 +57281,7 @@ particles = {}
         btn.Name                    = tabNames[i] .. "SideBtn"
         btn.Size                    = UDim2.new(1, 0, _tabScaleH, 0)
         btn.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
-        btn.BackgroundTransparency  = 0.10
+        btn.BackgroundTransparency  = 0.75  -- TRANSPARENCIA: ver fondo rbx
         btn.BorderSizePixel         = 0
         btn.ClipsDescendants        = false
         btn.ZIndex                  = 13
@@ -57343,7 +57360,11 @@ particles = {}
         end)
 
         clickRow.Selectable = false
+        local _tabBtnLastTime = 0  -- FIX DOBLE ACTIVACION TABS
         clickRow.Activated:Connect(function()
+            local _t = tick()
+            if (_t - _tabBtnLastTime) < 0.30 then return end  -- FIX: ignorar doble click
+            _tabBtnLastTime = _t
             PlayTabSound()
             local wasVisible = contentContainer.Visible
             if not wasVisible then
@@ -57410,7 +57431,7 @@ particles = {}
         TweenService:Create(arrowToggleBtn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(255, 180, 0), BackgroundTransparency = 0.5}):Play()
         -- Ocultar dock de tabs al mostrar server panel
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.15 end
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.65 end  -- TRANSPARENCIA restaurada
             contentContainer.Position = UDim2.new(0, 0, 1.5, 0)
             serverPanel.Visible = true
             serverPanel.Position = UDim2.new(0, 20, 0, 60)
@@ -57433,7 +57454,7 @@ particles = {}
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
             serverPanel.Visible = false
             if fpsConn then fpsConn:Disconnect(); fpsConn = nil end
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.15 end
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.65 end  -- TRANSPARENCIA restaurada
             if contentContainer.Visible then
                 contentContainer.Position = UDim2.new(0, 0, 0, 36)
             end
