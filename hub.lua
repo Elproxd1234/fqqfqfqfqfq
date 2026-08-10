@@ -12370,13 +12370,13 @@ function CreateSlider(parent, nombre, minVal, maxVal, defaultVal, callback, step
     --  Fill azul claro | Thumb circular blanco 18px
     -- ==============================================================
 
-    local C_BG_MAIN  = Color3.fromRGB(6, 10, 30)        -- azul muy oscuro (fondo panel)
-    local C_STROKE   = Color3.fromRGB(30, 50, 130)      -- azul oscuro (bordes)
+    local C_BG_MAIN  = Color3.fromRGB(30, 6, 10)        -- rojo oscuro (fondo panel)
+    local C_STROKE   = Color3.fromRGB(145, 30, 45)      -- rojo borde hub
     local C_TEXT     = Color3.fromRGB(255, 255, 255)
-    local C_TRACK_BG = Color3.fromRGB(20, 30, 80)        -- pista fondo oscuro
-    local C_TRACK_FG = Color3.fromRGB(120, 170, 255)    -- fill iluminado
+    local C_TRACK_BG = Color3.fromRGB(60, 10, 18)       -- pista fondo oscuro rojo
+    local C_TRACK_FG = Color3.fromRGB(210, 85, 100)     -- fill rojo-rosa
     local C_THUMB    = Color3.fromRGB(255, 255, 255)    -- knob blanco
-    local C_VALBG    = Color3.fromRGB(6, 10, 30)         -- fondo value box oscuro
+    local C_VALBG    = Color3.fromRGB(30, 6, 10)        -- fondo value box oscuro rojo
     local CONTAINER_H = 58
 
     -- Marco principal azul translucido
@@ -12444,7 +12444,7 @@ function CreateSlider(parent, nombre, minVal, maxVal, defaultVal, callback, step
     valueLabel.ZIndex                 = 13
     valueLabel.ClearTextOnFocus       = true
     valueLabel.PlaceholderText        = string.format("%.2f", _initVal)
-    valueLabel.PlaceholderColor3      = Color3.fromRGB(200, 220, 255)
+    valueLabel.PlaceholderColor3      = Color3.fromRGB(255, 200, 210)
 
     -- Track grueso (10px alto) posicionado en la parte baja del panel
     local sliderTrack = Instance.new("Frame", container)
