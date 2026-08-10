@@ -27442,8 +27442,9 @@ do
 end
 
 _hbTtracer = 0
-_tracerViewCenter = Vector2.new(0, 0)
-_tracerViewTick = 0
+_tracerViewCenter = Vector2.new(0, 0)  -- se actualiza al primer tick con ViewportSize real
+_tracerViewTick = 30  -- forzar recalculo en el primer frame (Y=0 = arriba de pantalla)
+_G._tracerFromHead = true  -- tracer siempre apunta a la cabeza
 -- GUARD: desconectar conexion anterior si existe (evita duplicados al re-ejecutar)
 if _G._tracerHBConn then pcall(function() _G._tracerHBConn:Disconnect() end) end
 _G._tracerHBConn = RunService.Heartbeat:Connect(function()
@@ -27462,7 +27463,8 @@ _G._tracerHBConn = RunService.Heartbeat:Connect(function()
     _tracerViewTick = _tracerViewTick + 1
     if _tracerViewTick >= 30 then
         _tracerViewTick = 0
-        _tracerViewCenter = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
+        -- TRACER ORIGIN: parte superior de la pantalla (Y = 0 = arriba del todo)
+        _tracerViewCenter = Vector2.new(cam.ViewportSize.X / 2, 0)
     end
     local center = _tracerViewCenter
 
@@ -27476,8 +27478,10 @@ _G._tracerHBConn = RunService.Heartbeat:Connect(function()
                 if roleOf ~= nil and (VisualState.tracer.gunholder or false) then role = roleOf(player) end
                 if vsShow(vt, role, player) then
                     local color = colorOf(role)
-                    -- knife removido: no sobreescribir color por knife en mano
-                    local _tPart = (_G._tracerFromHead and player.Character:FindFirstChild("Head")) or hrp
+                    -- TRACER TARGET: siempre apunta a la Head del jugador (no al HRP)
+                    -- _tracerFromHead ya no cambia el target; siempre es la cabeza
+                    local _head = player.Character:FindFirstChild("Head")
+                    local _tPart = _head or hrp
                     local sp, onScreen = cam:WorldToViewportPoint(_tPart.Position)
                     if onScreen then
                         local line = getLine()
@@ -28801,9 +28805,11 @@ end, _G._chamDropGun or false)
         MiniHeader(inner, "ZOMBIE", Color3.fromRGB(145, 30, 45))
         CreateAuroraToggle(inner, "Tracer Zombie Only", function(v) vt.zombie=v end, vt.zombie)
         MiniHeader(inner, "ORIGIN", Color3.fromRGB(200,200,200))
-        CreateAuroraToggle(inner, "Tracer from Head (sale de la cabeza)", function(v)
-            _G._tracerFromHead=v
-        end, _G._tracerFromHead or false)
+        -- NOTA: los tracers ahora SIEMPRE salen de arriba de la pantalla y apuntan a la cabeza.
+        -- Este toggle es legacy y no cambia el comportamiento (la cabeza ya es siempre el target).
+        CreateAuroraToggle(inner, "Tracer Top-Screen ? Head [ACTIVO]", function(v)
+            _G._tracerFromHead = true  -- siempre true: los tracers van a la cabeza
+        end, true)
         MiniHeader(inner, "THROWING KNIFE", Color3.fromRGB(255, 120, 0))
         CreateAuroraToggle(inner, "Tracer ThrowingKnife", function(v) vt.throwknife=v end, vt.throwknife)
     end
