@@ -43575,13 +43575,41 @@ function CreateCombatTab()
 
                 local onMurderer = _msMouseOverMurderer()
 
+                -- FIX FOV PREDICTION: si fovPred esta activo, tambien disparar cuando
+                -- el murderer este dentro del FOV de camara (sin necesitar cursor encima).
+                -- Antes: fovPred se seteaba pero nunca se leia -> el toggle no hacia nada.
+                local inFov = false
+                if _msState.fovPred and not onMurderer then
+                    local murderer = findMurderer and findMurderer()
+                    if murderer and murderer.Character then
+                        local tHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
+                        local tHum = murderer.Character:FindFirstChildOfClass("Humanoid")
+                        if tHRP and tHum and tHum.Health > 0 then
+                            local cam = workspace.CurrentCamera
+                            local vp  = cam.ViewportSize
+                            local screenPos, onScreen = cam:WorldToViewportPoint(tHRP.Position)
+                            if onScreen then
+                                -- Calcular distancia al centro de pantalla en pixeles
+                                local cx = vp.X / 2
+                                local cy = vp.Y / 2
+                                local dx = screenPos.X - cx
+                                local dy = screenPos.Y - cy
+                                local pixelDist = math.sqrt(dx*dx + dy*dy)
+                                -- FOV Prediction dispara si esta dentro de un radio de 200px del centro
+                                inFov = pixelDist <= (_msState.circleSize * 6 or 120)
+                            end
+                        end
+                    end
+                end
+
                 -- Feedback visual: el circulo se pone del color del hub cuando apunta al murder
-                if onMurderer ~= _msBright then
-                    _msBright = onMurderer
-                    local targetColor = onMurderer
+                local shouldFire = onMurderer or inFov
+                if shouldFire ~= _msBright then
+                    _msBright = shouldFire
+                    local targetColor = shouldFire
                         and Color3.fromRGB(50, 255, 120)   -- verde = apuntando al murder
                         or  Color3.fromRGB(255, 255, 255)  -- blanco = sin target
-                    local targetAlpha = onMurderer and 0.0 or 0.25
+                    local targetAlpha = shouldFire and 0.0 or 0.25
                     TweenService:Create(_msCircleFrame, TweenInfo.new(0.08), {
                         BackgroundColor3      = targetColor,
                         BackgroundTransparency = targetAlpha,
@@ -43589,13 +43617,13 @@ function CreateCombatTab()
                     local str = _msCircleFrame:FindFirstChildOfClass("UIStroke")
                     if str then
                         TweenService:Create(str, TweenInfo.new(0.08), {
-                            Color = onMurderer and Color3.fromRGB(50, 255, 120) or ThemeColors.Primary
+                            Color = shouldFire and Color3.fromRGB(50, 255, 120) or ThemeColors.Primary
                         }):Play()
                     end
                 end
 
-                -- Disparar autom?ticamente apenas el cursor pise el murder
-                if not onMurderer then return end
+                -- Disparar automaticamente apenas el cursor pise el murder (o FOV Prediction activo)
+                if not shouldFire then return end
                 local now = tick()
                 if now - _msLastShot < _msCooldown then return end
 
@@ -43603,7 +43631,7 @@ function CreateCombatTab()
                 if not gun then return end
 
                 -- Usar el mismo sistema de Silent Aim principal (_saGetTargetCF)
-                -- para garantizar predicci?n y CFrames id?nticos al SA normal
+                -- para garantizar prediccion y CFrames identicos al SA normal
                 local graCF, targetCF
                 pcall(function()
                     graCF, targetCF = _saGetTargetCF()
