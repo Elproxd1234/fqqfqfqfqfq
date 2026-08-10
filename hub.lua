@@ -27026,10 +27026,15 @@ function isAccessory(part)
 end
 
 function applyBodyParts()
+    -- FIX DISAPPEAR BUG: snapshot del char del LocalPlayer para que nunca sea tocado,
+    -- aunque _cachedPlayers lo incluya o Character haya sido reasignado temporalmente
+    -- (ej: sistema de invisibilidad asigna un clon como LocalPlayer.Character).
+    local _safeLocalChar = LocalPlayer and LocalPlayer.Character
     for _, player in ipairs(_cachedPlayers) do
         if player ~= LocalPlayer then
             local char = player.Character
-            if char then
+            -- FIX: doble guardia -- no tocar el char del LocalPlayer bajo ninguna condicion
+            if char and char ~= _safeLocalChar then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") or part:IsA("MeshPart") then
                         local hidden = false
@@ -27136,6 +27141,21 @@ function _vcRefreshAll()
             pcall(removeHighlight, player)
         end
     end
+    -- FIX DISAPPEAR BUG: tras limpiar todos los caches de visuals, asegurar que
+    -- el LocalPlayer nunca quede con LocalTransparencyModifier=1 (invisible).
+    -- Esto ocurria al desactivar cualquier toggle del tab MAIN despues de haber
+    -- activado visuals: _vcRefreshAll() se llamaba via doToggle y el personaje
+    -- del jugador podia quedar invisible indefinidamente.
+    pcall(function()
+        local _myChar = LocalPlayer and LocalPlayer.Character
+        if _myChar then
+            for _, part in ipairs(_myChar:GetDescendants()) do
+                if part:IsA("BasePart") and part.LocalTransparencyModifier ~= 0 then
+                    part.LocalTransparencyModifier = 0
+                end
+            end
+        end
+    end)
     -- Forzar tick inmediato del instanceLoop para re-aplicar
     _G._forceInstanceTick = true
 end
@@ -41282,14 +41302,14 @@ function CreateExclusiveTab()
                         task.defer(function() _freezeNPC(obj.Parent) end)
                     end
                 end)
-                CreateCustomNotification("OPT", "Freeze NPCs ON — NPCs congelados", 2)
+                CreateCustomNotification("OPT", "Freeze NPCs ON ? NPCs congelados", 2)
             else
                 -- Descongelar todos
                 for model in pairs(_frozenNPCs) do
                     _unfreezeNPC(model)
                 end
                 _frozenNPCs = {}
-                CreateCustomNotification("OPT", "Freeze NPCs OFF — NPCs restaurados", 2)
+                CreateCustomNotification("OPT", "Freeze NPCs OFF ? NPCs restaurados", 2)
             end
         end, _G._hubSettings.freezeNPCs)
 
