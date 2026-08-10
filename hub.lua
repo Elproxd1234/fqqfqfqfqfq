@@ -54,7 +54,7 @@ if _G._hubScriptExecuted then
                    or _cg:FindFirstChild("f")
                    or (gethui and gethui():FindFirstChild("f"))
     if _existing then
-        -- FIX TAMAÑO REOPEN MOBILE: ajustar escala antes de reactivar
+        -- FIX TAMA?O REOPEN MOBILE: ajustar escala antes de reactivar
         pcall(function()
             local _mf = _existing:FindFirstChildOfClass("Frame") or (_existing:GetChildren()[1])
             local _uiSc = _mf and _mf:FindFirstChildOfClass("UIScale")
@@ -46544,102 +46544,7 @@ function CreateCombatTab()
     -- (Animation toggles removed ? handled automatically by Knife SA)    -- (Animation toggles removed ? handled automatically by Knife SA)
 
     -- -------------------------------------------------------------------
-    -- KNIFE SA: FOV CIRCLE (From Mouse mode) - slider de radio en pixeles
-    -- -------------------------------------------------------------------
-    do
-        -- Inicializar mouseFovRadius si no existe
-        if not KnifeSAState.mouseFovRadius then KnifeSAState.mouseFovRadius = 120 end
 
-        -- Label informativo
-        local _mouseFovLbl = Instance.new("TextLabel", knifeSASection)
-        _mouseFovLbl.Size                = UDim2.new(1, -10, 0, 14)
-        _mouseFovLbl.BackgroundTransparency = 1
-        _mouseFovLbl.Text                = "Mouse FOV Radius (From Mouse mode):"
-        _mouseFovLbl.FontFace            = Font.fromEnum(Enum.Font.Arimo)
-        _mouseFovLbl.TextSize            = 10
-        _mouseFovLbl.TextColor3          = ThemeColors.TextSecondary
-        _mouseFovLbl.TextXAlignment      = Enum.TextXAlignment.Left
-        _mouseFovLbl.ZIndex              = 13
-
-        -- Slider de radio: 30 px (muy cerrado) a 600 px (casi toda la pantalla)
-        CreateSlider(knifeSASection, "FOV Radius px", 30, 600, KnifeSAState.mouseFovRadius, function(v)
-            KnifeSAState.mouseFovRadius = v
-            -- Actualizar el circulo de FOV si esta visible
-            if _G._ksaMouseFovCircle then
-                _G._ksaMouseFovCircle.Size = UDim2.new(0, v*2, 0, v*2)
-            end
-        end, 1)
-
-        -- Toggle: body lines (esqueleto del propio personaje sobre el circulo)
-        CreateAuroraToggle(knifeSASection, "Show Body Lines (skeleton)", function(on)
-            if _G._ksaBodyLines then
-                _G._ksaBodyLines.setEnabled(on)
-                CreateCustomNotification("KNIFE SA", on and "Body Lines ON" or "Body Lines OFF", 1.5)
-            end
-        end, true)  -- activado por defecto
-
-        -- Toggle: mostrar circulo visual del FOV alrededor del cursor
-        CreateAuroraToggle(knifeSASection, "Show Mouse FOV Circle", function(on)
-            _G._ksaShowMouseFovCircle = on
-            if not on then
-                if _G._ksaMouseFovGui then
-                    pcall(function() _G._ksaMouseFovGui:Destroy() end)
-                    _G._ksaMouseFovGui = nil
-                    _G._ksaMouseFovCircle = nil
-                    _G._ksaMouseFovConn = nil
-                end
-                return
-            end
-            -- Crear ScreenGui con circulo siguiendo el cursor
-            local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            if not pg then return end
-            local fovGui = Instance.new("ScreenGui")
-            fovGui.Name           = "KnifeSAMouseFOV"
-            fovGui.ResetOnSpawn   = false
-            fovGui.IgnoreGuiInset = true
-            fovGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-            pcall(function() fovGui.Parent = game:GetService("CoreGui") end)
-            if not fovGui.Parent then fovGui.Parent = pg end
-            _G._ksaMouseFovGui = fovGui
-
-            local r = KnifeSAState.mouseFovRadius or 120
-            local circle = Instance.new("Frame", fovGui)
-            circle.Name                   = "FOVCircle"
-            circle.AnchorPoint            = Vector2.new(0.5, 0.5)
-            circle.Size                   = UDim2.new(0, r*2, 0, r*2)
-            circle.Position               = UDim2.new(0.5, 0, 0.5, 0)
-            circle.BackgroundTransparency = 1
-            circle.ZIndex                 = 30
-            local cc = Instance.new("UICorner", circle); cc.CornerRadius = UDim.new(1, 0)
-            local cs = Instance.new("UIStroke", circle)
-            cs.Color        = Color3.fromRGB(0, 200, 255)
-            cs.Thickness    = 1.8
-            cs.Transparency = 0.15
-            _G._ksaMouseFovCircle = circle
-
-            -- Loop de seguimiento del cursor
-            local rs = game:GetService("RunService")
-            local uis = game:GetService("UserInputService")
-            if _G._ksaMouseFovConn then pcall(function() _G._ksaMouseFovConn:Disconnect() end) end
-            _G._ksaMouseFovConn = rs.Heartbeat:Connect(function()
-                if not _G._ksaShowMouseFovCircle or not fovGui or not fovGui.Parent then
-                    if _G._ksaMouseFovConn then _G._ksaMouseFovConn:Disconnect(); _G._ksaMouseFovConn = nil end
-                    return
-                end
-                local mouse = uis:GetMouseLocation()
-                local vp    = workspace.CurrentCamera.ViewportSize
-                circle.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
-                -- Actualizar radio en tiempo real
-                local curR = KnifeSAState.mouseFovRadius or 120
-                if circle.Size.X.Offset ~= curR*2 then
-                    circle.Size = UDim2.new(0, curR*2, 0, curR*2)
-                end
-                -- Color segun si hay target en rango
-                local target = _KnifeSA_getBestTarget and _KnifeSA_getBestTarget()
-                cs.Color = target and Color3.fromRGB(0, 230, 80) or Color3.fromRGB(0, 200, 255)
-            end)
-        end, false)
-    end
 
     -- -------------------------------------------------------------------
     -- KILL ONE ? Selector estilo NebulaSelector + bot?n CreateButton con shimmer/glitch
@@ -53901,8 +53806,8 @@ minimizeBtn.Activated:Connect(function()
                              or game:GetService("CoreGui"):FindFirstChild("f")
                              or (gethui and gethui():FindFirstChild("f"))
             if existingHub and _G._hubHidden then
-                -- FIX TAMAÑO REOPEN MOBILE: ajustar escala ANTES de Enabled=true
-                -- para que el hub nunca aparezca un solo frame al tamaño incorrecto.
+                -- FIX TAMA?O REOPEN MOBILE: ajustar escala ANTES de Enabled=true
+                -- para que el hub nunca aparezca un solo frame al tama?o incorrecto.
                 if mainFrame then
                     local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
@@ -54179,7 +54084,7 @@ closeBtn.Activated:Connect(function()
                              or game:GetService("CoreGui"):FindFirstChild("f")
                              or (gethui and gethui():FindFirstChild("f"))
             if existingHub and _G._hubHidden then
-                -- FIX TAMAÑO REOPEN MOBILE: ajustar escala ANTES de Enabled=true
+                -- FIX TAMA?O REOPEN MOBILE: ajustar escala ANTES de Enabled=true
                 if mainFrame then
                     local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
@@ -55485,8 +55390,8 @@ function abrirHub()
                 pcall(function() child:Destroy() end)
             end
         end
-        -- FIX TAMAÑO REOPEN MOBILE: ajustar tamaño y escala ANTES de Enabled=true
-        -- para que el hub nunca aparezca ni un frame al tamaño incorrecto.
+        -- FIX TAMA?O REOPEN MOBILE: ajustar tama?o y escala ANTES de Enabled=true
+        -- para que el hub nunca aparezca ni un frame al tama?o incorrecto.
         local _targetSc = (_getTargetScale and _getTargetScale() or 0.70)
         if mainFrame then
             local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
@@ -55885,7 +55790,7 @@ uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() d
 -- ================================================================
 _getTargetScale = function()
     -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
-    -- PC: usar hubScale guardado (slider 70-130%) para preservar tamaño al reabrir
+    -- PC: usar hubScale guardado (slider 70-130%) para preservar tama?o al reabrir
     local _vpNow = workspace.CurrentCamera.ViewportSize
     local _isMobileNow = false
     pcall(function()
@@ -55903,8 +55808,8 @@ _getTargetScale = function()
         -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
         return math.clamp(_autoScale, 0.45, 0.95)
     else
-        -- FIX TAMAÑO REOPEN: usar hubScale guardado para que al cerrar y abrir
-        -- el hub mantenga el tamaño que el usuario habia configurado con el slider.
+        -- FIX TAMA?O REOPEN: usar hubScale guardado para que al cerrar y abrir
+        -- el hub mantenga el tama?o que el usuario habia configurado con el slider.
         local _savedScale = _G._hubSettings and _G._hubSettings.hubScale
         if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
             return _savedScale / 100
@@ -56702,15 +56607,19 @@ particles = {}
         local _holdStartPos  = nil     -- posicion al presionar
         local _holdThread    = nil     -- coroutine del delay de hold
 
-        local HOLD_THRESHOLD = 0.25    -- segundos manteniendo antes de activar drag desde cualquier parte
-        local MOVE_THRESHOLD = 6       -- pixeles de movimiento para activar drag inmediato
+        -- DRAG INSTANTANEO: sin delay de hold, se activa apenas se presiona en cualquier parte del hub
+        local MOVE_THRESHOLD = 3  -- pixeles minimos para que cuente como drag (evita click accidental)
 
-        -- Inicio de drag ? solo desde el header, con hold o movimiento suficiente
+        -- Inicio de drag inmediato desde cualquier parte del mainFrame
         local function _startDrag(inputPos2D)
             if _G._hubSettings and _G._hubSettings.allowHubDrag == false then return end
-            -- Solo activar desde el header
-            if not _mouseOverHeader(inputPos2D) then return end
-            -- Convertir posicion a offset
+            if _dragActive then return end  -- ya dragging, no re-iniciar
+            -- Verificar que el click sea dentro del hub
+            local fPos = mainFrame.AbsolutePosition
+            local fSiz = mainFrame.AbsoluteSize
+            if inputPos2D.X < fPos.X or inputPos2D.X > fPos.X + fSiz.X then return end
+            if inputPos2D.Y < fPos.Y or inputPos2D.Y > fPos.Y + fSiz.Y then return end
+            -- Convertir posicion a offset absoluto
             local tl = _resolveFrameTopLeft()
             mainFrame.AnchorPoint = Vector2.new(0, 0)
             mainFrame.Position    = UDim2.new(0, tl.X, 0, tl.Y)
@@ -56721,36 +56630,17 @@ particles = {}
             _activateDragEffect()
         end
 
-        -- Presionar en header: esperar hold o movimiento para iniciar drag
+        -- _onHeaderPress ahora activa drag inmediatamente sin esperar hold
         local function _onHeaderPress(inputPos2D)
-            if _G._hubSettings and _G._hubSettings.allowHubDrag == false then return end
-            if not _mouseOverHeader(inputPos2D) then return end
-            _holdPending  = true
-            _holdStartPos = Vector2.new(inputPos2D.X, inputPos2D.Y)
-            -- Cancelar thread anterior si existia
-            if _holdThread then
-                pcall(function() task.cancel(_holdThread) end)
-                _holdThread = nil
-            end
-            -- Activar drag tras mantener HOLD_THRESHOLD segundos
-            _holdThread = task.delay(HOLD_THRESHOLD, function()
-                if _holdPending then
-                    _holdPending = false
-                    _startDrag(inputPos2D)
-                end
-            end)
+            _startDrag(inputPos2D)
         end
 
-        -- Soltar: cancelar hold pendiente y terminar drag si estaba activo
+        -- Soltar: terminar drag
         local function _onRelease()
-            _holdPending = false
-            if _holdThread then
-                pcall(function() task.cancel(_holdThread) end)
-                _holdThread = nil
-            end
+            -- noop: el estado se limpia en InputEnded abajo
         end
 
-        -- InputBegan: solo activar hold si es sobre el header
+        -- InputBegan: activar drag inmediatamente al presionar
         _safeConnect(UserInputService.InputBegan, function(inp)
             if inp.UserInputType == Enum.UserInputType.MouseButton1 then
                 local mp = UserInputService:GetMouseLocation()
@@ -56760,33 +56650,12 @@ particles = {}
             end
         end)
 
-        -- InputChanged: si el usuario mueve el mouse/touch mas de MOVE_THRESHOLD
-        -- mientras tiene el header presionado, activar drag inmediatamente
+        -- InputChanged: sin logica de hold, solo movimiento real del drag activo
         _safeConnect(UserInputService.InputChanged, function(inp)
-            if _holdPending and _holdStartPos then
-                local curPos
-                if inp.UserInputType == Enum.UserInputType.MouseMovement then
-                    local mp = UserInputService:GetMouseLocation()
-                    curPos = Vector2.new(mp.X, mp.Y)
-                elseif inp.UserInputType == Enum.UserInputType.Touch then
-                    curPos = Vector2.new(inp.Position.X, inp.Position.Y)
-                end
-                if curPos then
-                    local dist = (curPos - _holdStartPos).Magnitude
-                    if dist >= MOVE_THRESHOLD then
-                        -- Movimiento suficiente: activar drag inmediatamente
-                        _holdPending = false
-                        if _holdThread then
-                            pcall(function() task.cancel(_holdThread) end)
-                            _holdThread = nil
-                        end
-                        _startDrag(Vector2.new(_holdStartPos.X, _holdStartPos.Y))
-                    end
-                end
-            end
+            -- no se necesita logica extra aqui: el drag activo lo maneja el bloque de abajo
         end)
 
-        -- dragIcon mantiene compatibilidad para executors que no exponen UIS correctamente
+        -- dragIcon: compatibilidad con executors que no exponen UIS correctamente
         dragIcon.InputBegan:Connect(function(inp)
             if inp.UserInputType == Enum.UserInputType.MouseButton1 then
                 local mp = UserInputService:GetMouseLocation()
@@ -57103,28 +56972,53 @@ particles = {}
         local r      = _G._tabBtnRefs[i]
         local stroke = r and r.stroke
         local lbl2   = r and r.lbl2
-        -- tint ignorado: el nuevo estilo no tiene fondo visible, solo borde y texto
+        local _ind    = btn:FindFirstChild("TabIndicator")
+        local _capBot = btn:FindFirstChild("TabCapBottom")
 
         if isActive then
-            -- CAPYBARA: Tab activa: borde rojo-rosa brillante + texto rosa claro
+            -- Pestana ACTIVA: fondo mas solido, borde brillante, indicador encendido
+            TweenService:Create(btn, _ti_tab, {
+                BackgroundTransparency = 0.35,
+                BackgroundColor3       = Color3.fromRGB(130, 22, 38),
+            }):Play()
+            if _capBot then TweenService:Create(_capBot, _ti_tab, {
+                BackgroundTransparency = 0.35,
+                BackgroundColor3       = Color3.fromRGB(130, 22, 38),
+            }):Play() end
             if stroke then TweenService:Create(stroke, _ti_tab, {
                 Transparency = 0,
-                Color        = Color3.fromRGB(255, 60, 90),  -- knob ON rojo intenso
-                Thickness    = 8,
+                Color        = Color3.fromRGB(255, 60, 90),
+                Thickness    = 3,
+            }):Play() end
+            if _ind then TweenService:Create(_ind, _ti_tab, {
+                BackgroundColor3       = Color3.fromRGB(255, 60, 90),
+                BackgroundTransparency = 0,
             }):Play() end
             if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3             = Color3.fromRGB(255, 190, 200),  -- rosa titulo
+                TextColor3             = Color3.fromRGB(255, 190, 200),
                 TextTransparency       = 0,
             }):Play() end
         else
-            -- CAPYBARA: Tab inactiva: borde rojo oscuro + texto rosa suave
+            -- Pestana INACTIVA: mas transparente, borde apagado, indicador oculto
+            TweenService:Create(btn, _ti_tab, {
+                BackgroundTransparency = 0.75,
+                BackgroundColor3       = Color3.fromRGB(115, 20, 32),
+            }):Play()
+            if _capBot then TweenService:Create(_capBot, _ti_tab, {
+                BackgroundTransparency = 0.75,
+                BackgroundColor3       = Color3.fromRGB(115, 20, 32),
+            }):Play() end
             if stroke then TweenService:Create(stroke, _ti_tab, {
-                Transparency = 0,
-                Color        = Color3.fromRGB(145, 30, 45),  -- rojo logo oscuro
-                Thickness    = 6,
+                Transparency = 0.3,
+                Color        = Color3.fromRGB(145, 30, 45),
+                Thickness    = 2,
+            }):Play() end
+            if _ind then TweenService:Create(_ind, _ti_tab, {
+                BackgroundColor3       = Color3.fromRGB(145, 30, 45),
+                BackgroundTransparency = 0.7,
             }):Play() end
             if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3             = Color3.fromRGB(215, 150, 160),  -- rosa medio
+                TextColor3             = Color3.fromRGB(215, 150, 160),
                 TextTransparency       = 0,
             }):Play() end
         end
@@ -57363,21 +57257,43 @@ particles = {}
         _tabTag.Name    = "TAB_BTN_PROTECTED"
         _tabTag.Value   = "1"
 
-        -- Esquinas redondeadas al contenedor
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        -- FORMA DE PESTANA: UICorner con radio visible arriba
+        local _btnCorner = Instance.new("UICorner", btn)
+        _btnCorner.CornerRadius = UDim.new(0, 10)
 
-        -- Borde azul oscuro grueso (estilo del c?digo de referencia)
+        -- Recorte inferior: Frame que tapa las esquinas redondeadas de abajo
+        local _tabCapBottom = Instance.new("Frame", btn)
+        _tabCapBottom.Name = "TabCapBottom"
+        _tabCapBottom.Size = UDim2.new(1, 0, 0.5, 0)
+        _tabCapBottom.Position = UDim2.new(0, 0, 0.5, 0)
+        _tabCapBottom.BackgroundColor3 = btn.BackgroundColor3
+        _tabCapBottom.BackgroundTransparency = btn.BackgroundTransparency
+        _tabCapBottom.BorderSizePixel = 0
+        _tabCapBottom.ZIndex = 13
+
+        -- Borde estilo pestana
         local btnStroke           = Instance.new("UIStroke", btn)
         btnStroke.Color           = Color3.fromRGB(145, 30, 45)
         btnStroke.Thickness       = 2
         btnStroke.Transparency    = 0.3
         btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
+        -- Linea indicadora lateral izquierda
+        local _tabIndicator = Instance.new("Frame", btn)
+        _tabIndicator.Name = "TabIndicator"
+        _tabIndicator.Size = UDim2.new(0, 3, 0.7, 0)
+        _tabIndicator.Position = UDim2.new(0, 0, 0.15, 0)
+        _tabIndicator.BackgroundColor3 = Color3.fromRGB(145, 30, 45)
+        _tabIndicator.BackgroundTransparency = 0.7
+        _tabIndicator.BorderSizePixel = 0
+        _tabIndicator.ZIndex = 15
+        Instance.new("UICorner", _tabIndicator).CornerRadius = UDim.new(0, 4)
+
         -- "tintOverlay" dummy para compatibilidad con _applyBtnState
         local tintOverlay = Instance.new("Frame", btn)
         tintOverlay.Name               = "TinteDiagonal"
         tintOverlay.Size               = UDim2.new(1, 0, 1, 0)
-        tintOverlay.BackgroundTransparency = 1  -- invisible: el estilo lo da el borde
+        tintOverlay.BackgroundTransparency = 1
         tintOverlay.BorderSizePixel    = 0
         tintOverlay.ZIndex             = 14
 
@@ -57724,7 +57640,7 @@ particles = {}
                                      or game:GetService("CoreGui"):FindFirstChild("f")
                                      or (gethui and gethui():FindFirstChild("f"))
                     if existingHub and _G._hubHidden then
-                        -- FIX TAMAÑO REOPEN MOBILE: escala correcta ANTES de Enabled=true
+                        -- FIX TAMA?O REOPEN MOBILE: escala correcta ANTES de Enabled=true
                         local _tgtSc = (_getTargetScale and _getTargetScale() or 0.70)
                         local uiScaleR = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
                         if uiScaleR then uiScaleR.Scale = _tgtSc * 0.75 end
@@ -57855,7 +57771,7 @@ particles = {}
         local _animOk, _animErr = pcall(function()
         if _G._hubAlreadyBuilt then
             -- Reaper sin animacion: mostrar directo con pop-in suave
-            -- FIX TAMAÑO REOPEN MOBILE: escala correcta ANTES de Visible=true
+            -- FIX TAMA?O REOPEN MOBILE: escala correcta ANTES de Visible=true
             local _tgtSc2 = (_getTargetScale and _getTargetScale() or 0.70)
             local _uiSR = mainFrame:FindFirstChildOfClass("UIScale")
             if _uiSR then _uiSR.Scale = _tgtSc2 * 0.75 end
