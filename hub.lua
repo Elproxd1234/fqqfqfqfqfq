@@ -6920,14 +6920,12 @@ do
                 local _vp  = _cam.ViewportSize
                 -- Punto de referencia: los pies del personaje (HRP.Position - Y del HRP)
                 -- Para obtener los "pies" bajamos un poco desde el HRP
-                local _feetPos = myHRP.Position - Vector3.new(0, 3.2, 0)
+                -- Pies exactos: HRP esta a ~2.8 studs del suelo en R15
+                local _feetPos = myHRP.Position - Vector3.new(0, 2.8, 0)
                 local _screenPos, _onScreen = _cam:WorldToViewportPoint(_feetPos)
                 if _onScreen then
-                    -- Convertir pixeles de viewport a escala 0-1 del ScreenGui
-                    local _sx = _screenPos.X / _vp.X
-                    local _sy = _screenPos.Y / _vp.Y
-                    -- Offset vertical: 20px extra debajo de los pies
-                    _ksaRefs._root.Position = UDim2.new(_sx, 0, _sy, 0)
+                    -- Posicion en pixeles directamente (UDim2 con offset en pixeles)
+                    _ksaRefs._root.Position = UDim2.new(0, _screenPos.X, 0, _screenPos.Y)
                 else
                     -- Personaje fuera de pantalla: ocultar overlay
                     _ksaRefs._root.Position = UDim2.new(2, 0, 2, 0)  -- fuera de pantalla
@@ -7043,6 +7041,171 @@ end
 -- ================================================================
 -- == FIN KNIFE SA FOV OVERLAY
 -- ================================================================
+
+-- ================================================================
+-- == KNIFE SA BODY LINES v1
+-- Dibuja lineas del esqueleto del PROPIO personaje usando Drawing API.
+-- Se activa automaticamente junto con Knife Silent Aim.
+-- Las lineas van desde la cabeza -> torso -> caderas -> manos/pies,
+-- centradas en los pies del personaje (mismo punto de referencia que el circulo).
+-- ================================================================
+do
+    local _blLines     = {}   -- tabla de Drawing.Line activos
+    local _blConn      = nil  -- conexion RunService
+    local _blEnabled   = true -- encendido por defecto con KSA
+
+    -- Pares de partes del cuerpo que forman las lineas del esqueleto
+    -- { parte_origen, parte_destino }
+    local SKELETON_PAIRS = {
+        -- Columna vertebral
+        { "Head",        "UpperTorso"    },
+        { "UpperTorso",  "LowerTorso"    },
+        { "LowerTorso",  "HumanoidRootPart" },
+        -- Brazos izquierdo
+        { "UpperTorso",  "LeftUpperArm"  },
+        { "LeftUpperArm","LeftLowerArm"  },
+        { "LeftLowerArm","LeftHand"      },
+        -- Brazos derecho
+        { "UpperTorso",  "RightUpperArm" },
+        { "RightUpperArm","RightLowerArm"},
+        { "RightLowerArm","RightHand"    },
+        -- Piernas izquierda
+        { "LowerTorso",  "LeftUpperLeg"  },
+        { "LeftUpperLeg","LeftLowerLeg"  },
+        { "LeftLowerLeg","LeftFoot"      },
+        -- Piernas derecha
+        { "LowerTorso",  "RightUpperLeg" },
+        { "RightUpperLeg","RightLowerLeg"},
+        { "RightLowerLeg","RightFoot"    },
+    }
+
+    local COL_BL_BODY  = Color3.fromRGB(0, 200, 255)   -- azul neon (igual que el anillo)
+    local COL_BL_READY = Color3.fromRGB(0, 230, 80)    -- verde cuando target en cono
+    local COL_BL_BAD   = Color3.fromRGB(220, 50, 50)   -- rojo sin target
+
+    local function _blCreateLines()
+        _blLines = {}
+        for i = 1, #SKELETON_PAIRS do
+            local ln = Drawing.new("Line")
+            ln.Visible   = false
+            ln.Thickness = 1.5
+            ln.Color     = COL_BL_BODY
+            ln.Transparency = 0.15
+            ln.ZIndex    = 5
+            _blLines[i] = ln
+        end
+    end
+
+    local function _blDestroyLines()
+        for _, ln in ipairs(_blLines) do
+            pcall(function() ln:Remove() end)
+        end
+        _blLines = {}
+        if _blConn then _blConn:Disconnect(); _blConn = nil end
+    end
+
+    local function _blStartLoop()
+        local cam = workspace.CurrentCamera
+        local rs  = game:GetService("RunService")
+        if _blConn then _blConn:Disconnect() end
+
+        _blCreateLines()
+
+        _blConn = rs.Heartbeat:Connect(function()
+            if not KnifeSAState.enabled or not _blEnabled then
+                for _, ln in ipairs(_blLines) do pcall(function() ln.Visible = false end) end
+                return
+            end
+
+            local myChar = LocalPlayer.Character
+            if not myChar then
+                for _, ln in ipairs(_blLines) do pcall(function() ln.Visible = false end) end
+                return
+            end
+
+            -- Determinar color segun estado del target
+            local target = _KnifeSA_getBestTarget and _KnifeSA_getBestTarget()
+            local lineColor = target and COL_BL_BODY or COL_BL_BAD
+
+            -- Si hay target, calcular si esta en el cono para color verde
+            if target and target.Character then
+                local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+                local tHRP  = target.Character:FindFirstChild("HumanoidRootPart")
+                if myHRP and tHRP then
+                    local toT2D  = Vector3.new(tHRP.Position.X - myHRP.Position.X, 0, tHRP.Position.Z - myHRP.Position.Z)
+                    local look2D = Vector3.new(myHRP.CFrame.LookVector.X, 0, myHRP.CFrame.LookVector.Z)
+                    if toT2D.Magnitude > 0.01 and look2D.Magnitude > 0.01 then
+                        local dot = math.clamp(look2D.Unit:Dot(toT2D.Unit), -1, 1)
+                        local ang = math.deg(math.acos(dot))
+                        if math.abs(ang) <= 25 then lineColor = COL_BL_READY end
+                    end
+                end
+            end
+
+            -- Dibujar cada par de lineas
+            for i, pair in ipairs(SKELETON_PAIRS) do
+                local ln  = _blLines[i]
+                if not ln then continue end
+                local p1  = myChar:FindFirstChild(pair[1])
+                local p2  = myChar:FindFirstChild(pair[2])
+                if p1 and p2 then
+                    local s1, on1 = cam:WorldToViewportPoint(p1.Position)
+                    local s2, on2 = cam:WorldToViewportPoint(p2.Position)
+                    if on1 and on2 and s1.Z > 0 and s2.Z > 0 then
+                        ln.From    = Vector2.new(s1.X, s1.Y)
+                        ln.To      = Vector2.new(s2.X, s2.Y)
+                        ln.Color   = lineColor
+                        ln.Visible = true
+                    else
+                        ln.Visible = false
+                    end
+                else
+                    ln.Visible = false
+                end
+            end
+        end)
+    end
+
+    -- Hookear activate / deactivate del Knife SA
+    local _blOrigActivate   = _KnifeSA_activate
+    local _blOrigDeactivate = _KnifeSA_deactivate
+
+    _KnifeSA_activate = function(...)
+        _blOrigActivate(...)
+        task.spawn(function()
+            task.wait(0.1)
+            if _blEnabled then _blStartLoop() end
+        end)
+    end
+
+    _KnifeSA_deactivate = function(...)
+        _blDestroyLines()
+        _blOrigDeactivate(...)
+    end
+
+    -- Guardar referencia global para el toggle de la UI
+    _G._ksaBodyLines = {
+        start   = _blStartLoop,
+        stop    = _blDestroyLines,
+        setEnabled = function(v)
+            _blEnabled = v
+            if not v then
+                for _, ln in ipairs(_blLines) do pcall(function() ln.Visible = false end) end
+            elseif KnifeSAState.enabled and #_blLines == 0 then
+                _blStartLoop()
+            end
+        end,
+    }
+
+    -- Limpiar al salir del personaje
+    LocalPlayer.CharacterRemoving:Connect(function()
+        if not KnifeSAState.enabled then _blDestroyLines() end
+    end)
+end
+-- ================================================================
+-- == FIN KNIFE SA BODY LINES
+-- ================================================================
+
 -- [State vars moved to _G to free local registers]
 _G.KnifeAuraTState= { enabled = false, range = 10000, conn = nil }
 _G.FakeBombState  = { enabled = false, conn = nil }
@@ -12412,13 +12575,11 @@ function CreateSlider(parent, nombre, minVal, maxVal, defaultVal, callback, step
         sliderThumb.Interactable = enabled
     end
 
+    -- FIX SCROLL: el container del slider no debe absorber el MouseWheel
+    pcall(function() _attachScrollPassthrough(container, sliderThumb) end)
+
     return { frame = container, SetEnabled = _setSliderEnabled }
 end
-
-
-
--- ==================================================================
--- CreateGlowButton -- boton con borde degradado animado cyan->menta->purpura
 -- Gradiente 45 deg: (0,162,255) -> (79,255,176) -> (138,43,226)
 -- Fondo oscuro casi negro para efecto glow premium
 -- ==================================================================
@@ -21120,14 +21281,14 @@ function CreateBorderedSection(parent, title)
     end
     local padding = Instance.new("UIPadding", section)
     padding.PaddingTop = UDim.new(0, 2)
-    padding.PaddingBottom = UDim.new(0, 4)
+    padding.PaddingBottom = UDim.new(0, 2)
     padding.PaddingLeft = UDim.new(0, 2)
     padding.PaddingRight = UDim.new(0, 2)
     local layout = Instance.new("UIListLayout", section)
-    layout.Padding = UDim.new(0, 6)
+    layout.Padding = UDim.new(0, 0)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     local wPad = Instance.new("UIPadding", wrapper)
-    wPad.PaddingBottom = UDim.new(0, 4)
+    wPad.PaddingBottom = UDim.new(0, 2)
     _currentMainSectionFrame = section
     return section
 end
@@ -29540,7 +29701,7 @@ end
 function CreateAuroraToggle(parent, nombre, callback, initialValue)
     local actualParent = _currentMainSectionFrame or parent
     local _trackedCol = (actualParent == leftColumn or (actualParent and actualParent.Parent == leftColumn)) and leftColumn or rightColumn
-    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 36
+    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 58
 
     _G._toggleStates = _G._toggleStates or {}
     local savedState = _G._toggleStates[nombre]
@@ -29564,14 +29725,14 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
 
     -- Detectar m?vil para ajustar tama?os
     local _isMobileTog = pcall(function() return UserInputService.TouchEnabled end) and UserInputService.TouchEnabled
-    local _toggleBgW   = 52
-    local _toggleBgH   = 26
-    local _knobSize    = 18
+    local _toggleBgW   = 80
+    local _toggleBgH   = 38
+    local _knobSize    = 28
     local _knobOffR    = -(_knobSize + 5)
     local _knobOffL    = 4
-    local _labelTxtSz  = 13
-    local _labelWScale = 0.55
-    local _rowH        = 36
+    local _labelTxtSz  = 16
+    local _labelWScale = 0.60
+    local _rowH        = 58
     local _toggleRightOff = -8
 
     -- Marco principal ? fondo azul transl?cido con borde azul (dise?o foto)
@@ -29943,6 +30104,25 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
 
     -- FIX MOBILE: Activated responde a touch en celu; MouseButton1Click no siempre lo hace
     clickRow.Activated:Connect(doToggle)
+
+    -- FIX SCROLL: TextButton absorbe MouseWheel e impide scroll del ScrollingFrame padre.
+    clickRow.Selectable = false
+    if _attachScrollPassthrough then
+        _attachScrollPassthrough(clickRow)
+    else
+        clickRow.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseWheel then
+                local p = container.Parent
+                while p do
+                    if p:IsA("ScrollingFrame") then
+                        p.CanvasPosition = Vector2.new(p.CanvasPosition.X, math.clamp(p.CanvasPosition.Y - input.Position.Z * 36, 0, math.max(0, p.AbsoluteCanvasSize.Y - p.AbsoluteSize.Y)))
+                        break
+                    end
+                    p = p.Parent
+                end
+            end
+        end)
+    end
 
     return container
 end
@@ -41695,12 +41875,12 @@ function CreateCombatTab()
         padding.PaddingLeft = UDim.new(0, 2)
         padding.PaddingRight = UDim.new(0, 2)
         local layout = Instance.new("UIListLayout", section)
-        layout.Padding = UDim.new(0, 2)
+        layout.Padding = UDim.new(0, 0)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
 
         -- Espaciado inferior del wrapper para que AutomaticSize funcione bien
         local wPad = Instance.new("UIPadding", wrapper)
-        wPad.PaddingBottom = UDim.new(0, 4)
+        wPad.PaddingBottom = UDim.new(0, 2)
 
         _currentMainSectionFrame = section
         return section
@@ -46248,6 +46428,103 @@ function CreateCombatTab()
 
     -- (Animation toggles removed ? handled automatically by Knife SA)    -- (Animation toggles removed ? handled automatically by Knife SA)
 
+    -- -------------------------------------------------------------------
+    -- KNIFE SA: FOV CIRCLE (From Mouse mode) - slider de radio en pixeles
+    -- -------------------------------------------------------------------
+    do
+        -- Inicializar mouseFovRadius si no existe
+        if not KnifeSAState.mouseFovRadius then KnifeSAState.mouseFovRadius = 120 end
+
+        -- Label informativo
+        local _mouseFovLbl = Instance.new("TextLabel", knifeSASection)
+        _mouseFovLbl.Size                = UDim2.new(1, -10, 0, 14)
+        _mouseFovLbl.BackgroundTransparency = 1
+        _mouseFovLbl.Text                = "Mouse FOV Radius (From Mouse mode):"
+        _mouseFovLbl.FontFace            = Font.fromEnum(Enum.Font.Arimo)
+        _mouseFovLbl.TextSize            = 10
+        _mouseFovLbl.TextColor3          = ThemeColors.TextSecondary
+        _mouseFovLbl.TextXAlignment      = Enum.TextXAlignment.Left
+        _mouseFovLbl.ZIndex              = 13
+
+        -- Slider de radio: 30 px (muy cerrado) a 600 px (casi toda la pantalla)
+        CreateSlider(knifeSASection, "FOV Radius px", 30, 600, KnifeSAState.mouseFovRadius, function(v)
+            KnifeSAState.mouseFovRadius = v
+            -- Actualizar el circulo de FOV si esta visible
+            if _G._ksaMouseFovCircle then
+                _G._ksaMouseFovCircle.Size = UDim2.new(0, v*2, 0, v*2)
+            end
+        end, 1)
+
+        -- Toggle: body lines (esqueleto del propio personaje sobre el circulo)
+        CreateAuroraToggle(knifeSASection, "Show Body Lines (skeleton)", function(on)
+            if _G._ksaBodyLines then
+                _G._ksaBodyLines.setEnabled(on)
+                CreateCustomNotification("KNIFE SA", on and "Body Lines ON" or "Body Lines OFF", 1.5)
+            end
+        end, true)  -- activado por defecto
+
+        -- Toggle: mostrar circulo visual del FOV alrededor del cursor
+        CreateAuroraToggle(knifeSASection, "Show Mouse FOV Circle", function(on)
+            _G._ksaShowMouseFovCircle = on
+            if not on then
+                if _G._ksaMouseFovGui then
+                    pcall(function() _G._ksaMouseFovGui:Destroy() end)
+                    _G._ksaMouseFovGui = nil
+                    _G._ksaMouseFovCircle = nil
+                    _G._ksaMouseFovConn = nil
+                end
+                return
+            end
+            -- Crear ScreenGui con circulo siguiendo el cursor
+            local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            if not pg then return end
+            local fovGui = Instance.new("ScreenGui")
+            fovGui.Name           = "KnifeSAMouseFOV"
+            fovGui.ResetOnSpawn   = false
+            fovGui.IgnoreGuiInset = true
+            fovGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            pcall(function() fovGui.Parent = game:GetService("CoreGui") end)
+            if not fovGui.Parent then fovGui.Parent = pg end
+            _G._ksaMouseFovGui = fovGui
+
+            local r = KnifeSAState.mouseFovRadius or 120
+            local circle = Instance.new("Frame", fovGui)
+            circle.Name                   = "FOVCircle"
+            circle.AnchorPoint            = Vector2.new(0.5, 0.5)
+            circle.Size                   = UDim2.new(0, r*2, 0, r*2)
+            circle.Position               = UDim2.new(0.5, 0, 0.5, 0)
+            circle.BackgroundTransparency = 1
+            circle.ZIndex                 = 30
+            local cc = Instance.new("UICorner", circle); cc.CornerRadius = UDim.new(1, 0)
+            local cs = Instance.new("UIStroke", circle)
+            cs.Color        = Color3.fromRGB(0, 200, 255)
+            cs.Thickness    = 1.8
+            cs.Transparency = 0.15
+            _G._ksaMouseFovCircle = circle
+
+            -- Loop de seguimiento del cursor
+            local rs = game:GetService("RunService")
+            local uis = game:GetService("UserInputService")
+            if _G._ksaMouseFovConn then pcall(function() _G._ksaMouseFovConn:Disconnect() end) end
+            _G._ksaMouseFovConn = rs.Heartbeat:Connect(function()
+                if not _G._ksaShowMouseFovCircle or not fovGui or not fovGui.Parent then
+                    if _G._ksaMouseFovConn then _G._ksaMouseFovConn:Disconnect(); _G._ksaMouseFovConn = nil end
+                    return
+                end
+                local mouse = uis:GetMouseLocation()
+                local vp    = workspace.CurrentCamera.ViewportSize
+                circle.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
+                -- Actualizar radio en tiempo real
+                local curR = KnifeSAState.mouseFovRadius or 120
+                if circle.Size.X.Offset ~= curR*2 then
+                    circle.Size = UDim2.new(0, curR*2, 0, curR*2)
+                end
+                -- Color segun si hay target en rango
+                local target = _KnifeSA_getBestTarget and _KnifeSA_getBestTarget()
+                cs.Color = target and Color3.fromRGB(0, 230, 80) or Color3.fromRGB(0, 200, 255)
+            end)
+        end, false)
+    end
 
     -- -------------------------------------------------------------------
     -- KILL ONE ? Selector estilo NebulaSelector + bot?n CreateButton con shimmer/glitch
@@ -56738,7 +57015,7 @@ particles = {}
     local dockLayout = Instance.new("UIListLayout", tabDockList)
     dockLayout.FillDirection = Enum.FillDirection.Vertical
     dockLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    dockLayout.Padding = UDim.new(0, 0)  -- espacio entre pesta?as redondeadas
+    dockLayout.Padding = UDim.new(0, 0)  -- sin separacion entre pestanas
     dockLayout.SortOrder = Enum.SortOrder.LayoutOrder
     local dockPad = Instance.new("UIPadding", tabDockList)
     dockPad.PaddingTop    = UDim.new(0, 0)
@@ -56760,12 +57037,12 @@ particles = {}
 
     -- Tama?os del knob (igual que en CreateAuroraToggle)
     local _isMobileTog  = pcall(function() return UserInputService.TouchEnabled end) and UserInputService.TouchEnabled
-    local _knobBgW      = _isMobileTog and 52 or 65
-    local _knobBgH      = _isMobileTog and 26 or 32
-    local _knobSz       = _isMobileTog and 18 or 24
-    local _knobOffR     = _isMobileTog and -(_knobSz + 5) or -28
-    local _lblTxtSz     = _isMobileTog and 13 or 14
-    local _rowH         = _isMobileTog and 70 or 80   -- altura de cada pesta?a
+    local _knobBgW      = _isMobileTog and 62 or 80
+    local _knobBgH      = _isMobileTog and 30 or 38
+    local _knobSz       = _isMobileTog and 22 or 28
+    local _knobOffR     = _isMobileTog and -(_knobSz + 5) or -32
+    local _lblTxtSz     = _isMobileTog and 14 or 16
+    local _rowH         = _isMobileTog and 80 or 58
 
     local function _syncDockPos() end  -- no-op
 
@@ -56854,6 +57131,7 @@ particles = {}
             end
         end)
 
+        clickRow.Selectable = false
         clickRow.Activated:Connect(function()
             PlayTabSound()
             local wasVisible = contentContainer.Visible
@@ -56863,6 +57141,16 @@ particles = {}
             end
             SetActiveTab(i)
             _G._tabContentActive = true
+        end)
+
+        -- FIX SCROLL: pasar MouseWheel al tabDockList para poder scrollear la lista de tabs
+        clickRow.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseWheel then
+                tabDockList.CanvasPosition = Vector2.new(
+                    0,
+                    math.clamp(tabDockList.CanvasPosition.Y - input.Position.Z * 36, 0, math.max(0, tabDockList.AbsoluteCanvasSize.Y - tabDockList.AbsoluteSize.Y))
+                )
+            end
         end)
 
         sideButtons[i] = btn
