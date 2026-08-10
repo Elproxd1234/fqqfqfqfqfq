@@ -38643,8 +38643,11 @@ function CreatePremiumTab()
             skinIdx        = 1,
             origData       = {},
             _equippedConns = {},  -- FIX MOBILE v2: listeners de Equipped por tool
+            scaleOverrides = {},  -- FIX: multiplicador de escala POR SKIN (no compartido)
         }
         _G._skinChangerState = _skinState
+        -- Asegurar que scaleOverrides existe en estados restaurados de ejecuciones anteriores
+        _skinState.scaleOverrides = _skinState.scaleOverrides or {}
 
         local _SC_GUN_SKINS = {
             {
@@ -38718,7 +38721,7 @@ function CreatePremiumTab()
                 name   = "usp",
                 meshId = "rbxassetid://134394025639309",
                 texId  = "rbxassetid://129462008300983",
-                scale  = Vector3.new(0.007, 0.007, 0.007),
+                scale  = Vector3.new(1.2, 1.2, 1.2),
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
                 dualGun = true,
             },
@@ -38727,7 +38730,7 @@ function CreatePremiumTab()
                 name   = "scopeta",
                 meshId = "rbxassetid://71470025203613",
                 texId  = "rbxassetid://131252913061296",
-                scale  = Vector3.new(0.0025, 0.0025, 0.0025),
+                scale  = Vector3.new(1.0, 1.0, 1.0),
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
                 dualGun = true,
                 soundId = "rbxassetid://6012216349",
@@ -38845,6 +38848,11 @@ function CreatePremiumTab()
             end
             pcall(function() tool.Grip = skin.grip end)
 
+            -- FIX SCALE INDEPENDIENTE: usar el multiplicador guardado para esta skin especifica
+            -- _skinState.scaleOverrides[skin.name] = multiplicador (por defecto 1.0)
+            local _scaleMult = (_skinState.scaleOverrides and _skinState.scaleOverrides[skin.name]) or 1.0
+            local _effectiveScale = skin.scale * _scaleMult
+
             -- PASO 1: manejar el Handle directamente (mismo enfoque que actualizarBomba/GoldBomb)
             local handle = tool:FindFirstChild("Handle")
             if handle then
@@ -38859,7 +38867,7 @@ function CreatePremiumTab()
                     pcall(function()
                         existingSM.MeshId    = skin.meshId
                         existingSM.TextureId = skin.texId
-                        existingSM.Scale     = skin.scale
+                        existingSM.Scale     = _effectiveScale
                     end)
                 elseif handle:IsA("MeshPart") then
                     -- Handle MeshPart moderno
@@ -38887,7 +38895,7 @@ function CreatePremiumTab()
                         pcall(function()
                             _smFake.MeshId    = skin.meshId
                             _smFake.TextureId = skin.texId
-                            _smFake.Scale     = skin.scale
+                            _smFake.Scale     = _effectiveScale
                         end)
                     end
                 else
@@ -38912,7 +38920,7 @@ function CreatePremiumTab()
                     pcall(function()
                         obj.MeshId    = skin.meshId
                         obj.TextureId = skin.texId
-                        obj.Scale     = skin.scale
+                        obj.Scale     = _effectiveScale
                     end)
                 elseif obj:IsA("MeshPart") and obj ~= handle then
                     if not _skinState.origData[tool].Elements[obj] then
@@ -38943,7 +38951,7 @@ function CreatePremiumTab()
                             pcall(function()
                                 obj.MeshId    = skin.meshId
                                 obj.TextureId = skin.texId
-                                obj.Scale     = skin.scale
+                                obj.Scale     = _effectiveScale
                             end)
                         elseif obj:IsA("MeshPart") then
                             pcall(function()
@@ -39256,6 +39264,21 @@ function CreatePremiumTab()
             CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
         end)
 
+        -- SLIDER: Tamaño de la skin de gun SELECCIONADA (independiente por skin)
+        -- Cada skin guarda su propio multiplicador en _skinState.scaleOverrides[skinName]
+        -- El slider se actualiza al cambiar de skin via _G._scGunSizeSliderUpdate
+        do
+            local _gunSizeSlider = CreateSlider(leftColumn, "Tamaño Skin Gun (%)", 10, 300, 100, function(val)
+                local _curSkin = _scGetSkin and _scGetSkin()
+                if not _curSkin or _skinState.mode ~= "gun" then return end
+                -- Guardar el multiplicador SOLO para esta skin (no afecta otras)
+                _skinState.scaleOverrides[_curSkin.name] = val / 100
+                -- Re-aplicar la skin al arma actual con el nuevo scale
+                local tool = _findGun and _findGun()
+                if tool then pcall(function() _scApply(tool, _curSkin, true) end) end
+            end)
+        end
+
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
         do
             local _knifeNames = {}
@@ -39456,6 +39479,17 @@ function CreatePremiumTab()
                 end)
 
                 CreateCustomNotification("?? KNIFE SKIN", sel .. " aplicada!", 3)
+            end)
+
+            -- SLIDER: Tamaño de la skin de knife SELECCIONADA (independiente por skin)
+            CreateSlider(leftColumn, "Tamaño Skin Knife (%)", 10, 300, 100, function(val)
+                local _curSkin = _scGetSkin and _scGetSkin()
+                if not _curSkin or _skinState.mode ~= "knife" then return end
+                -- Guardar el multiplicador SOLO para esta skin knife
+                _skinState.scaleOverrides[_curSkin.name] = val / 100
+                -- Re-aplicar con nuevo scale
+                local _kn = _findKnife and _findKnife()
+                if _kn then pcall(function() _scApply(_kn, _curSkin, true) end) end
             end)
         end  -- cierra do knife selector
     end  -- cierra do SKIN CHANGER (abierto en l?nea 38252)
@@ -40534,7 +40568,7 @@ function CreateExclusiveTab()
                 sc.Scale = v / 100
                 -- Mantener el tama?o base correcto segun dispositivo
                 do
-                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 750, 0, 420)
+                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
                 end
             end)
@@ -53806,7 +53840,7 @@ minimizeBtn.Activated:Connect(function()
                 -- FIX TAMA?O: restaurar Size segun dispositivo antes de restaurar UIScale
                 if mainFrame then
                     do
-                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 750, 0, 420)
+                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
                 end
                     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -54080,7 +54114,7 @@ closeBtn.Activated:Connect(function()
                 -- FIX TAMA?O: restaurar Size segun dispositivo (modificado por tween de cierre)
                 if mainFrame then
                     do
-                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 750, 0, 420)
+                    local _ns = (_getHubSize and _getHubSize()) or UDim2.new(0, 820, 0, 460)
                     if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
                 end
                     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -55394,7 +55428,7 @@ function abrirHub()
         end)
         -- FIX TAMA?O: restaurar Size segun dispositivo antes del tween de escala
         if mainFrame then
-            do local _ns = UDim2.new(0, 750, 0, 420)
+            do local _ns = UDim2.new(0, 820, 0, 460)
                 if _G._setHubFrameSize then _G._setHubFrameSize(_ns) else mainFrame.Size = _ns end
             end
             mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -55503,7 +55537,7 @@ mainFrame.ClipsDescendants = true
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================
--- == FONDO PERSONALIZADO DEL HUB (imagen de fondo)
+-- == FONDO PERSONALIZADO DEL HUB (imagen de fondo con pan lento)
 -- ================================================================
 do
     local hubBgImage = Instance.new("ImageLabel", mainFrame)
@@ -55515,12 +55549,54 @@ do
     hubBgImage.Image = "rbxassetid://105280213845048"
     hubBgImage.ImageTransparency = 0
     hubBgImage.BackgroundTransparency = 1
-    hubBgImage.ScaleType = Enum.ScaleType.Crop
+    -- ScaleType Stretch + ImageRectSize/Offset nos permite "recortar" y mover
+    -- una ventana mas chica sobre la imagen, logrando el efecto de pan sin mover el frame
+    hubBgImage.ScaleType = Enum.ScaleType.Stretch
+    -- Rect que cubre toda la imagen (usamos 0,0 como origen; ajustamos abajo)
+    hubBgImage.ImageRectSize  = Vector2.new(820, 460)   -- mismo tama?o que el hub
+    hubBgImage.ImageRectOffset = Vector2.new(0, 0)
     Instance.new("UICorner", hubBgImage).CornerRadius = UDim.new(0, 8)
     -- Hacer el fondo del frame transparente para que solo se vea la imagen
     mainFrame.BackgroundTransparency = 1
     -- Guardar referencia global para que _applyHubBackground pueda acceder
     _G._hubBgMainImageRef = hubBgImage
+
+    -- ============================================================
+    -- ANIMACION: pan lento tipo "Ken Burns lite"
+    -- Mueve el ImageRectOffset suavemente en un loop de 4 fases,
+    -- volviendo siempre al origen para que sea perfecto e infinito.
+    -- El offset maximo es 60px X y 40px Y (imperceptible pero bonito).
+    -- ============================================================
+    local _bgAnimRunning = true
+    _G._hubBgAnimStop = function() _bgAnimRunning = false end
+
+    task.spawn(function()
+        -- Keyframes del pan: (offsetX, offsetY, duracion en segundos)
+        local _kf = {
+            {ox =  0,  oy =  0,  t = 0},
+            {ox = 60,  oy = 20,  t = 9},
+            {ox = 40,  oy = 40,  t = 9},
+            {ox = 10,  oy = 25,  t = 9},
+            {ox =  0,  oy =  0,  t = 9},
+        }
+        local _idx = 1
+        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
+            local _nxt = (_idx % (#_kf - 1)) + 2  -- avanza al siguiente keyframe (circular, saltea el 1)
+            if _idx == 1 then _nxt = 2 end
+            local _from = _kf[_idx]
+            local _to   = _kf[_nxt]
+            local _dur  = _to.t
+            -- Tween suave entre dos keyframes usando Sine InOut
+            local _ti = TweenInfo.new(_dur, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            TweenService:Create(hubBgImage, _ti, {
+                ImageRectOffset = Vector2.new(_to.ox, _to.oy)
+            }):Play()
+            task.wait(_dur)
+            _idx = _nxt
+            -- Al llegar al ultimo, volver al primero (ox=0, oy=0) sin salto brusco
+            if _nxt == #_kf then _idx = 1 end
+        end
+    end)
 end
 
 -- ================================================================
@@ -55604,7 +55680,7 @@ end)
 _G._isMobileHub = _isMobileHub
 
 -- Tama?o base fijo: UIScale se encarga de ajustar segun dispositivo
-mainFrame.Size = UDim2.new(0, 750, 0, 420)
+mainFrame.Size = UDim2.new(0, 820, 0, 460)
 
 -- ================================================================
 -- == GUARDIAN DE FORMA DEL HUB v1
@@ -55615,7 +55691,7 @@ mainFrame.Size = UDim2.new(0, 750, 0, 420)
 -- script pise el frame del hub.
 -- ================================================================
 do
-    local _guardSize   = UDim2.new(0, 750, 0, 420)
+    local _guardSize   = UDim2.new(0, 820, 0, 460)
     local _guardPos    = UDim2.new(0.5, 0, 0.5, 0)
     local _guardAnchor = Vector2.new(0.5, 0.5)
     local _guardBusy   = false   -- re-entrancy lock
@@ -55722,7 +55798,7 @@ end
 
 -- Helper global: siempre 750x420 (UIScale se encarga de la escala)
 _getHubSize = function()
-    return UDim2.new(0, 750, 0, 420)
+    return UDim2.new(0, 820, 0, 460)
 end
 
 uiScale = Instance.new("UIScale", mainFrame)
@@ -56396,7 +56472,7 @@ particles = {}
     header.Size = UDim2.new(1, 0, 0, 36)
     header.Position = UDim2.new(0, 0, 0, 0)
     header.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
-    header.BackgroundTransparency = 1  -- fondo del header invisible
+    header.BackgroundTransparency = 0.10  -- header visible
     header.BorderSizePixel = 0
     header.ZIndex = 10
     header.Active = true
@@ -57122,7 +57198,8 @@ particles = {}
     tabDockFrame.BorderSizePixel = 0
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
-    tabDockFrame.BackgroundTransparency = 1
+    tabDockFrame.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
+    tabDockFrame.BackgroundTransparency = 0.15
     tabDockFrame.Position = UDim2.new(0.65, 0, 0, 36)
     tabDockFrame.Size = UDim2.new(0.35, 0, 1, -36)
     tabDockFrame.Visible  = true
@@ -57132,6 +57209,15 @@ particles = {}
     _dockStroke.Thickness       = 0
     _dockStroke.Transparency    = 1.0
     _dockStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    -- Borde izquierdo separador entre contenido y tabs
+    local _dockDivider = Instance.new("Frame", tabDockFrame)
+    _dockDivider.Name = "DockDivider"
+    _dockDivider.Size = UDim2.new(0, 2, 1, 0)
+    _dockDivider.Position = UDim2.new(0, 0, 0, 0)
+    _dockDivider.BackgroundColor3 = Color3.fromRGB(210, 85, 100)
+    _dockDivider.BackgroundTransparency = 0.4
+    _dockDivider.BorderSizePixel = 0
+    _dockDivider.ZIndex = 14
 
     local tabDockList = Instance.new("ScrollingFrame", tabDockFrame)
     tabDockList.Name = "DockList"
@@ -57335,12 +57421,12 @@ particles = {}
         TweenService:Create(arrowToggleBtn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(255, 180, 0), BackgroundTransparency = 0.5}):Play()
         -- Ocultar dock de tabs al mostrar server panel
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 1 end
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.15 end
             contentContainer.Position = UDim2.new(0, 0, 1.5, 0)
             serverPanel.Visible = true
             serverPanel.Position = UDim2.new(0, 20, 0, 60)
         else
-            if tabDockFrame then TweenService:Create(tabDockFrame, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end
+            if tabDockFrame then TweenService:Create(tabDockFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0.15}):Play() end
             TweenService:Create(contentContainer, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0, 0, 1.5, 0)}):Play()
             task.wait(0.32)
             serverPanel.Visible = true
@@ -57358,7 +57444,7 @@ particles = {}
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
             serverPanel.Visible = false
             if fpsConn then fpsConn:Disconnect(); fpsConn = nil end
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 1 end
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.15 end
             if contentContainer.Visible then
                 contentContainer.Position = UDim2.new(0, 0, 0, 36)
             end
@@ -57479,7 +57565,7 @@ particles = {}
                 end
                 TweenService:Create(_mainFrameRef, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
                 if tabDockFrame then
-                    TweenService:Create(tabDockFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+                    TweenService:Create(tabDockFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0.15}):Play()
                 end
             end)
         end
