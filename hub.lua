@@ -39185,14 +39185,14 @@ function CreatePremiumTab()
             -- Glitch ultra rapido en el borde
             task.spawn(function()
                 while _waitFrame and _waitFrame.Parent do
-                    task.wait(math.random(1, 4) + math.random() * 0.5)
+                    task.wait(math.random(2, 5) + math.random() * 0.5)
                     if not _waitFrame.Parent then break end
                     pcall(function() _waitStroke.Transparency = 0; _waitStroke.Thickness = 2 end)
-                    task.wait(0.03)
+                    task.wait(0.08)  -- OPT: era 0.03 -> 0.08 (reduce CPU)
                     pcall(function() _waitStroke.Transparency = 0.85; _waitStroke.Thickness = 0.8 end)
-                    task.wait(0.02)
+                    task.wait(0.08)  -- OPT: era 0.02 -> 0.08
                     pcall(function() _waitStroke.Transparency = 0; _waitStroke.Thickness = 1.8 end)
-                    task.wait(0.025)
+                    task.wait(0.08)  -- OPT: era 0.025 -> 0.08
                     pcall(function() _waitStroke.Transparency = 0.3; _waitStroke.Thickness = 1.2 end)
                 end
             end)
@@ -57756,10 +57756,11 @@ particles = {}
                 _G._tabContentActive = false
                 -- FIX: hub inicia SIN pestana abierta; el usuario elige al clickear
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo
-            task.delay(0.6, function()
+            task.delay(1.5, function()
                 local _savedBg = _G._hubBackgrounds and _G._hubBackgrounds.current or 0
                 -- FIX COLORES REABRIR: si _restoreBackground ya existe, usarlo.
                 -- Si no existe (tab Use aun no buildeado), aplicar tema guardado directamente.
+                -- OPT: delay aumentado a 1.5s para que el tab 1 termine de renderizar
                 if _savedBg > 0 and _G._restoreBackground then
                     pcall(_G._restoreBackground, _savedBg)
                 else
@@ -57802,10 +57803,11 @@ particles = {}
                 contentContainer.Position = UDim2.new(0, 0, 0, 36)
                 pcall(function() SetActiveTab(1) end)  -- 1 = MAIN
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo
-            task.delay(0.6, function()
+            task.delay(1.5, function()
                 local _savedBg = _G._hubBackgrounds and _G._hubBackgrounds.current or 0
                 -- FIX COLORES REABRIR: si _restoreBackground ya existe, usarlo.
                 -- Si no existe (tab Use aun no buildeado), aplicar tema guardado directamente.
+                -- OPT: delay aumentado a 1.5s para que el tab 1 termine de renderizar
                 if _savedBg > 0 and _G._restoreBackground then
                     pcall(_G._restoreBackground, _savedBg)
                 else
@@ -57815,20 +57817,20 @@ particles = {}
             end)
             -- FIX AUTO SAVE: pre-buildear Settings en background (path _hubAlreadyBuilt)
             -- FIX DOUBLE COLUMN: delay aumentado a 1.2s para que SetActiveTab(1) tome el mutex primero
-            task.delay(1.2, function()
+            task.delay(5.5, function()
                 pcall(function() _buildTabCached(5) end)
             end)
             -- AUTO-BUILD TODOS LOS TABS: para que toggles guardados de cualquier pesta?a
             -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
             -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes
             -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-            task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
-            task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
-            task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
-            -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-            task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
-            task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
-            task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
+            task.delay(2.5, function() pcall(function() _buildTabCached(2) end) end)
+            task.delay(4.0, function() pcall(function() _buildTabCached(3) end) end)
+            task.delay(7.0, function() pcall(function() _buildTabCached(6) end) end)
+            -- FIX USE EN BLANCO: gaps ampliados para reducir lag al cargar
+            task.delay(9.0, function() pcall(function() _buildTabCached(7) end) end)
+            task.delay(11.0, function() pcall(function() _buildTabCached(8) end) end)
+            task.delay(13.0, function() pcall(function() _buildTabCached(9) end) end)
             return
         end
 
@@ -58240,20 +58242,20 @@ particles = {}
         -- se auto-active si estaba ON en disco. Sin esto, el toggle solo se crea
         -- cuando el usuario navega a Settings manualmente.
         -- FIX DOUBLE COLUMN: delay aumentado a 1.2s para que SetActiveTab(1) tome el mutex primero
-        task.delay(0.8, function()
+        task.delay(5.5, function()
             pcall(function() _buildTabCached(5) end)
         end)
         -- AUTO-BUILD TODOS LOS TABS: para que toggles guardados de cualquier pesta?a
         -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
         -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes
         -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-        task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
-        task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
-        task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
-        -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-        task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
-        task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
-        task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
+        task.delay(2.5, function() pcall(function() _buildTabCached(2) end) end)
+        task.delay(4.0, function() pcall(function() _buildTabCached(3) end) end)
+        task.delay(7.0, function() pcall(function() _buildTabCached(6) end) end)
+        -- FIX USE EN BLANCO: gaps ampliados para reducir lag al cargar
+        task.delay(9.0, function() pcall(function() _buildTabCached(7) end) end)
+        task.delay(11.0, function() pcall(function() _buildTabCached(8) end) end)
+        task.delay(13.0, function() pcall(function() _buildTabCached(9) end) end)
         -- AUTORESTORE: notificar si se restauraron toggles activos desde disco (config por jugador)
         -- FIX NOTIF SPAWN: solo mostrar la primera vez que el hub carga en este servidor.
         -- _G._autoRestoreNotifShown evita que la notif aparezca cada vez que el jugador
@@ -58301,10 +58303,11 @@ particles = {}
                 contentContainer.Position = UDim2.new(0, 0, 0, 36)
                 pcall(function() SetActiveTab(1) end)  -- 1 = MAIN
             -- FIX FONDO: restaurar el fondo seleccionado si habia uno activo
-            task.delay(0.6, function()
+            task.delay(1.5, function()
                 local _savedBg = _G._hubBackgrounds and _G._hubBackgrounds.current or 0
                 -- FIX COLORES REABRIR: si _restoreBackground ya existe, usarlo.
                 -- Si no existe (tab Use aun no buildeado), aplicar tema guardado directamente.
+                -- OPT: delay aumentado a 1.5s para que el tab 1 termine de renderizar
                 if _savedBg > 0 and _G._restoreBackground then
                     pcall(_G._restoreBackground, _savedBg)
                 else
@@ -58314,20 +58317,20 @@ particles = {}
             end)
             -- FIX AUTO SAVE: pre-buildear Settings en background (path fallback animacion)
             -- FIX DOUBLE COLUMN: delay aumentado a 1.2s para que SetActiveTab(1) tome el mutex primero
-            task.delay(1.2, function()
+            task.delay(5.5, function()
                 pcall(function() _buildTabCached(5) end)
             end)
             -- AUTO-BUILD TODOS LOS TABS: para que toggles guardados de cualquier pesta?a
             -- se registren y ejecuten su funci?n sin necesidad de entrar a cada pesta?a.
             -- idx: 1=Main 2=World 3=Visuals 4=Premium 5=Settings 6=Combat 7=Use 8=Emotes 9=Update
             -- FIX RACE: gaps de 0.5s entre tabs para que leftColumn/rightColumn no se pisen
-            task.delay(0.6, function() pcall(function() _buildTabCached(2) end) end)
-            task.delay(1.2, function() pcall(function() _buildTabCached(3) end) end)
-            task.delay(1.8, function() pcall(function() _buildTabCached(6) end) end)
-            -- FIX USE EN BLANCO: gaps ampliados para evitar race condition en leftColumn/rightColumn
-            task.delay(3.0, function() pcall(function() _buildTabCached(7) end) end)
-            task.delay(4.5, function() pcall(function() _buildTabCached(8) end) end)
-            task.delay(6.0, function() pcall(function() _buildTabCached(9) end) end)
+            task.delay(2.5, function() pcall(function() _buildTabCached(2) end) end)
+            task.delay(4.0, function() pcall(function() _buildTabCached(3) end) end)
+            task.delay(7.0, function() pcall(function() _buildTabCached(6) end) end)
+            -- FIX USE EN BLANCO: gaps ampliados para reducir lag al cargar
+            task.delay(9.0, function() pcall(function() _buildTabCached(7) end) end)
+            task.delay(11.0, function() pcall(function() _buildTabCached(8) end) end)
+            task.delay(13.0, function() pcall(function() _buildTabCached(9) end) end)
         end
     end)
 
