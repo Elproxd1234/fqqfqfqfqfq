@@ -40867,6 +40867,405 @@ function CreateExclusiveTab()
         end)
     end
 
+    -- ================================================================
+    -- CUSTOM COLOR PICKER CON SLIDER DE BRILLO
+    -- Permite cambiar el color base del hub via hex + slider claro/oscuro
+    -- ================================================================
+    do
+        local cpSec = CreateBorderedSectionGlobal(rightColumn, " COLOR PERSONALIZADO")
+
+        -- Estado interno del color picker
+        _G._hubSettings.customColorHex   = _G._hubSettings.customColorHex   or "FF0000"
+        _G._hubSettings.customColorBright = _G._hubSettings.customColorBright or 50  -- 0=oscuro, 100=claro
+
+        -- Funcion: convertir hex string a r,g,b (0-1)
+        local function hexToRGB(hex)
+            hex = hex:gsub("#",""):upper()
+            if #hex ~= 6 then return nil end
+            local r = tonumber(hex:sub(1,2),16)
+            local g = tonumber(hex:sub(3,4),16)
+            local b = tonumber(hex:sub(5,6),16)
+            if not (r and g and b) then return nil end
+            return r/255, g/255, b/255
+        end
+
+        -- Funcion: aplicar brillo (0=negro, 50=color puro, 100=blanco) a un Color3
+        local function applyBrightness(r, g, b, bright)
+            -- bright: 0..50 -> mezclar con negro; 50..100 -> mezclar con blanco
+            local t = bright / 100  -- 0..1
+            if t <= 0.5 then
+                -- oscuro: lerp de negro (t=0) a color puro (t=0.5)
+                local f = t / 0.5
+                return r*f, g*f, b*f
+            else
+                -- claro: lerp de color puro (t=0.5) a blanco (t=1)
+                local f = (t - 0.5) / 0.5
+                return r + (1-r)*f, g + (1-g)*f, b + (1-b)*f
+            end
+        end
+
+        -- Funcion: aplicar el color actual al hub usando ApplyTheme
+        local function _applyCustomColor()
+            local r, g, b = hexToRGB(_G._hubSettings.customColorHex)
+            if not r then
+                CreateCustomNotification("COLOR", "Hex invalido! Ej: FF0000", 2)
+                return
+            end
+            local bright = _G._hubSettings.customColorBright or 50
+
+            local function c3(cr, cg, cb)
+                return Color3.new(math.clamp(cr,0,1), math.clamp(cg,0,1), math.clamp(cb,0,1))
+            end
+
+            -- bright=50 -> color puro | bright<50 -> oscuro | bright>50 -> claro
+            local bR, bG, bB           = applyBrightness(r, g, b, bright)
+            -- Fondos: bastante mas oscuros
+            local darkR, darkG, darkB  = applyBrightness(r, g, b, math.max(4,  bright - 38))
+            -- Fondo intermedio (Secondary)
+            local midR,  midG,  midB   = applyBrightness(r, g, b, math.max(8,  bright - 25))
+            -- Acento: ligeramente mas brillante
+            local accR,  accG,  accB   = applyBrightness(r, g, b, math.min(96, bright + 12))
+            -- Aurora2: mas saturado/brillante
+            local a2R,   a2G,   a2B    = applyBrightness(r, g, b, math.min(98, bright + 20))
+            -- Aurora3: rosa/claro (badge, textos de acento)
+            local a3R,   a3G,   a3B    = applyBrightness(r, g, b, math.min(99, bright + 40))
+            -- Aurora4: muy claro, casi blanco tintado
+            local a4R,   a4G,   a4B    = applyBrightness(r, g, b, math.min(99, bright + 55))
+            -- Texto primario: siempre muy claro
+            local txR,   txG,   txB    = applyBrightness(r, g, b, math.min(99, bright + 60))
+            -- Texto secundario: claro pero un poco menos
+            local ts2R,  ts2G,  ts2B   = applyBrightness(r, g, b, math.min(97, bright + 48))
+
+            -- Construir el tema dinamico con todos los keys que ApplyTheme necesita
+            local dynamicTheme = {
+                Primary         = c3(bR,   bG,   bB),
+                Secondary       = c3(midR,  midG,  midB),
+                Accent          = c3(accR,  accG,  accB),
+                Background      = c3(darkR, darkG, darkB),
+                BackgroundLight = c3(midR,  midG,  midB),
+                TextPrimary     = c3(txR,   txG,   txB),
+                TextSecondary   = c3(ts2R,  ts2G,  ts2B),
+                Aurora1         = c3(bR,   bG,   bB),
+                Aurora2         = c3(a2R,  a2G,  a2B),
+                Aurora3         = c3(a3R,  a3G,  a3B),
+                Aurora4         = c3(a4R,  a4G,  a4B),
+            }
+
+            -- Registrar en Themes para que ApplyTheme lo encuentre
+            Themes["__CustomColor"] = dynamicTheme
+
+            -- Guardar transparencias ANTES del remap para restaurarlas despues
+            local _savedMainT    = mainFrame        and mainFrame.BackgroundTransparency
+            local _savedContentT = contentContainer and contentContainer.BackgroundTransparency
+
+            -- Guardar ImageColor3 de TODOS los ImageLabel/Button con imagen rbxassetid
+            -- para restaurarlos despues (ApplyTheme los corrompe a negro)
+            local _savedImgColors = {}
+            pcall(function()
+                if mainFrame and mainFrame.Parent then
+                    for _, obj in ipairs(mainFrame:GetDescendants()) do
+                        pcall(function()
+                            if (obj:IsA("ImageLabel") or obj:IsA("ImageButton"))
+                            and obj.Image ~= ""
+                            and obj.Image:find("rbxassetid://") then
+                                _savedImgColors[obj] = obj.ImageColor3
+                            end
+                        end)
+                    end
+                end
+            end)
+
+            -- Usar ApplyTheme: hace el remap completo sobre todos los descendants
+            ApplyTheme("__CustomColor")
+
+            -- ApplyTheme tweenea BackgroundColor3 pero puede corromper:
+            -- 1) Transparencias de mainFrame/contentContainer (quedan invisibles)
+            -- 2) ImageColor3 de ImageLabels con imagen rbxassetid (quedan negros/invisibles)
+            -- Restaurar todo en el siguiente frame.
+            task.defer(function()
+                pcall(function()
+                    if mainFrame and mainFrame.Parent then
+                        mainFrame.BackgroundTransparency = _savedMainT or 0.82
+                    end
+                    if contentContainer and contentContainer.Parent then
+                        contentContainer.BackgroundTransparency = _savedContentT or 0.55
+                        contentContainer.BackgroundColor3 = dynamicTheme.Background
+                    end
+                    -- Actualizar el borde del hub al nuevo color primario
+                    if glowBorder and glowBorder.Parent then
+                        glowBorder.Color = dynamicTheme.Primary
+                    end
+                    -- Actualizar el borde del contentContainer
+                    pcall(function()
+                        local _cc = mainFrame:FindFirstChild("ContentContainer")
+                        if _cc then
+                            local _st = _cc:FindFirstChildOfClass("UIStroke")
+                            if _st then _st.Color = dynamicTheme.Primary end
+                        end
+                    end)
+                    -- RESTAURAR ImageColor3 de todos los ImageLabels con rbxassetid.
+                    -- ApplyTheme los mapea al color mas cercano del tema (frecuentemente
+                    -- negro/oscuro), haciendo que las imagenes desaparezcan visualmente.
+                    for obj, savedColor in pairs(_savedImgColors) do
+                        pcall(function()
+                            if obj and obj.Parent then
+                                obj.ImageColor3 = savedColor
+                            end
+                        end)
+                    end
+                end)
+            end)
+
+            CreateCustomNotification("COLOR", "Color del hub actualizado!", 1.5)
+        end
+
+        -- ---- ROW: input hex + preview ----
+        local hexRow = Instance.new("Frame", cpSec)
+        hexRow.Name                   = "HexRow"
+        hexRow.Size                   = UDim2.new(1, -8, 0, 38)
+        hexRow.BackgroundTransparency = 1
+        hexRow.BorderSizePixel        = 0
+
+        -- Etiqueta HEX
+        local hexLbl = Instance.new("TextLabel", hexRow)
+        hexLbl.Size                   = UDim2.new(0, 32, 1, 0)
+        hexLbl.Position               = UDim2.new(0, 0, 0, 0)
+        hexLbl.BackgroundTransparency = 1
+        hexLbl.Text                   = "#"
+        hexLbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+        hexLbl.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        hexLbl.TextSize               = 13
+        hexLbl.ZIndex                 = 13
+
+        -- TextBox para el valor hex
+        local hexBox = Instance.new("TextBox", hexRow)
+        hexBox.Name                   = "HexInput"
+        hexBox.Size                   = UDim2.new(0, 82, 0, 30)
+        hexBox.Position               = UDim2.new(0, 18, 0.5, -15)
+        hexBox.BackgroundColor3       = Color3.fromRGB(30, 10, 15)
+        hexBox.BackgroundTransparency = 0.2
+        hexBox.BorderSizePixel        = 0
+        hexBox.Text                   = _G._hubSettings.customColorHex
+        hexBox.TextColor3             = Color3.fromRGB(255, 255, 255)
+        hexBox.PlaceholderText        = "FF0000"
+        hexBox.PlaceholderColor3      = Color3.fromRGB(160, 80, 80)
+        hexBox.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        hexBox.TextSize               = 12
+        hexBox.ClearTextOnFocus       = false
+        hexBox.ZIndex                 = 14
+        Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
+        local hexBoxStroke = Instance.new("UIStroke", hexBox)
+        hexBoxStroke.Color     = ThemeColors.Primary
+        hexBoxStroke.Thickness = 1.5
+
+        -- Preview box (muestra el color actual con brillo aplicado)
+        local colorPreview = Instance.new("Frame", hexRow)
+        colorPreview.Name                   = "ColorPreview"
+        colorPreview.Size                   = UDim2.new(0, 30, 0, 30)
+        colorPreview.Position               = UDim2.new(0, 106, 0.5, -15)
+        colorPreview.BackgroundColor3       = Color3.fromRGB(255, 0, 0)
+        colorPreview.BackgroundTransparency = 0
+        colorPreview.BorderSizePixel        = 0
+        colorPreview.ZIndex                 = 13
+        Instance.new("UICorner", colorPreview).CornerRadius = UDim.new(0, 6)
+        Instance.new("UIStroke", colorPreview).Thickness = 1.5
+
+        -- Boton APLICAR
+        local applyBtn = Instance.new("TextButton", hexRow)
+        applyBtn.Name                   = "ApplyColorBtn"
+        applyBtn.Size                   = UDim2.new(0, 70, 0, 30)
+        applyBtn.Position               = UDim2.new(0, 142, 0.5, -15)
+        applyBtn.BackgroundColor3       = ThemeColors.Primary
+        applyBtn.BackgroundTransparency = 0.2
+        applyBtn.BorderSizePixel        = 0
+        applyBtn.Text                   = " Aplicar"
+        applyBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+        applyBtn.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        applyBtn.TextSize               = 11
+        applyBtn.AutoButtonColor        = false
+        applyBtn.ZIndex                 = 14
+        Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 6)
+        local applyStroke = Instance.new("UIStroke", applyBtn)
+        applyStroke.Color = ThemeColors.Primary; applyStroke.Thickness = 1.5
+
+        -- Funcion para actualizar el preview cuando cambia hex o brillo
+        local function _updatePreview()
+            local r, g, b = hexToRGB(hexBox.Text)
+            if not r then
+                colorPreview.BackgroundColor3 = Color3.fromRGB(60,20,20)
+                return
+            end
+            _G._hubSettings.customColorHex = hexBox.Text:upper():gsub("#","")
+            local bright = _G._hubSettings.customColorBright or 50
+            local fr, fg, fb = applyBrightness(r, g, b, bright)
+            colorPreview.BackgroundColor3 = Color3.new(math.clamp(fr,0,1), math.clamp(fg,0,1), math.clamp(fb,0,1))
+        end
+
+        -- Inicializar preview
+        _updatePreview()
+
+        hexBox.FocusLost:Connect(function()
+            local raw = hexBox.Text:upper():gsub("#",""):gsub("%s","")
+            if #raw == 6 then
+                hexBox.Text = raw
+                _G._hubSettings.customColorHex = raw
+                _updatePreview()
+            end
+        end)
+
+        applyBtn.MouseEnter:Connect(function()
+            TweenService:Create(applyBtn, TweenInfo.new(0.10), {BackgroundTransparency = 0}):Play()
+        end)
+        applyBtn.MouseLeave:Connect(function()
+            TweenService:Create(applyBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.2}):Play()
+        end)
+        applyBtn.Activated:Connect(function()
+            _updatePreview()
+            _applyCustomColor()
+        end)
+
+        -- ---- SLIDER DE BRILLO: Oscuro <-> Claro ----
+        local brightLabel = Instance.new("TextLabel", cpSec)
+        brightLabel.Size                   = UDim2.new(1, -8, 0, 18)
+        brightLabel.BackgroundTransparency = 1
+        brightLabel.Text                   = "Brillo: Oscuro  ?-------------?  Claro"
+        brightLabel.TextColor3             = Color3.fromRGB(200, 200, 220)
+        brightLabel.FontFace               = Font.fromEnum(Enum.Font.Gotham)
+        brightLabel.TextSize               = 10
+        brightLabel.TextXAlignment         = Enum.TextXAlignment.Left
+        brightLabel.ZIndex                 = 13
+        local _bPad = Instance.new("UIPadding", brightLabel)
+        _bPad.PaddingLeft = UDim.new(0, 2)
+
+        -- Track del slider de brillo (gradiente negro -> color -> blanco)
+        local brightTrackOuter = Instance.new("Frame", cpSec)
+        brightTrackOuter.Name                   = "BrightSliderOuter"
+        brightTrackOuter.Size                   = UDim2.new(1, -8, 0, 28)
+        brightTrackOuter.BackgroundTransparency = 1
+        brightTrackOuter.BorderSizePixel        = 0
+
+        local brightTrack = Instance.new("Frame", brightTrackOuter)
+        brightTrack.Name                   = "BrightTrack"
+        brightTrack.Size                   = UDim2.new(1, -20, 0, 12)
+        brightTrack.Position               = UDim2.new(0, 10, 0.5, -6)
+        brightTrack.BackgroundColor3       = Color3.fromRGB(30, 10, 15)
+        brightTrack.BackgroundTransparency = 0
+        brightTrack.BorderSizePixel        = 0
+        brightTrack.ZIndex                 = 12
+        Instance.new("UICorner", brightTrack).CornerRadius = UDim.new(1, 0)
+
+        -- Gradiente dentro del track (negro -> rojo -> blanco)
+        local brightGrad = Instance.new("UIGradient", brightTrack)
+        brightGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0,   0)),
+            ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
+        })
+        brightGrad.Rotation = 0
+
+        -- Thumb del slider
+        local initRatio = (_G._hubSettings.customColorBright or 50) / 100
+        local brightThumb = Instance.new("Frame", brightTrack)
+        brightThumb.Name              = "BrightThumb"
+        brightThumb.Size              = UDim2.new(0, 18, 0, 18)
+        brightThumb.AnchorPoint       = Vector2.new(0.5, 0.5)
+        brightThumb.Position          = UDim2.new(initRatio, 0, 0.5, 0)
+        brightThumb.BackgroundColor3  = Color3.fromRGB(255, 255, 255)
+        brightThumb.BorderSizePixel   = 0
+        brightThumb.ZIndex            = 14
+        Instance.new("UICorner", brightThumb).CornerRadius = UDim.new(1, 0)
+        local thumbStroke = Instance.new("UIStroke", brightThumb)
+        thumbStroke.Color = ThemeColors.Primary; thumbStroke.Thickness = 2
+
+        -- Label del valor de brillo
+        local brightValLbl = Instance.new("TextLabel", brightTrackOuter)
+        brightValLbl.Size                   = UDim2.new(0, 30, 1, 0)
+        brightValLbl.Position               = UDim2.new(1, -30, 0, 0)
+        brightValLbl.BackgroundTransparency = 1
+        brightValLbl.Text                   = tostring(_G._hubSettings.customColorBright or 50)
+        brightValLbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+        brightValLbl.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        brightValLbl.TextSize               = 10
+        brightValLbl.ZIndex                 = 13
+
+        -- Logica de drag del slider de brillo
+        local _brightDragging = false
+        local function _updateBrightSlider(inputX)
+            local trackAbsPos  = brightTrack.AbsolutePosition
+            local trackAbsSize = brightTrack.AbsoluteSize
+            local relX = math.clamp((inputX - trackAbsPos.X) / trackAbsSize.X, 0, 1)
+            local brightVal = math.floor(relX * 100 + 0.5)
+            _G._hubSettings.customColorBright = brightVal
+            brightThumb.Position = UDim2.new(relX, 0, 0.5, 0)
+            brightValLbl.Text    = tostring(brightVal)
+            -- Actualizar gradiente con el color hex actual
+            local r, g, b = hexToRGB(_G._hubSettings.customColorHex or "FF0000")
+            if r then
+                brightGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(math.floor(r*255), math.floor(g*255), math.floor(b*255))),
+                    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
+                })
+            end
+            _updatePreview()
+        end
+
+        brightTrack.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _brightDragging = true
+                _updateBrightSlider(inp.Position.X)
+            end
+        end)
+        brightTrack.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _brightDragging = false
+            end
+        end)
+        brightThumb.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _brightDragging = true
+            end
+        end)
+        brightThumb.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _brightDragging = false
+            end
+        end)
+        game:GetService("UserInputService").InputChanged:Connect(function(inp)
+            if _brightDragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then
+                _updateBrightSlider(inp.Position.X)
+            end
+        end)
+
+        -- Hint de uso
+        local hintLbl = Instance.new("TextLabel", cpSec)
+        hintLbl.Size                   = UDim2.new(1, -8, 0, 16)
+        hintLbl.BackgroundTransparency = 1
+        hintLbl.Text                   = "  Escribe el hex > mueve el slider > presiona Aplicar"
+        hintLbl.TextColor3             = Color3.fromRGB(140, 140, 160)
+        hintLbl.FontFace               = Font.fromEnum(Enum.Font.Gotham)
+        hintLbl.TextSize               = 9
+        hintLbl.TextXAlignment         = Enum.TextXAlignment.Left
+        hintLbl.ZIndex                 = 13
+
+        -- Inicializar el gradiente con el color guardado
+        pcall(function()
+            local r, g, b = hexToRGB(_G._hubSettings.customColorHex or "FF0000")
+            if r then
+                brightGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,   0,   0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(math.floor(r*255), math.floor(g*255), math.floor(b*255))),
+                    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 255, 255)),
+                })
+            end
+        end)
+    end
+
     -- -- NOTIFICACIONES -------------------------------------------
     local notifSec = CreateBorderedSectionGlobal(rightColumn, " NOTIFICACIONES")
 
@@ -57057,7 +57456,7 @@ particles = {}
     local function _syncDockPos() end  -- no-op
 
     -- Crear botones de tabs ? estilo "Visual": fondo transparente + borde azul oscuro grueso + texto blanco centrado
-    local _tabScaleH = 1 / #tabNames  -- cada pestaña ocupa 1/N del alto total, sin scroll
+    local _tabScaleH = 1 / #tabNames  -- cada pesta?a ocupa 1/N del alto total, sin scroll
     for i = 1, #tabNames do
         -- Contenedor principal del bot?n
         local btn = Instance.new("Frame", tabDockList)
