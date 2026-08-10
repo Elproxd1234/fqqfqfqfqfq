@@ -57718,18 +57718,20 @@ particles = {}
                                      or game:GetService("CoreGui"):FindFirstChild("f")
                                      or (gethui and gethui():FindFirstChild("f"))
                     if existingHub and _G._hubHidden then
-                        existingHub.Enabled = true
-                        _G._hubHidden = false
-                        -- FIX BINDABLES: restaurar todos los botones/bindables flotantes al reabrir
-                        pcall(function() if _G._setAllBindablesVisible then _G._setAllBindablesVisible(true) end end)
+                        -- FIX TAMAÑO REOPEN MOBILE: escala correcta ANTES de Enabled=true
+                        local _tgtSc = (_getTargetScale and _getTargetScale() or 0.70)
+                        local uiScaleR = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
+                        if uiScaleR then uiScaleR.Scale = _tgtSc * 0.75 end
                         if mainFrame and mainFrame.Parent then
                             mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
                             mainFrame.Position    = UDim2.new(0.5, 0, 0.5, 0)
                         end
-                        local uiScaleR = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
+                        existingHub.Enabled = true
+                        _G._hubHidden = false
+                        -- FIX BINDABLES: restaurar todos los botones/bindables flotantes al reabrir
+                        pcall(function() if _G._setAllBindablesVisible then _G._setAllBindablesVisible(true) end end)
                         if uiScaleR then
-                            uiScaleR.Scale = 0
-                            TweenService:Create(uiScaleR, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = (_getTargetScale and _getTargetScale() or 0.70)}):Play()
+                            TweenService:Create(uiScaleR, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = _tgtSc}):Play()
                         end
                     else
                         task.spawn(abrirHub)
@@ -57847,21 +57849,19 @@ particles = {}
         local _animOk, _animErr = pcall(function()
         if _G._hubAlreadyBuilt then
             -- Reaper sin animacion: mostrar directo con pop-in suave
-            mainFrame.Visible = true
-            mainFrame.BackgroundTransparency = 1  -- fondo transparente, sin imagen
-            -- (imagen Aurora eliminada, nada que restaurar aqui)
+            -- FIX TAMAÑO REOPEN MOBILE: escala correcta ANTES de Visible=true
+            local _tgtSc2 = (_getTargetScale and _getTargetScale() or 0.70)
             local _uiSR = mainFrame:FindFirstChildOfClass("UIScale")
-            if _uiSR then _uiSR.Scale = 0 end
+            if _uiSR then _uiSR.Scale = _tgtSc2 * 0.75 end
+            mainFrame.Visible = true
+            mainFrame.BackgroundTransparency = 1
             if _uiSR then
-                TweenService:Create(_uiSR, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = (_getTargetScale and _getTargetScale() or 0.70)}):Play()
+                TweenService:Create(_uiSR, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = _tgtSc2}):Play()
             end
             header.Position  = UDim2.new(0, 0, 0, 0)
             TweenService:Create(glowBorder, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Thickness = 0, Transparency = 1.0}):Play()
             _G._hubReady = true
             mainFrame.BackgroundTransparency = 1
-            if mainFrame:FindFirstChildOfClass("UIScale") then
-                mainFrame:FindFirstChildOfClass("UIScale").Scale = (_getTargetScale and _getTargetScale() or 0.70)
-            end
             task.defer(function()
                 _G._tabContentActive = false
                 -- AUTO-ABRIR MAIN al iniciar
