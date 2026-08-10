@@ -29773,28 +29773,50 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         end
     end
 
-    -- Indicador cuadrado compacto directamente en el row (sin caja contenedora grande)
-    local toggleBg = Instance.new("Frame", container)
-    toggleBg.Name                   = "ToggleBackground"
-    toggleBg.Size                   = UDim2.new(0, 22, 0, 18)
-    toggleBg.AnchorPoint            = Vector2.new(1, 0.5)
-    toggleBg.Position               = UDim2.new(1, _toggleRightOff, 0.5, 0)
-    toggleBg.BackgroundColor3       = estado and Color3.fromRGB(0, 200, 80) or Color3.fromRGB(220, 30, 30)
-    toggleBg.BackgroundTransparency = 0
-    toggleBg.BorderSizePixel        = 0
-    toggleBg.ZIndex                 = 21
+    -- Toggle estilo Combat (pill/switch): track con thumb deslizante y numero 1/0
+    local _TRACK_W, _TRACK_H = 54, 22
+    local _THUMB_W, _THUMB_H = 22, 16
+    local _THUMB_PAD = 3
+    local _C_TRACK_OFF  = Color3.fromRGB(45, 45, 45)
+    local _C_TRACK_ON   = Color3.fromRGB(0, 220, 0)
+    local _C_THUMB_ON   = Color3.fromRGB(145, 30, 45)
+    local _C_THUMB_OFF  = Color3.fromRGB(115, 20, 32)
+    local _POS_THUMB_ON  = UDim2.new(1, -(_THUMB_W + _THUMB_PAD), 0.5, -_THUMB_H/2)
+    local _POS_THUMB_OFF = UDim2.new(0, _THUMB_PAD, 0.5, -_THUMB_H/2)
+    local _POS_NUM_ON    = UDim2.new(0, _THUMB_PAD, 0, 0)
+    local _POS_NUM_OFF   = UDim2.new(0.5, 0, 0, 0)
 
-    local toggleBgCorner = Instance.new("UICorner", toggleBg)
-    toggleBgCorner.CornerRadius = UDim.new(0, 4)
+    local track = Instance.new("Frame", container)
+    track.Name                   = "ToggleTrack"
+    track.Size                   = UDim2.new(0, _TRACK_W, 0, _TRACK_H)
+    track.AnchorPoint            = Vector2.new(1, 0.5)
+    track.Position               = UDim2.new(1, _toggleRightOff, 0.5, 0)
+    track.BackgroundColor3       = estado and _C_TRACK_ON or _C_TRACK_OFF
+    track.BackgroundTransparency = 0
+    track.BorderSizePixel        = 0
+    track.ZIndex                 = 21
+    track.ClipsDescendants       = false
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-    local toggleBgStroke = Instance.new("UIStroke", toggleBg)
-    toggleBgStroke.Color = Color3.fromRGB(255, 255, 255)
-    toggleBgStroke.Thickness = 1
-    toggleBgStroke.Transparency = 0.6
-    toggleBgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local thumb = Instance.new("Frame", track)
+    thumb.Size                   = UDim2.new(0, _THUMB_W, 0, _THUMB_H)
+    thumb.Position               = estado and _POS_THUMB_ON or _POS_THUMB_OFF
+    thumb.BackgroundColor3       = estado and _C_THUMB_ON or _C_THUMB_OFF
+    thumb.BackgroundTransparency = 0
+    thumb.BorderSizePixel        = 0
+    thumb.ZIndex                 = 24
+    Instance.new("UICorner", thumb).CornerRadius = UDim.new(0, 5)
 
-    -- Knob = mismo frame (el indicador ES el toggleBg en este estilo)
-    local indicator = toggleBg
+    local numLabel = Instance.new("TextLabel", track)
+    numLabel.Size                   = UDim2.new(0.5, 0, 1, 0)
+    numLabel.Position               = estado and _POS_NUM_ON or _POS_NUM_OFF
+    numLabel.BackgroundTransparency = 1
+    numLabel.Text                   = estado and "1" or "0"
+    numLabel.Font                   = Enum.Font.GothamBold
+    numLabel.TextSize               = 9
+    numLabel.TextColor3             = ThemeColors and ThemeColors.TextPrimary or Color3.fromRGB(255,255,255)
+    numLabel.TextXAlignment         = Enum.TextXAlignment.Center
+    numLabel.ZIndex                 = 23
 
     -- Boton invisible sobre todo el row
     local clickRow = Instance.new("TextButton", container)
@@ -29806,15 +29828,27 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
 
     -- Funcion de actualizacion visual
     local function ApplyState(on, animate)
-        local _onColor  = Color3.fromRGB(0, 200, 80)
-        local _offColor = Color3.fromRGB(220, 30, 30)
+        local _tiTrack = TweenInfo.new(animate and 0.20 or 0, Enum.EasingStyle.Quad)
+        local _tiThumb = TweenInfo.new(animate and 0.22 or 0, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         if animate then
-            TweenService:Create(indicator, TWEEN_T, {
-                BackgroundColor3 = on and _onColor or _offColor,
-            }):Play()
+            TweenService:Create(track, _tiTrack, {BackgroundColor3 = on and _C_TRACK_ON or _C_TRACK_OFF}):Play()
+            TweenService:Create(thumb, _tiThumb, {Position = on and _POS_THUMB_ON or _POS_THUMB_OFF}):Play()
+            TweenService:Create(numLabel, _tiTrack, {Position = on and _POS_NUM_ON or _POS_NUM_OFF}):Play()
+            if on then
+                TweenService:Create(thumb, TweenInfo.new(0.10, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(210, 55, 75)}):Play()
+                task.delay(0.12, function()
+                    TweenService:Create(thumb, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundColor3 = _C_THUMB_ON}):Play()
+                end)
+            else
+                TweenService:Create(thumb, TweenInfo.new(0.20), {BackgroundColor3 = _C_THUMB_OFF}):Play()
+            end
         else
-            indicator.BackgroundColor3 = on and _onColor or _offColor
+            track.BackgroundColor3 = on and _C_TRACK_ON or _C_TRACK_OFF
+            thumb.Position         = on and _POS_THUMB_ON or _POS_THUMB_OFF
+            thumb.BackgroundColor3 = on and _C_THUMB_ON or _C_THUMB_OFF
+            numLabel.Position      = on and _POS_NUM_ON or _POS_NUM_OFF
         end
+        numLabel.Text = on and "1" or "0"
     end
     -- FIX AUTO-RESTORE VISUAL: exponer ApplyState globalmente para que el
     -- bloque de restauracion del World Tab pueda actualizar el knob a ON/OFF
