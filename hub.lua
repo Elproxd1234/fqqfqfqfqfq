@@ -1853,6 +1853,18 @@ task.spawn(function()
         if _G._gunHookDone then
             for k in next, _G._gunHookDone do _G._gunHookDone[k] = nil end
         end
+        -- FIX HERO DETECTION: limpiar flags de hero hook para que se re-hookeen en la nueva ronda
+        if _G._heroHookDoneP then
+            for k in next, _G._heroHookDoneP do _G._heroHookDoneP[k] = nil end
+        end
+        -- Re-hookear todos los jugadores para deteccion de hero en la nueva ronda
+        if _G._hookPlayerHero then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    task.defer(function() pcall(_G._hookPlayerHero, p) end)
+                end
+            end
+        end
         -- FIX COLOR MUERTOS: limpiar _deadRoles al inicio de ronda
         -- para que los jugadores de la ronda anterior no queden pintados gris
         if _G._deadRoles then
@@ -1921,6 +1933,118 @@ Players.LocalPlayer.CharacterAdded:Connect(function()
         _deadBodies = {}
     end)
 end)
+
+-- ================================================================
+-- FIX HERO DETECTION: hookear ChildAdded en Character Y Backpack
+-- de todos los jugadores para detectar INSTANTANEAMENTE cuando un
+-- inocente agarra la gun (no esperar el poll de GetPlayerData).
+-- El rol Hero se asigna tanto si la gun esta en Backpack (sin equipar)
+-- como si esta en Character (equipada). Sin este hook, el rol solo
+-- se detecta cuando el jugador EQUIPA la gun (delay de 0.08-1s).
+-- ================================================================
+do
+    local _heroHookConns  = {}  -- [player] = lista de conexiones
+    local _heroHookDoneP  = {}  -- [player] = true (ya se hookeo esta ronda)
+
+    local _HERO_GUN_NAMES = {
+        GunDrop=true, DropGun=true, Gun=true,
+        SheriffGun=true, HeroGun=true, GunModel=true,
+    }
+
+    local function _isGunTool(obj)
+        if not obj or not obj:IsA("Tool") then return false end
+        if _HERO_GUN_NAMES[obj.Name] then return true end
+        local n = obj.Name:lower()
+        return n:find("gun") or n:find("revolver") or n:find("pistol") or n:find("sheriff")
+    end
+
+    -- Promueve a p como Hero en roleCache (solo si no es Murderer/Sheriff)
+    local function _promoteHero(p)
+        if _G._visualRoundOver or _G._betweenRounds then return end
+        if not _roleCache.murderer then return end  -- sin ronda activa
+        if _roleCache.murderer == p then return end
+        if _roleCache.sheriff  == p then return end
+        if _roleCache.hero     == p then return end  -- ya es hero
+        _roleCache.hero       = p
+        _roleCache.lastUpdate = 0
+        if p == LocalPlayer then
+            _roleCache.localRole = "Hero"
+        end
+        _G._forceInstanceTick = true
+    end
+
+    local function _hookPlayerHero(p)
+        if _heroHookDoneP[p] then return end
+        _heroHookDoneP[p] = true
+
+        -- Desconectar hooks anteriores si existen
+        if _heroHookConns[p] then
+            for _, c in ipairs(_heroHookConns[p]) do pcall(function() c:Disconnect() end) end
+        end
+        _heroHookConns[p] = {}
+        local conns = _heroHookConns[p]
+
+        local function _watchContainer(container)
+            if not container then return end
+            -- Detectar gun ya presente (ej: Sheriff que ya tenia gun antes del hook)
+            for _, obj in ipairs(container:GetChildren()) do
+                if _isGunTool(obj) then
+                    _promoteHero(p)
+                    return
+                end
+            end
+            -- Detectar gun que llega
+            local conn = container.ChildAdded:Connect(function(obj)
+                if _isGunTool(obj) then
+                    _promoteHero(p)
+                end
+            end)
+            table.insert(conns, conn)
+        end
+
+        -- Hook Character actual (gun equipada aparece aqui)
+        if p.Character then _watchContainer(p.Character) end
+        -- Hook Backpack actual (gun agarrada sin equipar aparece aqui)
+        local bp = p:FindFirstChildOfClass("Backpack")
+        if bp then _watchContainer(bp) end
+
+        -- Re-hookear cuando el jugador respawnee (nuevo Character)
+        local charConn = p.CharacterAdded:Connect(function(newChar)
+            _heroHookDoneP[p] = nil
+            task.defer(function()
+                if not _heroHookDoneP[p] then
+                    _hookPlayerHero(p)
+                end
+            end)
+        end)
+        table.insert(conns, charConn)
+    end
+
+    -- Hookear todos los jugadores actuales y futuros
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            pcall(_hookPlayerHero, p)
+        end
+    end
+    Players.PlayerAdded:Connect(function(p)
+        if p ~= LocalPlayer then
+            pcall(_hookPlayerHero, p)
+        end
+    end)
+    Players.PlayerRemoving:Connect(function(p)
+        if _heroHookConns[p] then
+            for _, c in ipairs(_heroHookConns[p]) do pcall(function() c:Disconnect() end) end
+            _heroHookConns[p] = nil
+        end
+        _heroHookDoneP[p] = nil
+    end)
+
+    -- Exponer globalmente para que RoundStart limpie flags al inicio de ronda
+    _G._heroHookDoneP  = _heroHookDoneP
+    _G._heroHookConns  = _heroHookConns
+    _G._hookPlayerHero = _hookPlayerHero
+end
+-- ================================================================
 
 function _detectLocalRole()
     -- REMOVIDO: deteccion por knife/gun en el Character/Backpack.
