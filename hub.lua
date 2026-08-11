@@ -56770,16 +56770,16 @@ particles = {}
     -- ContentContainer: panel izquierdo del hub (contenido de tabs)
     contentContainer = Instance.new("Frame", mainFrame)
     contentContainer.Name = "ContentContainer"
-    contentContainer.Size = UDim2.new(0.65, 0, 1, -36)
+    contentContainer.Size = UDim2.new(0.78, 0, 1, -36)
     contentContainer.Position = UDim2.new(0, 0, 0, 36)
-    contentContainer.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
-    contentContainer.BackgroundTransparency = 1
+    contentContainer.BackgroundColor3 = Color3.fromRGB(80, 12, 22)
+    contentContainer.BackgroundTransparency = 0.30  -- fondo relleno; tapa el hueco del mainFrame
     contentContainer.BorderSizePixel = 0
     contentContainer.ClipsDescendants = true
     contentContainer.ZIndex = 50
-    contentContainer.Visible = false  -- empieza cerrado, se abre al clickear tab
+    contentContainer.Visible = true  -- siempre visible para no dejar el mainFrame al descubierto
     local _ccCorner = Instance.new("UICorner", contentContainer)
-    _ccCorner.CornerRadius = UDim.new(0, 8)
+    _ccCorner.CornerRadius = UDim.new(0, 0)  -- sin radio: mainFrame ya recorta las esquinas
     local _ccStroke = Instance.new("UIStroke", contentContainer)
     _ccStroke.Color = Color3.fromRGB(145, 30, 45)
     _ccStroke.Thickness = 0
@@ -57168,8 +57168,8 @@ particles = {}
     tabDockFrame.BorderSizePixel = 0
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
-    tabDockFrame.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
-    tabDockFrame.BackgroundTransparency = 0.65  -- TRANSPARENCIA: ver fondo rbx
+    tabDockFrame.BackgroundColor3 = Color3.fromRGB(80, 12, 22)
+    tabDockFrame.BackgroundTransparency = 0.30  -- igual que contentContainer, sin huecos
     tabDockFrame.Position = UDim2.new(0.78, 0, 0, 36)
     tabDockFrame.Size = UDim2.new(0.22, 0, 1, -36)
     tabDockFrame.Visible  = true
@@ -57476,10 +57476,7 @@ particles = {}
         TweenService:Create(arrowToggleBtn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(255, 180, 0), BackgroundTransparency = 0.5}):Play()
         -- Ocultar dock de tabs al mostrar server panel
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.65 end  -- TRANSPARENCIA restaurada
-            contentContainer.Position = UDim2.new(0, 0, 1.5, 0)
-            serverPanel.Visible = true
-            serverPanel.Position = UDim2.new(0, 20, 0, 60)
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.30 end  -- TRANSPARENCIA restaurada
         else
             if tabDockFrame then TweenService:Create(tabDockFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0.15}):Play() end
             TweenService:Create(contentContainer, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0, 0, 1.5, 0)}):Play()
@@ -57499,10 +57496,7 @@ particles = {}
         if _G._hubSettings and _G._hubSettings.noMinMaxAnimations then
             serverPanel.Visible = false
             if fpsConn then fpsConn:Disconnect(); fpsConn = nil end
-            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.65 end  -- TRANSPARENCIA restaurada
-            if contentContainer.Visible then
-                contentContainer.Position = UDim2.new(0, 0, 0, 36)
-            end
+            if tabDockFrame then tabDockFrame.BackgroundTransparency = 0.30 end  -- TRANSPARENCIA restaurada
         else
             TweenService:Create(serverPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0, 20, 1.5, 0)}):Play()
             task.wait(0.32)
