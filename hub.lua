@@ -56982,50 +56982,42 @@ particles = {}
         local _capBot = btn:FindFirstChild("TabCapBottom")
 
         if isActive then
-            -- Pestana ACTIVA: fondo mas solido, borde brillante, indicador encendido
+            -- Pestana ACTIVA: fondo mas solido, borde brillante rojo, indicador encendido
             TweenService:Create(btn, _ti_tab, {
-                BackgroundTransparency = 0.35,
-                BackgroundColor3       = Color3.fromRGB(130, 22, 38),
+                BackgroundTransparency = 0.05,          -- casi solido (como img activa)
+                BackgroundColor3       = Color3.fromRGB(90, 15, 22),  -- granate intenso
             }):Play()
-            if _capBot then TweenService:Create(_capBot, _ti_tab, {
-                BackgroundTransparency = 0.35,
-                BackgroundColor3       = Color3.fromRGB(130, 22, 38),
-            }):Play() end
             if stroke then TweenService:Create(stroke, _ti_tab, {
                 Transparency = 0,
-                Color        = Color3.fromRGB(255, 60, 90),
-                Thickness    = 3,
-            }):Play() end
-            if _ind then TweenService:Create(_ind, _ti_tab, {
-                BackgroundColor3       = Color3.fromRGB(255, 60, 90),
-                BackgroundTransparency = 0,
-            }):Play() end
-            if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3             = Color3.fromRGB(255, 190, 200),
-                TextTransparency       = 0,
-            }):Play() end
-        else
-            -- Pestana INACTIVA: mas transparente, borde apagado, indicador oculto
-            TweenService:Create(btn, _ti_tab, {
-                BackgroundTransparency = 0.75,
-                BackgroundColor3       = Color3.fromRGB(115, 20, 32),
-            }):Play()
-            if _capBot then TweenService:Create(_capBot, _ti_tab, {
-                BackgroundTransparency = 0.75,
-                BackgroundColor3       = Color3.fromRGB(115, 20, 32),
-            }):Play() end
-            if stroke then TweenService:Create(stroke, _ti_tab, {
-                Transparency = 0.3,
-                Color        = Color3.fromRGB(145, 30, 45),
+                Color        = Color3.fromRGB(210, 35, 55),  -- rojo brillante
                 Thickness    = 2,
             }):Play() end
             if _ind then TweenService:Create(_ind, _ti_tab, {
-                BackgroundColor3       = Color3.fromRGB(145, 30, 45),
-                BackgroundTransparency = 0.7,
+                BackgroundColor3       = Color3.fromRGB(255, 60, 90),  -- indicador encendido
+                BackgroundTransparency = 0,
             }):Play() end
             if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3             = Color3.fromRGB(215, 150, 160),
-                TextTransparency       = 0,
+                TextColor3       = Color3.fromRGB(255, 230, 235),  -- blanco brillante
+                TextTransparency = 0,
+            }):Play() end
+        else
+            -- Pestana INACTIVA: semitransparente, borde fino apagado, indicador oculto
+            TweenService:Create(btn, _ti_tab, {
+                BackgroundTransparency = 0.18,          -- semitransparente como img
+                BackgroundColor3       = Color3.fromRGB(70, 18, 18),   -- granate oscuro
+            }):Play()
+            if stroke then TweenService:Create(stroke, _ti_tab, {
+                Transparency = 0,
+                Color        = Color3.fromRGB(160, 20, 20),  -- rojo oscuro
+                Thickness    = 1.5,
+            }):Play() end
+            if _ind then TweenService:Create(_ind, _ti_tab, {
+                BackgroundColor3       = Color3.fromRGB(160, 20, 20),
+                BackgroundTransparency = 1,              -- oculto en inactivo
+            }):Play() end
+            if lbl2 then TweenService:Create(lbl2, _ti_tab, {
+                TextColor3       = Color3.fromRGB(220, 210, 210),  -- blanco rosado suave
+                TextTransparency = 0,
             }):Play() end
         end
     end
@@ -57178,8 +57170,8 @@ particles = {}
     tabDockFrame.ClipsDescendants = false
     tabDockFrame.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
     tabDockFrame.BackgroundTransparency = 0.65  -- TRANSPARENCIA: ver fondo rbx
-    tabDockFrame.Position = UDim2.new(0.65, 0, 0, 36)
-    tabDockFrame.Size = UDim2.new(0.35, 0, 1, -36)
+    tabDockFrame.Position = UDim2.new(0.78, 0, 0, 36)
+    tabDockFrame.Size = UDim2.new(0.22, 0, 1, -36)
     tabDockFrame.Visible  = true
 
     -- ============================================================
@@ -57189,8 +57181,8 @@ particles = {}
     -- Este guard re-ancla ambos al detectar cualquier cambio.
     -- ============================================================
     local _HEADER_POS    = UDim2.new(0, 0, 0, 0)
-    local _TABDOCK_POS   = UDim2.new(0.65, 0, 0, 36)
-    local _TABDOCK_SIZE  = UDim2.new(0.35, 0, 1, -36)
+    local _TABDOCK_POS   = UDim2.new(0.78, 0, 0, 36)
+    local _TABDOCK_SIZE  = UDim2.new(0.22, 0, 1, -36)
     local _CONTENT_POS   = UDim2.new(0, 0, 0, 36)
     local _guardBusy     = false
 
@@ -57284,10 +57276,10 @@ particles = {}
     dockPad.PaddingLeft   = UDim.new(0, 0)
     dockPad.PaddingRight  = UDim.new(0, 0)
 
-    -- Panel izquierdo: contentContainer (?rea de contenido de tabs)
+    -- Panel izquierdo: contentContainer (area de contenido de tabs)
     contentContainer.Position = UDim2.new(0, 0, 0, 36)
-    contentContainer.Size = UDim2.new(0.65, 0, 1, -36)
-    contentContainer.Visible  = false
+    contentContainer.Size = UDim2.new(0.78, 0, 1, -36)
+    contentContainer.Visible  = true  -- visible desde el inicio para rellenar el espacio rojo
 
     -- Mismos colores que CreateAuroraToggle
     local C_TOG_BG      = Color3.fromRGB(180, 55, 70)  -- celeste igual que toggle
@@ -57307,56 +57299,54 @@ particles = {}
 
     local function _syncDockPos() end  -- no-op
 
-    -- Crear botones de tabs
+    -- ============================================================
+    -- TAB BUTTONS: estilo imagen de referencia
+    -- Barra compacta granate oscuro, borde rojo fino, texto
+    -- pequeno a la izquierda, sin padding excesivo.
+    -- ============================================================
     local _tabScaleH = 1 / #tabNames
     for i = 1, #tabNames do
-        -- Contenedor principal del boton
+
+        -- -- Contenedor principal --------------------------------
         local btn = Instance.new("Frame", tabDockList)
-        btn.Name                    = tabNames[i] .. "SideBtn"
-        btn.Size                    = UDim2.new(1, 0, _tabScaleH, 0)
-        btn.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
-        btn.BackgroundTransparency  = 0.75  -- TRANSPARENCIA: ver fondo rbx
-        btn.BorderSizePixel         = 0
-        btn.ClipsDescendants        = false
-        btn.ZIndex                  = 13
-        btn.LayoutOrder             = i
+        btn.Name                   = tabNames[i] .. "SideBtn"
+        btn.Size                   = UDim2.new(1, 0, _tabScaleH, 0)
+        btn.BackgroundColor3       = Color3.fromRGB(70, 18, 18)  -- granate muy oscuro
+        btn.BackgroundTransparency = 0.18                         -- semitransparente como img
+        btn.BorderSizePixel        = 0
+        btn.ClipsDescendants       = true                         -- elimina desbordes
+        btn.ZIndex                 = 13
+        btn.LayoutOrder            = i
 
-        local _tabTag   = Instance.new("StringValue", btn)
-        _tabTag.Name    = "TAB_BTN_PROTECTED"
-        _tabTag.Value   = "1"
+        -- Tag de proteccion (no tocar en ApplyTheme)
+        local _tabTag  = Instance.new("StringValue", btn)
+        _tabTag.Name   = "TAB_BTN_PROTECTED"
+        _tabTag.Value  = "1"
 
-        -- FORMA RECTANGULAR: esquinas cuadradas, estilo referencia
+        -- Esquinas ligeramente redondeadas (4px como en la imagen)
         local _btnCorner = Instance.new("UICorner", btn)
-        _btnCorner.CornerRadius = UDim.new(0, 3)
+        _btnCorner.CornerRadius = UDim.new(0, 4)
 
-        -- Cap inferior (colapsado - forma rectangular no necesita recorte)
-        local _tabCapBottom = Instance.new("Frame", btn)
-        _tabCapBottom.Name = "TabCapBottom"
-        _tabCapBottom.Size = UDim2.new(0, 0, 0, 0)
-        _tabCapBottom.Position = UDim2.new(0, 0, 1, 0)
-        _tabCapBottom.BackgroundTransparency = 1
-        _tabCapBottom.BorderSizePixel = 0
-        _tabCapBottom.ZIndex = 13
-
-        -- Borde estilo pestana
+        -- -- Borde rojo fino (1.5px, igual que imagen) ----------
         local btnStroke           = Instance.new("UIStroke", btn)
-        btnStroke.Color           = Color3.fromRGB(145, 30, 45)
-        btnStroke.Thickness       = 2
-        btnStroke.Transparency    = 0.3
+        btnStroke.Color           = Color3.fromRGB(160, 20, 20)
+        btnStroke.Thickness       = 1.5
+        btnStroke.Transparency    = 0
         btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-        -- Linea indicadora lateral izquierda
+        -- -- Linea indicadora lateral izquierda (activa/inactiva) -
         local _tabIndicator = Instance.new("Frame", btn)
-        _tabIndicator.Name = "TabIndicator"
-        _tabIndicator.Size = UDim2.new(0, 3, 0.7, 0)
-        _tabIndicator.Position = UDim2.new(0, 0, 0.15, 0)
-        _tabIndicator.BackgroundColor3 = Color3.fromRGB(145, 30, 45)
-        _tabIndicator.BackgroundTransparency = 0.7
-        _tabIndicator.BorderSizePixel = 0
-        _tabIndicator.ZIndex = 15
-        Instance.new("UICorner", _tabIndicator).CornerRadius = UDim.new(0, 4)
+        _tabIndicator.Name                   = "TabIndicator"
+        _tabIndicator.Size                   = UDim2.new(0, 2, 0.6, 0)
+        _tabIndicator.AnchorPoint            = Vector2.new(0, 0.5)
+        _tabIndicator.Position               = UDim2.new(0, 0, 0.5, 0)
+        _tabIndicator.BackgroundColor3       = Color3.fromRGB(210, 35, 55)
+        _tabIndicator.BackgroundTransparency = 1   -- oculta por defecto; activa=visible
+        _tabIndicator.BorderSizePixel        = 0
+        _tabIndicator.ZIndex                 = 16
+        Instance.new("UICorner", _tabIndicator).CornerRadius = UDim.new(0, 3)
 
-        -- "tintOverlay" dummy para compatibilidad con _applyBtnState
+        -- -- TintOverlay dummy (compatibilidad con _applyBtnState) -
         local tintOverlay = Instance.new("Frame", btn)
         tintOverlay.Name               = "TinteDiagonal"
         tintOverlay.Size               = UDim2.new(1, 0, 1, 0)
@@ -57364,22 +57354,22 @@ particles = {}
         tintOverlay.BorderSizePixel    = 0
         tintOverlay.ZIndex             = 14
 
-        -- Etiqueta de texto centrada ? ?NICO elemento visible de la pesta?a
+        -- -- Texto: centrado, fuente media, bien legible en panel angosto --
         local lbl               = Instance.new("TextLabel", btn)
         lbl.Name                = "TabLabel"
-        lbl.Size                = UDim2.new(1, 0, 1, 0)
-        lbl.Position            = UDim2.new(0, 0, 0, 0)
+        lbl.Size                = UDim2.new(1, -6, 1, 0)
+        lbl.Position            = UDim2.new(0, 3, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text                = tabNames[i]
-        lbl.Font                = Enum.Font.GothamSemibold
-        lbl.TextScaled          = true
-        lbl.TextSize            = 55
-        lbl.TextColor3          = Color3.fromRGB(255, 255, 255)
+        lbl.Font                = Enum.Font.GothamMedium
+        lbl.TextScaled          = true   -- escala auto para llenar la altura del boton
+        lbl.TextSize            = 13
+        lbl.TextColor3          = Color3.fromRGB(220, 210, 210)
         lbl.TextXAlignment      = Enum.TextXAlignment.Center
         lbl.TextYAlignment      = Enum.TextYAlignment.Center
-        lbl.TextWrapped         = false
+        lbl.TextWrapped         = true
         lbl.TextTruncate        = Enum.TextTruncate.AtEnd
-        lbl.TextStrokeTransparency = 1  -- sin borde de texto
+        lbl.TextStrokeTransparency = 1
         lbl.ZIndex              = 16
 
         do
@@ -57391,7 +57381,7 @@ particles = {}
             end
         end
 
-        -- Bot?n invisible sobre todo el row (captura clicks)
+        -- -- Boton invisible que captura clicks ------------------
         local clickRow              = Instance.new("TextButton", btn)
         clickRow.Size               = UDim2.new(1, 0, 1, 0)
         clickRow.BackgroundTransparency = 1
@@ -57399,44 +57389,44 @@ particles = {}
         clickRow.ZIndex             = 20
         clickRow.AutoButtonColor    = false
 
-        local ti = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local ti = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-        -- Hover: iluminar el borde
+        -- Hover: borde mas brillante + fondo ligero
         clickRow.MouseEnter:Connect(function()
             if activeTabIdx ~= i then
                 PlayHoverSound()
-                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(255, 60, 90), Thickness = 3}):Play()
+                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.05}):Play()
+                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(210, 35, 55), Thickness = 2}):Play()
+                TweenService:Create(lbl,       ti, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
         end)
         clickRow.MouseLeave:Connect(function()
             if activeTabIdx ~= i then
-                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(145, 30, 45), Thickness = 2}):Play()
+                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.18}):Play()
+                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(160, 20, 20), Thickness = 1.5}):Play()
+                TweenService:Create(lbl,       ti, {TextColor3 = Color3.fromRGB(220, 210, 210)}):Play()
             end
         end)
 
         clickRow.Selectable = false
-        local _tabBtnLastTime = 0  -- FIX DOBLE ACTIVACION TABS
+        local _tabBtnLastTime = 0
         clickRow.Activated:Connect(function()
             local _t = tick()
-            if (_t - _tabBtnLastTime) < 0.30 then return end  -- FIX: ignorar doble click
+            if (_t - _tabBtnLastTime) < 0.30 then return end
             _tabBtnLastTime = _t
             PlayTabSound()
-            local wasVisible = contentContainer.Visible
-            if not wasVisible then
-                contentContainer.Visible = true
-                contentContainer.Position = UDim2.new(0, 0, 0, 36)
-            end
+            -- contentContainer siempre visible; solo garantizar posicion correcta
+            contentContainer.Visible = true
+            contentContainer.Position = UDim2.new(0, 0, 0, 36)
             SetActiveTab(i)
             _G._tabContentActive = true
         end)
-
-        -- Scroll de pestanas desactivado: todas caben en pantalla sin scrollear
 
         sideButtons[i] = btn
         _G._tabBtnRefs[i] = {
             icon      = nil,
             stroke    = btnStroke,
-            activeBar = nil,
+            activeBar = _tabIndicator,
             knob      = nil,
             knobBg    = nil,
             lbl2      = lbl,
@@ -57528,11 +57518,10 @@ particles = {}
 
     _G._tabContentActive = false
 
-    -- Funcion para volver al estado vacio (mostrar tabs, ocultar contenido)
+    -- Funcion para volver al estado vacio (deseleccionar tabs pero mantener area visible)
     local function _goBackToEmpty()
-        -- FIX: cerrar el contenido sin abrir ninguna pestana
         _G._tabContentActive = false
-        if contentContainer then contentContainer.Visible = false end
+        -- NO ocultar contentContainer: el area izquierda siempre rellena el hub
         for _, btn in ipairs(sideButtons) do
             pcall(function() _applyBtnState(_, false) end)
         end
