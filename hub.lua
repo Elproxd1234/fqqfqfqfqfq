@@ -55622,69 +55622,8 @@ do
     end)
 end
 
--- ================================================================
--- == HEADER RECTANGULAR (barra de titulo encima del fondo)
--- Queda encima de la imagen (ZIndex 2) pero debajo de todo el
--- contenido (toggles ZIndex 20+), visible a traves del hub.
--- ================================================================
-do
-    local _newHeader = Instance.new("Frame", mainFrame)
-    _newHeader.Name = "HubHeaderBar"
-    _newHeader.Size = UDim2.new(1, 0, 0, 36)
-    _newHeader.Position = UDim2.new(0, 0, 0, 0)
-    _newHeader.AnchorPoint = Vector2.new(0, 0)
-    _newHeader.BackgroundColor3 = Color3.fromRGB(80, 10, 20)
-    _newHeader.BackgroundTransparency = 0.50  -- TRANSPARENCIA: ver fondo rbx
-    _newHeader.BorderSizePixel = 0
-    _newHeader.ZIndex = 2
-
-    local _nhCorner = Instance.new("UICorner", _newHeader)
-    _nhCorner.CornerRadius = UDim.new(0, 8)
-
-    local _nhStroke = Instance.new("UIStroke", _newHeader)
-    _nhStroke.Color = Color3.fromRGB(210, 85, 100)
-    _nhStroke.Thickness = 1.2
-    _nhStroke.Transparency = 0.3
-    _nhStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-    -- Linea separadora inferior sutil
-    local _nhDivider = Instance.new("Frame", _newHeader)
-    _nhDivider.Name = "Divider"
-    _nhDivider.Size = UDim2.new(0.85, 0, 0, 1)
-    _nhDivider.Position = UDim2.new(0.075, 0, 1, -1)
-    _nhDivider.BackgroundColor3 = Color3.fromRGB(210, 85, 100)
-    _nhDivider.BackgroundTransparency = 0.5
-    _nhDivider.BorderSizePixel = 0
-    _nhDivider.ZIndex = 3
-
-    -- Punto decorativo izquierdo
-    local _nhDot = Instance.new("Frame", _newHeader)
-    _nhDot.Size = UDim2.new(0, 6, 0, 6)
-    _nhDot.Position = UDim2.new(0, 12, 0.5, -3)
-    _nhDot.BackgroundColor3 = Color3.fromRGB(255, 120, 140)
-    _nhDot.BackgroundTransparency = 0.1
-    _nhDot.BorderSizePixel = 0
-    _nhDot.ZIndex = 3
-    Instance.new("UICorner", _nhDot).CornerRadius = UDim.new(1, 0)
-
-    -- Titulo
-    local _nhTitle = Instance.new("TextLabel", _newHeader)
-    _nhTitle.Size = UDim2.new(0.7, 0, 1, 0)
-    _nhTitle.Position = UDim2.new(0.15, 0, 0, 0)
-    _nhTitle.BackgroundTransparency = 1
-    _nhTitle.Text = "Zerqon Hub"
-    _nhTitle.TextColor3 = Color3.fromRGB(255, 200, 210)
-    _nhTitle.FontFace = Font.fromEnum(Enum.Font.GothamBold)
-    _nhTitle.TextSize = 14
-    _nhTitle.TextXAlignment = Enum.TextXAlignment.Center
-    _nhTitle.TextYAlignment = Enum.TextYAlignment.Center
-    _nhTitle.TextStrokeTransparency = 0.6
-    _nhTitle.TextStrokeColor3 = Color3.fromRGB(255, 100, 120)
-    _nhTitle.ZIndex = 3
-
-    -- Guardar referencia global por si se necesita referenciar
-    _G._hubHeaderBarRef = _newHeader
-end
+-- HubHeaderBar eliminado: el TopBar ya contiene el header completo estilo Capybara.
+-- _G._hubHeaderBarRef se asigna al TopBar que se crea mas abajo.
 
 -- ================================================================
 -- == DETECCION DE DISPOSITIVO: PC vs CELULAR
@@ -56503,71 +56442,92 @@ particles = {}
     header.BackgroundColor3 = Color3.fromRGB(115, 20, 32)
     header.BackgroundTransparency = 0.10  -- header visible
     header.BorderSizePixel = 0
-    header.ZIndex = 10
+    header.ZIndex = 20
     header.Active = true
     header.ClipsDescendants = false  -- no recortar el boton de salida
     local _hdrCorner = Instance.new("UICorner", header)
-    _hdrCorner.CornerRadius = UDim.new(0, 10)
+    _hdrCorner.CornerRadius = UDim.new(0, 0)  -- sin radio: mainFrame ya recorta, evita gap visual
     local _hdrStroke = Instance.new("UIStroke", header)
     _hdrStroke.Color = Color3.fromRGB(145, 30, 45)
-    _hdrStroke.Thickness = 0  -- borde invisible
+    _hdrStroke.Thickness = 0
     _hdrStroke.Transparency = 1
     _hdrStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-    -- Contenedor centrado para los dos textos del header
-    local _hdCenter = Instance.new("Frame", header)
-    _hdCenter.Size = UDim2.new(0.6, 0, 1, 0)
-    _hdCenter.Position = UDim2.new(0.2, 0, 0, 0)
-    _hdCenter.BackgroundTransparency = 1
-    _hdCenter.BorderSizePixel = 0
-    _hdCenter.ZIndex = 12
+    -- ============================================================
+    -- HEADER ESTILO CAPYBARA: izquierda "GameName / PlayerCount", derecha "By Zerqon Hub" + X
+    -- ============================================================
+    -- Icono/avatar placeholder izquierdo
+    local _hdrIcon = Instance.new("Frame", header)
+    _hdrIcon.Name = "HdrIcon"
+    _hdrIcon.Size = UDim2.new(0, 28, 0, 28)
+    _hdrIcon.Position = UDim2.new(0, 4, 0.5, -14)
+    _hdrIcon.BackgroundColor3 = Color3.fromRGB(180, 55, 70)
+    _hdrIcon.BackgroundTransparency = 0.3
+    _hdrIcon.BorderSizePixel = 0
+    _hdrIcon.ZIndex = 11
+    Instance.new("UICorner", _hdrIcon).CornerRadius = UDim.new(0, 3)
+    local _hdrIconLbl = Instance.new("TextLabel", _hdrIcon)
+    _hdrIconLbl.Size = UDim2.new(1, 0, 1, 0)
+    _hdrIconLbl.BackgroundTransparency = 1
+    _hdrIconLbl.Text = "Z"
+    _hdrIconLbl.TextColor3 = Color3.fromRGB(255, 220, 225)
+    _hdrIconLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+    _hdrIconLbl.TextSize = 14
+    _hdrIconLbl.ZIndex = 12
 
-    -- T?tulo principal centrado (oculto)
-    local _hdLabel = Instance.new("TextLabel", _hdCenter)
-    _hdLabel.Size = UDim2.new(1, 0, 0.55, 0)
-    _hdLabel.Position = UDim2.new(0, 0, 0.05, 0)
+    -- Titulo del juego: "Murderer Mystery 2 / PlayerCount"
+    local _hdLabel = Instance.new("TextLabel", header)
+    _hdLabel.Name = "HdrGameTitle"
+    _hdLabel.Size = UDim2.new(0.52, 0, 0.55, 0)
+    _hdLabel.Position = UDim2.new(0, 36, 0.02, 0)
     _hdLabel.BackgroundTransparency = 1
-    _hdLabel.Visible = false
+    _hdLabel.Visible = true
     _hdLabel.Text = "Murderer Mystery 2"
     _hdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     _hdLabel.FontFace = Font.fromEnum(Enum.Font.GothamBold)
     _hdLabel.TextScaled = false
-    _hdLabel.TextSize = 18
-    _hdLabel.TextXAlignment = Enum.TextXAlignment.Center
+    _hdLabel.TextSize = 13
+    _hdLabel.TextXAlignment = Enum.TextXAlignment.Left
     _hdLabel.TextYAlignment = Enum.TextYAlignment.Center
-    _hdLabel.TextStrokeTransparency = 0.4
-    _hdLabel.TextStrokeColor3 = Color3.fromRGB(255, 175, 188)
+    _hdLabel.TextTruncate = Enum.TextTruncate.AtEnd
     _hdLabel.ZIndex = 12
-
-    -- Animacion lenta de brillo del titulo (pulso de stroke)
+    -- Actualizar con player count dinamico
     task.spawn(function()
+        local _ps = game:GetService("Players")
         while _hdLabel and _hdLabel.Parent do
-            TweenService:Create(_hdLabel, TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                TextStrokeTransparency = 0.0,
-                TextColor3 = Color3.fromRGB(255, 175, 188),
-            }):Play()
-            task.wait(2.2)
-            TweenService:Create(_hdLabel, TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                TextStrokeTransparency = 0.6,
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-            }):Play()
-            task.wait(2.2)
+            local _cnt = #_ps:GetPlayers()
+            local _max = _ps.MaxPlayers
+            _hdLabel.Text = "Murderer Mystery 2 / " .. tostring(_cnt)
+            task.wait(5)
         end
     end)
 
-    -- Subt?tulo centrado debajo del t?tulo (oculto)
-    local _hdSub = Instance.new("TextLabel", _hdCenter)
-    _hdSub.Size = UDim2.new(1, 0, 0.38, 0)
-    _hdSub.Position = UDim2.new(0, 0, 0.60, 0)
+    -- Subtitulo: "By Zerqon Hub"
+    local _hdSub = Instance.new("TextLabel", header)
+    _hdSub.Name = "HdrByLine"
+    _hdSub.Size = UDim2.new(0.40, 0, 0.42, 0)
+    _hdSub.Position = UDim2.new(0, 36, 0.55, 0)
     _hdSub.BackgroundTransparency = 1
-    _hdSub.Visible = false
-    _hdSub.Text = "Zerqon Hub"
-    _hdSub.TextColor3 = Color3.fromRGB(255, 190, 200)
+    _hdSub.Visible = true
+    _hdSub.Text = "By Zerqon Hub"
+    _hdSub.TextColor3 = Color3.fromRGB(210, 85, 100)
     _hdSub.FontFace = Font.fromEnum(Enum.Font.Gotham)
-    _hdSub.TextSize = 12
-    _hdSub.TextXAlignment = Enum.TextXAlignment.Center
+    _hdSub.TextSize = 10
+    _hdSub.TextXAlignment = Enum.TextXAlignment.Left
     _hdSub.TextYAlignment = Enum.TextYAlignment.Center
     _hdSub.ZIndex = 12
+
+    -- Contenedor centrado legacy (mantener para compatibilidad con referencias)
+    local _hdCenter = Instance.new("Frame", header)
+    _hdCenter.Size = UDim2.new(0, 0, 0, 0)
+    _hdCenter.Position = UDim2.new(0, 0, 0, 0)
+    _hdCenter.BackgroundTransparency = 1
+    _hdCenter.BorderSizePixel = 0
+    _hdCenter.ZIndex = 12
+    -- Asignar referencia global al TopBar (antes apuntaba a HubHeaderBar eliminado)
+    _G._hubHeaderBarRef = header
+
+    -- (animacion de titulo removida: header usa layout Capybara estilo con textos visibles)
 
     -- ================================================================
     -- DRAG DEL HUB ? sistema ?nico consolidado (v-fix)
@@ -57222,6 +57182,68 @@ particles = {}
     tabDockFrame.Size = UDim2.new(0.35, 0, 1, -36)
     tabDockFrame.Visible  = true
 
+    -- ============================================================
+    -- POSITION GUARD: proteger posiciones contra desincronizacion
+    -- Cuando toggles se auto-activan crean ScreenGuis que pueden
+    -- forzar un recalculo del layout y desplazar el header o el dock.
+    -- Este guard re-ancla ambos al detectar cualquier cambio.
+    -- ============================================================
+    local _HEADER_POS    = UDim2.new(0, 0, 0, 0)
+    local _TABDOCK_POS   = UDim2.new(0.65, 0, 0, 36)
+    local _TABDOCK_SIZE  = UDim2.new(0.35, 0, 1, -36)
+    local _CONTENT_POS   = UDim2.new(0, 0, 0, 36)
+    local _guardBusy     = false
+
+    local function _reanchorLayout()
+        if _guardBusy then return end
+        _guardBusy = true
+        task.defer(function()
+            pcall(function()
+                if header and header.Parent then
+                    header.Position = _HEADER_POS
+                end
+                if tabDockFrame and tabDockFrame.Parent then
+                    tabDockFrame.Position = _TABDOCK_POS
+                    tabDockFrame.Size     = _TABDOCK_SIZE
+                end
+                if contentContainer and contentContainer.Parent and contentContainer.Visible then
+                    contentContainer.Position = _CONTENT_POS
+                end
+            end)
+            _guardBusy = false
+        end)
+    end
+
+    -- Escuchar cambios en el header
+    pcall(function()
+        header:GetPropertyChangedSignal("Position"):Connect(function()
+            if header.Position ~= _HEADER_POS then
+                _reanchorLayout()
+            end
+        end)
+    end)
+    -- Escuchar cambios en el contentContainer (se mueve cuando _buildTabCached corre en bg)
+    pcall(function()
+        contentContainer:GetPropertyChangedSignal("Position"):Connect(function()
+            if contentContainer.Visible and contentContainer.Position ~= _CONTENT_POS then
+                _reanchorLayout()
+            end
+        end)
+    end)
+    -- Escuchar cambios en el tabDockFrame
+    pcall(function()
+        tabDockFrame:GetPropertyChangedSignal("Position"):Connect(function()
+            if tabDockFrame.Position ~= _TABDOCK_POS then
+                _reanchorLayout()
+            end
+        end)
+        tabDockFrame:GetPropertyChangedSignal("Size"):Connect(function()
+            if tabDockFrame.Size ~= _TABDOCK_SIZE then
+                _reanchorLayout()
+            end
+        end)
+    end)
+
     local _dockStroke = Instance.new("UIStroke", tabDockFrame)
     _dockStroke.Color           = Color3.fromRGB(145, 30, 45)
     _dockStroke.Thickness       = 0
@@ -57285,10 +57307,10 @@ particles = {}
 
     local function _syncDockPos() end  -- no-op
 
-    -- Crear botones de tabs ? estilo "Visual": fondo transparente + borde azul oscuro grueso + texto blanco centrado
-    local _tabScaleH = 1 / #tabNames  -- cada pesta?a ocupa 1/N del alto total, sin scroll
+    -- Crear botones de tabs
+    local _tabScaleH = 1 / #tabNames
     for i = 1, #tabNames do
-        -- Contenedor principal del bot?n
+        -- Contenedor principal del boton
         local btn = Instance.new("Frame", tabDockList)
         btn.Name                    = tabNames[i] .. "SideBtn"
         btn.Size                    = UDim2.new(1, 0, _tabScaleH, 0)
@@ -57303,17 +57325,16 @@ particles = {}
         _tabTag.Name    = "TAB_BTN_PROTECTED"
         _tabTag.Value   = "1"
 
-        -- FORMA DE PESTANA: UICorner con radio visible arriba
+        -- FORMA RECTANGULAR: esquinas cuadradas, estilo referencia
         local _btnCorner = Instance.new("UICorner", btn)
-        _btnCorner.CornerRadius = UDim.new(0, 10)
+        _btnCorner.CornerRadius = UDim.new(0, 3)
 
-        -- Recorte inferior: Frame que tapa las esquinas redondeadas de abajo
+        -- Cap inferior (colapsado - forma rectangular no necesita recorte)
         local _tabCapBottom = Instance.new("Frame", btn)
         _tabCapBottom.Name = "TabCapBottom"
-        _tabCapBottom.Size = UDim2.new(1, 0, 0.5, 0)
-        _tabCapBottom.Position = UDim2.new(0, 0, 0.5, 0)
-        _tabCapBottom.BackgroundColor3 = btn.BackgroundColor3
-        _tabCapBottom.BackgroundTransparency = btn.BackgroundTransparency
+        _tabCapBottom.Size = UDim2.new(0, 0, 0, 0)
+        _tabCapBottom.Position = UDim2.new(0, 0, 1, 0)
+        _tabCapBottom.BackgroundTransparency = 1
         _tabCapBottom.BorderSizePixel = 0
         _tabCapBottom.ZIndex = 13
 
