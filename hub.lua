@@ -8822,12 +8822,44 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
         TweenService:Create(_bindUiScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
     end)
 
-    -- -- DRAG ---------------------------------------------
+    -- -- DRAG (variables declaradas aqui para que el float animation las capture como upvalues)
     local _dragConn  = nil
     local _dragging  = false
     local _dragStart = nil
     local _startPos  = nil
     local _moved     = false
+
+    -- -- ANIMACION FLOTANTE (idle bobbing) -----------------
+    -- Movimiento sinusoidal suave en Y + rotacion sutil: el boton flota
+    -- Se pausa mientras el usuario lo arrastra (_dragging o _moved)
+    local _floatConn  = nil
+    local _floatPhase = math.random() * math.pi * 2  -- fase aleatoria: cada boton empieza en posicion diferente
+    local _floatAmp   = 5    -- pixeles de amplitud (subida/bajada maxima)
+    local _floatSpeed = 1.5  -- ciclos por segundo
+    local _floatBaseY = posYOff  -- posicion Y base (slot asignado)
+    local _floatTick  = 0
+
+    _floatConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        _floatTick = _floatTick + dt
+        if not bg or not bg.Parent then
+            if _floatConn then pcall(function() _floatConn:Disconnect() end) end
+            _floatConn = nil
+            return
+        end
+        if _dragging or _moved then
+            _floatBaseY = bg.Position.Y.Offset
+            return
+        end
+        local wave = math.sin(_floatTick * _floatSpeed * math.pi * 2 + _floatPhase) * _floatAmp
+        local tilt  = math.sin(_floatTick * _floatSpeed * math.pi * 2 + _floatPhase + math.pi * 0.5) * 2
+        pcall(function()
+            bg.Position = UDim2.fromOffset(bg.Position.X.Offset, _floatBaseY + wave)
+            bg.Rotation = tilt
+        end)
+    end)
+
+    -- -- FIN ANIMACION FLOTANTE ----------------------------
+    -- (El override de _animatedDestroy se hace mas abajo, despues de que la funcion original es definida)
 
     if pcall(function()
         local dd = Instance.new("UIDragDetector", bg)
@@ -8956,8 +8988,14 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
         TweenService:Create(_bindUiScale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale=0}):Play()
         task.delay(0.25, function() pcall(function() _bindSg:Destroy() end) end)
     end
-    bg._animatedDestroy      = _animatedDestroy
-    _bindSg._animatedDestroy = _animatedDestroy
+    -- Envolver _animatedDestroy para que tambien detenga la animacion flotante
+    local _origAnimDestroy = _animatedDestroy
+    local function _animatedDestroyFull()
+        if _floatConn then pcall(function() _floatConn:Disconnect() end); _floatConn = nil end
+        _origAnimDestroy()
+    end
+    bg._animatedDestroy      = _animatedDestroyFull
+    _bindSg._animatedDestroy = _animatedDestroyFull
 
     -- Limpiar registry al destruirse
     _bindSg.AncestryChanged:Connect(function()
@@ -29802,15 +29840,15 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     label.Position         = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text             = nombre
-    label.TextSize         = 12
-    label.FontFace         = Font.fromEnum(Enum.Font.Gotham)
+    label.TextSize         = 14
+    label.FontFace         = Font.fromEnum(Enum.Font.GothamBold)
     label.TextColor3       = Color3.fromRGB(255, 255, 255)
     label.TextXAlignment   = Enum.TextXAlignment.Left
     label.TextYAlignment   = Enum.TextYAlignment.Center
     label.TextTruncate     = Enum.TextTruncate.AtEnd
     label.ZIndex           = 22
     label.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
-    label.TextStrokeTransparency = 0.5
+    label.TextStrokeTransparency = 0.2
 
     -- Registro de traduccion
     if _LangObjects then
@@ -47874,9 +47912,11 @@ function CreateCombatTab()
             Settings.premium.knifeAura.connection = nil
         end
         local _hbTknifeAura = 0
+        local _kaOnCooldown = false  -- FIX: flag para evitar bloquear el Heartbeat con task.wait
         Settings.premium.knifeAura.connection = RunService.Heartbeat:Connect(function()
-            _hbTknifeAura = _hbTknifeAura + 1; if _hbTknifeAura < 6 then return end; _hbTknifeAura = 0  -- OPT: 100ms
+            _hbTknifeAura = _hbTknifeAura + 1; if _hbTknifeAura < 3 then return end; _hbTknifeAura = 0  -- OPT: ~50ms
             if not Settings.premium.knifeAura.enabled then return end
+            if _kaOnCooldown then return end  -- FIX: cooldown sin bloquear el heartbeat
             if _G._visualRoundOver then return end
             if _G._betweenRounds    then return end
             local char = LocalPlayer.Character; if not char then return end
@@ -47885,24 +47925,30 @@ function CreateCombatTab()
             local savedVel = hrp.AssemblyLinearVelocity
             local radius   = Settings.premium.knifeAura.radius
             local myPos    = hrp.Position
-            -- OPT: usar cache de HRP ? sin FindFirstChild en cada player cada tick
+            -- OPT: usar cache de HRP - sin FindFirstChild en cada player cada tick
             for p, tHRP in pairs(_kaHRPCache) do
-                if tHRP and tHRP.Parent and tHRP.Position.Y <= 70 then
+                if tHRP and tHRP.Parent then
                     local d = (myPos - tHRP.Position).Magnitude
                     if d <= radius then
-                        -- WALL CHECK: no atacar a trav?s de paredes
+                        -- WALL CHECK: wallCheckRaycast devuelve true = linea de vision libre (sin pared)
                         local eyePos  = myPos + Vector3.new(0, 1.5, 0)
                         local bodyPos = tHRP.Position + Vector3.new(0, 0.8, 0)
                         if not wallCheckRaycast(eyePos, bodyPos) then continue end
-                        _FireKnifeCombat(tHRP)
+                        -- FIX: disparar en task.spawn para no bloquear el Heartbeat
+                        _kaOnCooldown = true
+                        local _tHRP = tHRP
+                        local _savedCF = savedCF
+                        local _savedVel = savedVel
                         _sp(function()
+                            pcall(function() _FireKnifeCombat(_tHRP) end)
                             pcall(function()
-                                hrp.CFrame = savedCF
-                                hrp.AssemblyLinearVelocity = savedVel or Vector3.zero
+                                hrp.CFrame = _savedCF
+                                hrp.AssemblyLinearVelocity = _savedVel or Vector3.zero
                                 hrp.AssemblyAngularVelocity = Vector3.zero
                             end)
+                            _w(Settings.premium.knifeAura.cooldown or 0.3)
+                            _kaOnCooldown = false
                         end)
-                        _w(Settings.premium.knifeAura.cooldown or 0.5)
                         break
                     end
                 end
