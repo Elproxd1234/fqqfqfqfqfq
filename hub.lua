@@ -9361,8 +9361,12 @@ end
 function updateBindables()
     if Settings.combat.bindable.shoot then
         if not shootBtnGui then
-            -- == BOTON SILENT AIM PERSONALIZADO (estilo transparente con borde) ==
+            -- == BOTON SHOOT MURDERER: misma estructura y animaciones que createBindableButton ==
             do
+                local BTN_W = 76
+                local BTN_H = 76
+                local vp    = workspace.CurrentCamera.ViewportSize
+
                 local _saGui = Instance.new("ScreenGui")
                 _saGui.Name           = "SHOOT MURDERER_CapyBtn"
                 _saGui.ResetOnSpawn   = false
@@ -9372,15 +9376,12 @@ function updateBindables()
                 pcall(function() _saGui.Parent = game:GetService("CoreGui") end)
                 if not _saGui.Parent then _saGui.Parent = LocalPlayer.PlayerGui end
 
-                local vp = workspace.CurrentCamera.ViewportSize
-                local BTN_W = 250
-                local BTN_H = 180
-                local _slot  = _assignSlot("SHOOT MURDERER")
+                local _slot = _assignSlot("SHOOT MURDERER")
                 local _sx, _sy = _getBindablePosition(_slot)
-                local posX  = math.clamp(_sx, 4, vp.X - BTN_W - 4)
-                local posY  = math.clamp(_sy, 4, vp.Y - BTN_H - 4)
+                local posX = math.clamp(_sx, 4, vp.X - BTN_W - 4)
+                local posY = math.clamp(_sy, 4, vp.Y - BTN_H - 4)
 
-                -- Contenedor raiz draggable
+                -- Contenedor raiz (invisible, solo para drag)
                 local _saBg = Instance.new("Frame", _saGui)
                 _saBg.Name                   = "CapyBindBtn"
                 _saBg.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
@@ -9390,70 +9391,183 @@ function updateBindables()
                 _saBg.ZIndex                 = 200
                 _saBg.Active                 = true
 
-                -- Boton principal con apariencia personalizada
-                local shootButton = Instance.new("TextButton", _saBg)
-                shootButton.Name                   = "ShootButton"
-                shootButton.Size                   = UDim2.new(1, 0, 1, 0)
-                shootButton.Position               = UDim2.new(0, 0, 0, 0)
-                shootButton.AnchorPoint            = Vector2.new(0.5, 0.5)
-                shootButton.BackgroundTransparency = 1
-                shootButton.Text                   = "Shoot"
-                shootButton.TextColor3             = Color3.fromRGB(255, 255, 255)
-                shootButton.TextSize               = 24
-                shootButton.Font                   = Enum.Font.GothamMedium
-                shootButton.AutoButtonColor        = false
-                shootButton.ZIndex                 = 210
-
-                local _saCorner = Instance.new("UICorner", shootButton)
-                _saCorner.CornerRadius = UDim.new(0, 20)
-
-                local _saStroke = Instance.new("UIStroke", shootButton)
-                _saStroke.Color           = Color3.fromRGB(45, 45, 45)
-                _saStroke.Thickness       = 4
-                _saStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-                -- Escala animada de entrada
+                -- UIScale: 0?1 con Back bounce al aparecer
                 local _saScale = Instance.new("UIScale", _saBg)
                 _saScale.Scale = 0
+
+                -- Pill (fondo que aparece en hover/press)
+                local pill = Instance.new("Frame", _saBg)
+                pill.Name                   = "Pill"
+                pill.AnchorPoint            = Vector2.new(0.5, 0.5)
+                pill.Position               = UDim2.fromScale(0.5, 0.5)
+                pill.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
+                pill.BackgroundColor3       = ThemeColors.Aurora1
+                pill.BackgroundTransparency = 1
+                pill.BorderSizePixel        = 0
+                pill.ZIndex                 = 201
+                Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 10)
+
+                -- Borde exterior del color del hub
+                local outerRing = Instance.new("Frame", _saBg)
+                outerRing.Name                   = "OuterRing"
+                outerRing.AnchorPoint            = Vector2.new(0.5, 0.5)
+                outerRing.Position               = UDim2.fromScale(0.5, 0.5)
+                outerRing.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
+                outerRing.BackgroundTransparency = 1
+                outerRing.BorderSizePixel        = 0
+                outerRing.ZIndex                 = 202
+                Instance.new("UICorner", outerRing).CornerRadius = UDim.new(0, 10)
+
+                local outerStroke = Instance.new("UIStroke", outerRing)
+                outerStroke.Color           = ThemeColors.Aurora1
+                outerStroke.Thickness       = 3
+                outerStroke.Transparency    = 0
+                outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+                -- Label centrado con contorno negro
+                local lbl = Instance.new("TextLabel", _saBg)
+                lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
+                lbl.Position               = UDim2.fromScale(0.5, 0.5)
+                lbl.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
+                lbl.BackgroundTransparency = 1
+                lbl.Text                   = "Shoot"
+                lbl.TextSize               = 11
+                lbl.Font                   = Enum.Font.GothamBold
+                lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+                lbl.TextXAlignment         = Enum.TextXAlignment.Center
+                lbl.TextYAlignment         = Enum.TextYAlignment.Center
+                lbl.TextWrapped            = true
+                lbl.TextScaled             = false
+                lbl.ZIndex                 = 205
+                local lblStroke = Instance.new("UIStroke", lbl)
+                lblStroke.Color        = Color3.fromRGB(0, 0, 0)
+                lblStroke.Thickness    = 1
+                lblStroke.Transparency = 0.5
+
+                -- Boton invisible encima para capturar clicks
+                local shootButton = Instance.new("TextButton", _saBg)
+                shootButton.Name                   = "Fill"
+                shootButton.AnchorPoint            = Vector2.new(0.5, 0.5)
+                shootButton.Position               = UDim2.fromScale(0.5, 0.5)
+                shootButton.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
+                shootButton.BackgroundTransparency = 1
+                shootButton.Text                   = ""
+                shootButton.AutoButtonColor        = false
+                shootButton.ZIndex                 = 210
+                Instance.new("UICorner", shootButton).CornerRadius = UDim.new(0, 10)
+
+                -- Glow de fondo
+                local glow = Instance.new("ImageLabel", _saBg)
+                glow.AnchorPoint            = Vector2.new(0.5, 0.5)
+                glow.Position               = UDim2.fromScale(0.5, 0.5)
+                glow.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.8)
+                glow.BackgroundTransparency = 1
+                glow.Image                  = "rbxassetid://4970638706"
+                glow.ImageColor3            = ThemeColors.Aurora1
+                glow.ImageTransparency      = 0.82
+                glow.ZIndex                 = 199
+
+                -- _moved declarado ANTES del bloque de drag
+                local _saMoved = false
+
+                -- Animacion de entrada: scale 0?1 con Back bounce
                 task.spawn(function()
                     task.wait(0.016)
                     TweenService:Create(_saScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
                 end)
 
-                -- Drag manual (compatible con mobile)
-                local _saMoved    = false
-                local _saDragging = false
-                local _saDragStart= nil
-                local _saStartPos = nil
-                shootButton.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1
-                    or input.UserInputType == Enum.UserInputType.Touch then
-                        _saDragging  = true
-                        _saMoved     = false
-                        _saDragStart = input.Position
-                        _saStartPos  = _saBg.Position
-                    end
+                -- Hover
+                shootButton.MouseEnter:Connect(function()
+                    TweenService:Create(pill,        TweenInfo.new(0.12), {BackgroundTransparency = 0.75}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.12), {Thickness = 3.5}):Play()
                 end)
-                UserInputService.InputChanged:Connect(function(input)
-                    if not _saDragging then return end
-                    if input.UserInputType ~= Enum.UserInputType.MouseMovement
-                    and input.UserInputType ~= Enum.UserInputType.Touch then return end
-                    local delta = input.Position - _saDragStart
-                    if delta.Magnitude > 4 then _saMoved = true end
-                    local vpN = workspace.CurrentCamera.ViewportSize
-                    _saBg.Position = UDim2.fromOffset(
-                        math.clamp(_saStartPos.X.Offset + delta.X, 0, vpN.X - BTN_W),
-                        math.clamp(_saStartPos.Y.Offset + delta.Y, 0, vpN.Y - BTN_H))
-                end)
-                shootButton.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1
-                    or input.UserInputType == Enum.UserInputType.Touch then
-                        _saDragging = false
-                        task.defer(function() _saMoved = false end)
-                    end
+                shootButton.MouseLeave:Connect(function()
+                    TweenService:Create(pill,        TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.15), {Thickness = 3}):Play()
                 end)
 
-                -- Exponer como gui.Frame para que el Activated de abajo funcione igual
+                -- Press / Release: hundido + glow intenso
+                shootButton.MouseButton1Down:Connect(function()
+                    if _saMoved then return end
+                    TweenService:Create(pill,        TweenInfo.new(0.07), {BackgroundTransparency = 0.40}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.07), {Thickness = 2}):Play()
+                    TweenService:Create(_saScale,    TweenInfo.new(0.07), {Scale = 0.92}):Play()
+                    TweenService:Create(glow,        TweenInfo.new(0.07), {ImageTransparency = 0.55}):Play()
+                end)
+                shootButton.MouseButton1Up:Connect(function()
+                    if _saMoved then return end
+                    TweenService:Create(pill,        TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.18), {Thickness = 3}):Play()
+                    TweenService:Create(_saScale,    TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                    TweenService:Create(glow,        TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
+                end)
+
+                -- Activated: flash glow
+                shootButton.Activated:Connect(function()
+                    if _saMoved then return end
+                    TweenService:Create(glow, TweenInfo.new(0.08), {ImageTransparency = 0.42}):Play()
+                    task.delay(0.12, function()
+                        TweenService:Create(glow, TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
+                    end)
+                end)
+
+                -- Drag: UIDragDetector con fallback manual
+                if pcall(function()
+                    local dd = Instance.new("UIDragDetector", _saBg)
+                    dd.DragStyle     = Enum.UIDragDetectorDragStyle.TranslatePlane
+                    dd.ResponseStyle = Enum.UIDragDetectorResponseStyle.CustomWithFallback
+                    dd.Dragged:Connect(function()
+                        if _G._hubUndraggableButtons then return end
+                        _saMoved = true
+                        local vpN = workspace.CurrentCamera.ViewportSize
+                        _saBg.Position = UDim2.fromOffset(
+                            math.clamp(_saBg.Position.X.Offset, 0, vpN.X - BTN_W),
+                            math.clamp(_saBg.Position.Y.Offset, 0, vpN.Y - BTN_H))
+                        _G._bindablePosSave = _G._bindablePosSave or {}
+                        _G._bindablePosSave["SHOOT MURDERER"] = {x = _saBg.Position.X.Offset, y = _saBg.Position.Y.Offset}
+                    end)
+                    dd.DragEnd:Connect(function() task.defer(function() _saMoved = false end) end)
+                end) then
+                    -- UIDragDetector OK
+                else
+                    -- Fallback manual
+                    local _saDragging = false
+                    local _saDragStart = nil
+                    local _saStartPos  = nil
+                    shootButton.InputBegan:Connect(function(input)
+                        if _G._hubUndraggableButtons then return end
+                        if input.UserInputType == Enum.UserInputType.MouseButton1
+                        or input.UserInputType == Enum.UserInputType.Touch then
+                            _saDragging  = true
+                            _saMoved     = false
+                            _saDragStart = input.Position
+                            _saStartPos  = _saBg.Position
+                        end
+                    end)
+                    UserInputService.InputChanged:Connect(function(input)
+                        if not _saDragging then return end
+                        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+                        and input.UserInputType ~= Enum.UserInputType.Touch then return end
+                        local delta = input.Position - _saDragStart
+                        if delta.Magnitude > 4 then _saMoved = true end
+                        local vpN = workspace.CurrentCamera.ViewportSize
+                        _saBg.Position = UDim2.fromOffset(
+                            math.clamp(_saStartPos.X.Offset + delta.X, 0, vpN.X - BTN_W),
+                            math.clamp(_saStartPos.Y.Offset + delta.Y, 0, vpN.Y - BTN_H))
+                    end)
+                    shootButton.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1
+                        or input.UserInputType == Enum.UserInputType.Touch then
+                            _saDragging = false
+                            if _saMoved then
+                                _G._bindablePosSave = _G._bindablePosSave or {}
+                                _G._bindablePosSave["SHOOT MURDERER"] = {x = _saBg.Position.X.Offset, y = _saBg.Position.Y.Offset}
+                            end
+                            task.defer(function() _saMoved = false end)
+                        end
+                    end)
+                end
+
                 _saGui.Frame = shootButton
                 _BindableButtons["SHOOT MURDERER"] = _saGui
                 _registerBindableGui("SHOOT MURDERER_CapyBtn", _saGui)
@@ -50631,170 +50745,210 @@ function CreateCombatTab()
             if CombatTabState then CombatTabState._saBypassHook = false end
         end
 
-        -- Boton SHOOT flotante -- estilo identico al boton bindable del hub
+        -- Boton SHOOT flotante -- misma estructura y animaciones que createBindableButton
         local _pGui = nil
         local function _pCreateBtn()
             if _G._pGuiRef and _G._pGuiRef.Parent then pcall(function() _G._pGuiRef:Destroy() end) end
-            local _BTN_W = 60
-            local _BTN_H = 60
-            local _vp    = workspace.CurrentCamera.ViewportSize
+
+            local BTN_W = 76
+            local BTN_H = 76
+            local vp    = workspace.CurrentCamera.ViewportSize
+
             local gui = Instance.new("ScreenGui")
-            gui.Name="PierceBulletGui"; gui.ResetOnSpawn=false
-            gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; gui.DisplayOrder=9900; gui.IgnoreGuiInset=true
+            gui.Name           = "PierceBulletGui"
+            gui.ResetOnSpawn   = false
+            gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            gui.DisplayOrder   = 9900
+            gui.IgnoreGuiInset = true
             pcall(function() gui.Parent = game:GetService("CoreGui") end)
-            if not gui.Parent then
-                local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-                if not pg then return end
-                gui.Parent = pg
-            end
+            if not gui.Parent then gui.Parent = LocalPlayer.PlayerGui end
             _G._pGuiRef = gui
 
-            -- Contenedor raiz (drag)
+            -- Contenedor raiz (invisible, solo para drag) — igual que bindable
             local bg = Instance.new("Frame", gui)
-            bg.Name = "CapyBindBtn"
-            bg.Size = UDim2.fromOffset(_BTN_W, _BTN_H)
-            bg.Position = UDim2.fromOffset(
-                math.clamp(_vp.X/2 - _BTN_W/2, 4, _vp.X - _BTN_W - 4),
-                math.clamp(_vp.Y - 180, 4, _vp.Y - _BTN_H - 4))
+            bg.Name                   = "CapyBindBtn"
+            bg.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
+            bg.Position               = UDim2.fromOffset(
+                math.clamp(vp.X/2 - BTN_W/2, 4, vp.X - BTN_W - 4),
+                math.clamp(vp.Y - 200, 4, vp.Y - BTN_H - 4))
             bg.BackgroundTransparency = 1
-            bg.BorderSizePixel = 0
-            bg.ZIndex = 200
-            bg.Active = true
+            bg.BorderSizePixel        = 0
+            bg.ZIndex                 = 200
+            bg.Active                 = true
 
+            -- UIScale: empieza en 0, anima a 1 con Back bounce
             local _bgScale = Instance.new("UIScale", bg)
             _bgScale.Scale = 0
 
-            -- Fondo interno (pill)
+            -- Fondo transparente (aparece en hover/press) — igual que bindable
             local pill = Instance.new("Frame", bg)
-            pill.Name = "Pill"
-            pill.AnchorPoint = Vector2.new(0.5, 0.5)
-            pill.Position = UDim2.fromScale(0.5, 0.5)
-            pill.Size = UDim2.fromOffset(_BTN_W, _BTN_H)
-            pill.BackgroundColor3 = ThemeColors.Aurora1
+            pill.Name                   = "Pill"
+            pill.AnchorPoint            = Vector2.new(0.5, 0.5)
+            pill.Position               = UDim2.fromScale(0.5, 0.5)
+            pill.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
+            pill.BackgroundColor3       = ThemeColors.Aurora1
             pill.BackgroundTransparency = 1
-            pill.BorderSizePixel = 0
-            pill.ZIndex = 201
+            pill.BorderSizePixel        = 0
+            pill.ZIndex                 = 201
             Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 10)
 
-            -- Borde exterior estilo hub
+            -- Borde exterior del color del hub — igual que bindable
             local outerRing = Instance.new("Frame", bg)
-            outerRing.Name = "OuterRing"
-            outerRing.AnchorPoint = Vector2.new(0.5, 0.5)
-            outerRing.Position = UDim2.fromScale(0.5, 0.5)
-            outerRing.Size = UDim2.fromOffset(_BTN_W, _BTN_H)
+            outerRing.Name                   = "OuterRing"
+            outerRing.AnchorPoint            = Vector2.new(0.5, 0.5)
+            outerRing.Position               = UDim2.fromScale(0.5, 0.5)
+            outerRing.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
             outerRing.BackgroundTransparency = 1
-            outerRing.BorderSizePixel = 0
-            outerRing.ZIndex = 202
+            outerRing.BorderSizePixel        = 0
+            outerRing.ZIndex                 = 202
             Instance.new("UICorner", outerRing).CornerRadius = UDim.new(0, 10)
+
             local outerStroke = Instance.new("UIStroke", outerRing)
-            outerStroke.Color = ThemeColors.Aurora1
-            outerStroke.Thickness = 3
-            outerStroke.Transparency = 0
+            outerStroke.Color           = ThemeColors.Aurora1
+            outerStroke.Thickness       = 3
+            outerStroke.Transparency    = 0
             outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-            -- Label centrado estilo hub
+            -- Label centrado con contorno negro — igual que bindable
             local lbl = Instance.new("TextLabel", bg)
-            lbl.AnchorPoint = Vector2.new(0.5, 0.5)
-            lbl.Position = UDim2.fromScale(0.5, 0.5)
-            lbl.Size = UDim2.fromOffset(_BTN_W - 8, _BTN_H - 8)
+            lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
+            lbl.Position               = UDim2.fromScale(0.5, 0.5)
+            lbl.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
             lbl.BackgroundTransparency = 1
-            lbl.Text = "SHOOT"
-            lbl.TextSize = 11
-            lbl.Font = Enum.Font.GothamBold
-            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-            lbl.TextXAlignment = Enum.TextXAlignment.Center
-            lbl.TextYAlignment = Enum.TextYAlignment.Center
-            lbl.TextWrapped = true
-            lbl.TextScaled = false
-            lbl.ZIndex = 205
+            lbl.Text                   = "PIERCE"
+            lbl.TextSize               = 11
+            lbl.Font                   = Enum.Font.GothamBold
+            lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+            lbl.TextXAlignment         = Enum.TextXAlignment.Center
+            lbl.TextYAlignment         = Enum.TextYAlignment.Center
+            lbl.TextWrapped            = true
+            lbl.TextScaled             = false
+            lbl.ZIndex                 = 205
             local lblStroke = Instance.new("UIStroke", lbl)
-            lblStroke.Color = Color3.fromRGB(0,0,0); lblStroke.Thickness = 1; lblStroke.Transparency = 0.5
+            lblStroke.Color        = Color3.fromRGB(0, 0, 0)
+            lblStroke.Thickness    = 1
+            lblStroke.Transparency = 0.5
 
-            -- Glow
-            local glow = Instance.new("ImageLabel", bg)
-            glow.AnchorPoint = Vector2.new(0.5, 0.5)
-            glow.Position = UDim2.fromScale(0.5, 0.5)
-            glow.Size = UDim2.fromOffset(_BTN_W * 1.3, _BTN_H * 1.8)
-            glow.BackgroundTransparency = 1
-            glow.Image = "rbxassetid://4970638706"
-            glow.ImageColor3 = ThemeColors.Aurora1
-            glow.ImageTransparency = 0.82
-            glow.ZIndex = 199
-
-            -- Boton invisible encima
+            -- Boton invisible encima para capturar clicks — igual que bindable
             local fill = Instance.new("TextButton", bg)
-            fill.Name = "Fill"
-            fill.AnchorPoint = Vector2.new(0.5, 0.5)
-            fill.Position = UDim2.fromScale(0.5, 0.5)
-            fill.Size = UDim2.fromOffset(_BTN_W, _BTN_H)
+            fill.Name                   = "Fill"
+            fill.AnchorPoint            = Vector2.new(0.5, 0.5)
+            fill.Position               = UDim2.fromScale(0.5, 0.5)
+            fill.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
             fill.BackgroundTransparency = 1
-            fill.Text = ""
-            fill.AutoButtonColor = false
-            fill.ZIndex = 210
+            fill.Text                   = ""
+            fill.AutoButtonColor        = false
+            fill.ZIndex                 = 210
             Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 10)
 
-            -- Entrada animada
-            _sp(function()
-                _w(0.016)
-                TweenService:Create(_bgScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
+            -- Glow de fondo — igual que bindable
+            local glow = Instance.new("ImageLabel", bg)
+            glow.AnchorPoint            = Vector2.new(0.5, 0.5)
+            glow.Position               = UDim2.fromScale(0.5, 0.5)
+            glow.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.8)
+            glow.BackgroundTransparency = 1
+            glow.Image                  = "rbxassetid://4970638706"
+            glow.ImageColor3            = ThemeColors.Aurora1
+            glow.ImageTransparency      = 0.82
+            glow.ZIndex                 = 199
+
+            -- _moved declarado ANTES del bloque de drag (igual que bindable, evita el bug)
+            local _moved = false
+
+            -- -- ANIMACION DE ENTRADA: scale 0?1 con Back bounce --------------
+            task.spawn(function()
+                task.wait(0.016)
+                TweenService:Create(_bgScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
             end)
 
-            -- Hover
+            -- -- HOVER ---------------------------------------------------------
             fill.MouseEnter:Connect(function()
-                TweenService:Create(pill, TweenInfo.new(0.12), {BackgroundTransparency=0.75}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.12), {Thickness=3.5}):Play()
+                TweenService:Create(pill,        TweenInfo.new(0.12), {BackgroundTransparency = 0.75}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.12), {Thickness = 3.5}):Play()
             end)
             fill.MouseLeave:Connect(function()
-                TweenService:Create(pill, TweenInfo.new(0.15), {BackgroundTransparency=1}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.15), {Thickness=3}):Play()
+                TweenService:Create(pill,        TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.15), {Thickness = 3}):Play()
             end)
-            -- Press / release
+
+            -- -- PRESS / RELEASE: hundido + glow intenso -----------------------
             fill.MouseButton1Down:Connect(function()
-                TweenService:Create(pill, TweenInfo.new(0.07), {BackgroundTransparency=0.40}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.07), {Thickness=2}):Play()
-                TweenService:Create(_bgScale, TweenInfo.new(0.07), {Scale=0.92}):Play()
-                TweenService:Create(glow, TweenInfo.new(0.07), {ImageTransparency=0.55}):Play()
+                if _moved then return end
+                TweenService:Create(pill,        TweenInfo.new(0.07), {BackgroundTransparency = 0.40}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.07), {Thickness = 2}):Play()
+                TweenService:Create(_bgScale,    TweenInfo.new(0.07), {Scale = 0.92}):Play()
+                TweenService:Create(glow,        TweenInfo.new(0.07), {ImageTransparency = 0.55}):Play()
             end)
             fill.MouseButton1Up:Connect(function()
-                TweenService:Create(pill, TweenInfo.new(0.18), {BackgroundTransparency=1}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.18), {Thickness=3}):Play()
-                TweenService:Create(_bgScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
-                TweenService:Create(glow, TweenInfo.new(0.25), {ImageTransparency=0.82}):Play()
+                if _moved then return end
+                TweenService:Create(pill,        TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.18), {Thickness = 3}):Play()
+                TweenService:Create(_bgScale,    TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                TweenService:Create(glow,        TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
             end)
 
-            -- Drag manual
-            local _moved2, _dragging2, _dragStart2, _startPos2 = false, false, nil, nil
-            fill.InputBegan:Connect(function(i)
-                if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                    _dragging2=true; _moved2=false; _dragStart2=i.Position; _startPos2=bg.Position
-                end
-            end)
-            UserInputService.InputChanged:Connect(function(i)
-                if not _dragging2 then return end
-                if i.UserInputType~=Enum.UserInputType.MouseMovement and i.UserInputType~=Enum.UserInputType.Touch then return end
-                local d=i.Position-_dragStart2
-                if d.Magnitude>4 then _moved2=true end
-                local vpN=workspace.CurrentCamera.ViewportSize
-                bg.Position=UDim2.fromOffset(
-                    math.clamp(_startPos2.X.Offset+d.X, 0, vpN.X-_BTN_W),
-                    math.clamp(_startPos2.Y.Offset+d.Y, 0, vpN.Y-_BTN_H))
-            end)
-            fill.InputEnded:Connect(function(i)
-                if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                    _dragging2=false
-                    task.defer(function() _moved2=false end)
-                end
-            end)
-
-            -- Click
+            -- -- ACTIVATED: flash glow + disparo pierce ------------------------
             fill.Activated:Connect(function()
-                if _moved2 then return end
+                if _moved then return end
                 if not _pEnabled then return end
-                local now=tick(); if now-_pLastShot<_pCooldown then return end; _pLastShot=now
-                TweenService:Create(glow, TweenInfo.new(0.08), {ImageTransparency=0.42}):Play()
-                _dl(0.12, function() TweenService:Create(glow, TweenInfo.new(0.25), {ImageTransparency=0.82}):Play() end)
+                local now = tick()
+                if now - _pLastShot < _pCooldown then return end
+                _pLastShot = now
+                TweenService:Create(glow, TweenInfo.new(0.08), {ImageTransparency = 0.42}):Play()
+                task.delay(0.12, function()
+                    TweenService:Create(glow, TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
+                end)
                 _sp(function() _doPierce(true) end)
             end)
+
+            -- -- DRAG: UIDragDetector con fallback manual ----------------------
+            if pcall(function()
+                local dd = Instance.new("UIDragDetector", bg)
+                dd.DragStyle     = Enum.UIDragDetectorDragStyle.TranslatePlane
+                dd.ResponseStyle = Enum.UIDragDetectorResponseStyle.CustomWithFallback
+                dd.Dragged:Connect(function()
+                    _moved = true
+                    local vpN = workspace.CurrentCamera.ViewportSize
+                    bg.Position = UDim2.fromOffset(
+                        math.clamp(bg.Position.X.Offset, 0, vpN.X - BTN_W),
+                        math.clamp(bg.Position.Y.Offset, 0, vpN.Y - BTN_H))
+                end)
+                dd.DragEnd:Connect(function() task.defer(function() _moved = false end) end)
+            end) then
+                -- UIDragDetector OK
+            else
+                -- Fallback manual (executors sin soporte UIDragDetector)
+                local _dragging  = false
+                local _dragStart = nil
+                local _startPos  = nil
+                fill.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1
+                    or input.UserInputType == Enum.UserInputType.Touch then
+                        _dragging  = true
+                        _moved     = false
+                        _dragStart = input.Position
+                        _startPos  = bg.Position
+                    end
+                end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if not _dragging then return end
+                    if input.UserInputType ~= Enum.UserInputType.MouseMovement
+                    and input.UserInputType ~= Enum.UserInputType.Touch then return end
+                    local delta = input.Position - _dragStart
+                    if delta.Magnitude > 4 then _moved = true end
+                    local vpN = workspace.CurrentCamera.ViewportSize
+                    bg.Position = UDim2.fromOffset(
+                        math.clamp(_startPos.X.Offset + delta.X, 0, vpN.X - BTN_W),
+                        math.clamp(_startPos.Y.Offset + delta.Y, 0, vpN.Y - BTN_H))
+                end)
+                fill.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1
+                    or input.UserInputType == Enum.UserInputType.Touch then
+                        _dragging = false
+                        task.defer(function() _moved = false end)
+                    end
+                end)
+            end
         end
 
         -- LMB hook
