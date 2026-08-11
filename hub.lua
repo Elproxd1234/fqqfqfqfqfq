@@ -18758,23 +18758,22 @@ function _createOverlayLabel(name, posY, textSize, font)
     local pillH     = textSize + 18
     local pillW     = name == "Timer" and 200 or 180
 
-    -- Pill centrada horizontalmente, empieza 30px arriba de su posicion final
+    -- Pill centrada horizontalmente, completamente sin fondo (solo texto flotante)
     local pill = Instance.new("Frame", sg)
     pill.Name                   = "Pill"
     pill.Size                   = UDim2.new(0, pillW, 0, pillH)
     pill.AnchorPoint            = Vector2.new(0.5, 0.5)
     pill.Position               = UDim2.new(0.5, 0, yScale, -30)  -- empieza 30px arriba
-    pill.BackgroundColor3       = Color3.fromRGB(5, 12, 28)
-    pill.BackgroundTransparency = 1   -- empieza transparente
+    pill.BackgroundTransparency = 1   -- sin fondo: completamente transparente
     pill.BorderSizePixel        = 0
     pill.ZIndex                 = 99
     Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 12)
 
-    -- Borde brillante cyan
+    -- Sin borde: elemento completamente flotante
     local stroke = Instance.new("UIStroke", pill)
     stroke.Color           = Color3.fromRGB(0, 210, 255)
-    stroke.Thickness       = 1.5
-    stroke.Transparency    = 1.0   -- empieza invisible
+    stroke.Thickness       = 0
+    stroke.Transparency    = 1.0   -- invisible siempre
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- Label de texto centrado dentro del pill
@@ -18795,30 +18794,20 @@ function _createOverlayLabel(name, posY, textSize, font)
     lbl.TextYAlignment         = Enum.TextYAlignment.Center
     lbl.ZIndex                 = 100
 
-    -- Animacion de entrada: slide-down desde arriba + fade-in
+    -- Animacion de entrada: slide-down desde arriba + fade-in (solo texto, sin fondo)
     local _ts = TweenService or game:GetService("TweenService")
     local targetPos = UDim2.new(0.5, 0, yScale, 0)
 
     task.spawn(function()
         task.wait(0.05)
-        -- Slide-down + fade-in del fondo
+        -- Slide-down del pill (sin cambiar transparencia de fondo: se mantiene en 1)
         _ts:Create(pill, TweenInfo.new(0.40, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Position               = targetPos,
-            BackgroundTransparency = 0.25,
+            Position = targetPos,
         }):Play()
-        -- Brillo del borde
-        _ts:Create(stroke, TweenInfo.new(0.40, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-            Transparency = 0.0,
-        }):Play()
-        -- Fade-in del texto un poco despues
+        -- Fade-in del texto
         task.wait(0.12)
         _ts:Create(lbl, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             TextTransparency = 0,
-        }):Play()
-        task.wait(0.55)
-        -- Asentar el stroke a valor normal
-        _ts:Create(stroke, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-            Transparency = 0.35,
         }):Play()
     end)
 
@@ -18862,7 +18851,7 @@ function CreateMainUI_GameInfo()
         _cpanel.AnchorPoint = Vector2.new(0.5, 0)
         _cpanel.Position = UDim2.new(0.5, 0, 0, 6)
         _cpanel.BackgroundColor3 = Color3.fromRGB(5, 14, 30)
-        _cpanel.BackgroundTransparency = 0.18
+        _cpanel.BackgroundTransparency = 1   -- sin fondo: flota sobre el juego
         _cpanel.BorderSizePixel = 0
         _cpanel.ZIndex = 60
 
@@ -18878,15 +18867,15 @@ function CreateMainUI_GameInfo()
 
         local _cpStroke = Instance.new("UIStroke", _cpanel)
         _cpStroke.Color = Color3.fromRGB(210, 85, 100)
-        _cpStroke.Thickness = 1.5
-        _cpStroke.Transparency = 0.25
+        _cpStroke.Thickness = 0          -- sin borde
+        _cpStroke.Transparency = 1.0     -- completamente invisible
         _cpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-        -- Gradiente sutil en el panel
+        -- Sin gradiente: fondo limpio
         local _cpGrad = Instance.new("UIGradient", _cpanel)
         _cpGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,   Color3.fromRGB(10, 30, 60)),
-            ColorSequenceKeypoint.new(1,   Color3.fromRGB(5,  14, 30)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
         })
         _cpGrad.Rotation = 90
 
@@ -19548,22 +19537,21 @@ function CreateMainUI_GameInfo()
                 pcall(function() sg.Parent = game:GetService("CoreGui") end)
                 if not sg.Parent then sg.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-                -- Pill centrada horizontalmente, empieza 30px arriba de su posicion final
+                -- Pill centrada horizontalmente, sin fondo (solo texto flotante con color del rol)
                 local pill = Instance.new("Frame", sg)
                 pill.Name                   = "Pill"
                 pill.Size                   = UDim2.new(0, 200, 0, 40)
                 pill.AnchorPoint            = Vector2.new(0.5, 0.5)
                 pill.Position               = UDim2.new(0.5, 0, 0.50, -30)  -- arriba inicialmente
-                pill.BackgroundColor3       = Color3.fromRGB(5, 12, 28)
-                pill.BackgroundTransparency = 1
+                pill.BackgroundTransparency = 1   -- sin fondo: siempre transparente
                 pill.BorderSizePixel        = 0
                 pill.ZIndex                 = 99
                 Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 12)
 
                 local stroke = Instance.new("UIStroke", pill)
                 stroke.Color           = color
-                stroke.Thickness       = 1.8
-                stroke.Transparency    = 1.0   -- empieza invisible
+                stroke.Thickness       = 0     -- sin borde
+                stroke.Transparency    = 1.0
                 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                 local lbl = Instance.new("TextLabel", pill)
@@ -19582,30 +19570,24 @@ function CreateMainUI_GameInfo()
                 lbl.TextYAlignment         = Enum.TextYAlignment.Center
                 lbl.ZIndex                 = 100
 
-                -- Animacion de entrada: slide-down + fade-in
+                -- Animacion de entrada: slide-down + fade-in (solo texto, sin fondo)
                 local _ts2 = TweenService or game:GetService("TweenService")
                 task.spawn(function()
                     task.wait(0.05)
-                    -- Slide-down al centro exacto
+                    -- Slide-down al centro exacto (sin cambiar BackgroundTransparency)
                     _ts2:Create(pill, TweenInfo.new(0.40, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                        Position               = UDim2.new(0.5, 0, 0.50, 0),
-                        BackgroundTransparency = 0.25,
-                    }):Play()
-                    _ts2:Create(stroke, TweenInfo.new(0.40, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-                        Transparency = 0.0,
+                        Position = UDim2.new(0.5, 0, 0.50, 0),
                     }):Play()
                     task.wait(0.12)
                     _ts2:Create(lbl, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                         TextTransparency = 0,
                     }):Play()
+                    -- Pulso del color del texto (en lugar del borde)
                     task.wait(0.55)
-                    _ts2:Create(stroke, TweenInfo.new(0.5), {Transparency = 0.30}):Play()
-
-                    -- Pulso suave del borde del color del rol
                     while lbl and lbl.Parent and _notifyRolState.enabled do
-                        _ts2:Create(stroke, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.65}):Play()
+                        _ts2:Create(lbl, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.30}):Play()
                         task.wait(1.4)
-                        _ts2:Create(stroke, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.05}):Play()
+                        _ts2:Create(lbl, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
                         task.wait(1.4)
                     end
                 end)
@@ -38753,11 +38735,8 @@ function CreatePremiumTab()
             skinIdx        = 1,
             origData       = {},
             _equippedConns = {},  -- FIX MOBILE v2: listeners de Equipped por tool
-            scaleOverrides = {},  -- FIX: multiplicador de escala POR SKIN (no compartido)
         }
         _G._skinChangerState = _skinState
-        -- Asegurar que scaleOverrides existe en estados restaurados de ejecuciones anteriores
-        _skinState.scaleOverrides = _skinState.scaleOverrides or {}
 
         local _SC_GUN_SKINS = {
             {
@@ -38765,21 +38744,15 @@ function CreatePremiumTab()
                 meshId = "http://www.roblox.com/asset/?id=95356090",
                 texId  = "http://www.roblox.com/asset/?id=126534866",
                 scale  = Vector3.new(1.7999999523162842, 1.7999999523162842, 1.7999999523162842),
+                -- GRIP: mismo agarre que ElderwoodGun
                 grip   = CFrame.new(
-                    0, -0.5, 0.5,
-                    0.999924004,    -0.00871835742, -0.00871835742,
-                    0.00871835742,   0.999961972,   -3.80063248e-05,
-                    0.00871835742,  -3.80063248e-05,  0.999961972
+                    -0.567565918, -0.124303818, -0.0424308777,
+                    -0.000212550163, 0.0230092816, -0.999735236,
+                    -0.011778634,   0.999665856,   0.0230101906,
+                     0.99993062,    0.0117804073,  5.85317612e-05
                 ),
             },
-            {
-                name   = "Harvester",
-                meshId = "rbxassetid://7775027413",
-                texId  = "http://www.roblox.com/asset/?id=7775245551",
-                scale  = Vector3.new(0.14, 0.12, 0.12),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                dualGun = true,
-            },
+
             {
                 -- Bacon: SpecialMesh, Grip exacto del scanner, GunClient confirmado
                 name   = "Bacon",
@@ -38799,7 +38772,7 @@ function CreatePremiumTab()
                 name   = "ElderwoodGun",
                 meshId = "rbxassetid://4210029922",
                 texId  = "rbxassetid://4210038158",
-                scale  = Vector3.new(0.085, 0.085, 0.085),
+                scale  = Vector3.new(0.035, 0.035, 0.035),
                 grip   = CFrame.new(
                     -0.567565918, -0.124303818, -0.0424308777,
                     -0.000212550163, 0.0230092816, -0.999735236,
@@ -38809,85 +38782,47 @@ function CreatePremiumTab()
                 dualGun = true,
             },
             {
-                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado ? IDs capturados en consola
+                -- GingerScope: Handle + Scope (MeshPart), GunClient confirmado
                 name   = "GingerScope",
                 meshId = "rbxassetid://15374602183",
-                texId  = "rbxassetid://107224776622554",
-                scale  = Vector3.new(0.18, 0.18, 0.18),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                texId  = "rbxassetid://15409041564",
+                scale  = Vector3.new(0.08, 0.08, 0.08),
+                -- GRIP: mismo agarre que ElderwoodGun
+                grip   = CFrame.new(
+                    -0.567565918, -0.124303818, -0.0424308777,
+                    -0.000212550163, 0.0230092816, -0.999735236,
+                    -0.011778634,   0.999665856,   0.0230101906,
+                     0.99993062,    0.0117804073,  5.85317612e-05
+                ),
                 dualGun = true,
             },
-            {
-                -- XenoShot: Handle MeshPart, GunClient confirmado ? IDs capturados en consola
-                name   = "XenoShot",
-                meshId = "rbxassetid://96867436912658",
-                texId  = "rbxassetid://103568875118220",
-                scale  = Vector3.new(0.13, 0.13, 0.13),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                dualGun = true,
-            },
-            {
-                -- USP: grip reconstruido desde cero con angulos explicitos
-                name   = "usp",
-                meshId = "rbxassetid://134394025639309",
-                texId  = "rbxassetid://129462008300983",
-                scale  = Vector3.new(0.075, 0.075, 0.075),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
-                dualGun = true,
-            },
-            {
-                -- Scopeta (scale reducido: mesh tiene dimensiones internas grandes)
-                name   = "scopeta",
-                meshId = "rbxassetid://71470025203613",
-                texId  = "rbxassetid://131252913061296",
-                scale  = Vector3.new(0.065, 0.065, 0.065),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) * CFrame.Angles(0, math.rad(90), 0),
-                dualGun = true,
-                soundId = "rbxassetid://6012216349",
-            },
-
         }
-        -- FIX: exponer la lista en _G para que _dualStartArm pueda referenciarla
+        -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
+
+        -- Grip estandar testeado y confirmado para todos los knives (dualKnife)
+        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, -0, 0, 0, 1, 0, -1, 0)
 
         local _SC_KNIFE_SKINS = {
             {
-                name       = "? Remove Skin",
-                removeSkin = true,
-            },
-            {
-                name   = "Turkey",
-                meshId = "rbxassetid://15320557481",
-                texId  = "rbxassetid://86999625612475",
-                scale  = Vector3.new(0.115, 0.115, 0.115),
-                -- GRIP CORREGIDO: identidad + offset Y para que el knife quede parado (no acostado)
-                grip   = CFrame.new(0, -0.1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                -- Turkey: SpecialMesh -- IDs capturados via MM2 Skin Analyzer
+                name      = "Turkey",
+                meshId    = "rbxassetid://15320557481",
+                texId     = "rbxassetid://86999625612475",
+                scale     = Vector3.new(0.0560000017285347, 0.0560000017285347, 0.0560000017285347),
+                grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
             {
-                name   = "Candy",
-                meshId = "http://www.roblox.com/asset/?id=19040337",
-                texId  = "rbxassetid://19040326",
-                scale  = Vector3.new(0.115, 0.115, 0.115),
-                grip   = CFrame.new(0, -0.1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                -- Candleflame: MeshPart -- IDs capturados via MM2 Skin Analyzer
+                name      = "Candleflame",
+                meshId    = "rbxassetid://7791364860",
+                texId     = "rbxassetid://7791364988",
+                scale     = Vector3.new(0.056, 0.056, 0.056),
+                grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
-            {
-                name   = "Custom knife for me",
-                meshId = "rbxassetid://106376139482867",
-                texId  = "rbxassetid://112744655854803",
-                scale  = Vector3.new(0.5, 0.5, 0.5),
-                grip   = CFrame.new(0, -0.6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                dualKnife = true,
-            },
-            {
-                name   = " Coming Soon...",
-                meshId = "",
-                texId  = "",
-                scale  = Vector3.new(0.05, 0.05, 0.05),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                comingSoon = true,
-            },
+
         }
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
@@ -38921,16 +38856,19 @@ function CreatePremiumTab()
                     for obj, eData in pairs(data.Elements) do
                         if obj and obj.Parent then
                             pcall(function()
-                                if eData._isFakeSM then
-                                    -- SpecialMesh inyectado como fallback: destruirlo al resetear
-                                    obj:Destroy()
-                                elseif obj:IsA("SpecialMesh") then
+                                if obj:IsA("SpecialMesh") then
                                     obj.MeshId    = eData.Mesh
                                     obj.TextureId = eData.Texture
                                     obj.Scale     = eData.Scale
                                 elseif obj:IsA("MeshPart") then
-                                    if eData.Mesh and eData.Mesh ~= "" then obj.MeshId = eData.Mesh end
+                                    -- Restaurar MeshId y TextureID originales
+                                    if eData.Mesh then
+                                        obj.MeshId = eData.Mesh
+                                    end
                                     obj.TextureID = eData.Texture
+                                    -- Destruir cualquier SpecialMesh inyectado que cause invisibilidad
+                                    local _sm = obj:FindFirstChildOfClass("SpecialMesh")
+                                    if _sm then pcall(function() _sm:Destroy() end) end
                                 end
                             end)
                         end
@@ -38938,241 +38876,240 @@ function CreatePremiumTab()
                 end
             end
             table.clear(_skinState.origData)
+            -- FIX MOBILE v2: desconectar listeners de Equipped al resetear
+            if _skinState._equippedConns then
+                for _, conn in pairs(_skinState._equippedConns) do
+                    pcall(function() conn:Disconnect() end)
+                end
+                _skinState._equippedConns = {}
+            end
         end
 
-        -- _scApply: aplica mesh + grip de la skin directamente (logica WWWWWWWW)
+        -- LOGICA DIRECTA SOBRE EL HANDLE (como el Rayfield skin changer)
         -- Aplica para TODOS los tipos de knife sin importar si el Handle es MeshPart o BasePart:
         --   1. Handle MeshPart  -> escribir MeshId y TextureID directamente (executor lo permite)
         --                          NUNCA inyectar SpecialMesh: un SM dentro de MeshPart vuelve
         --                          el part completamente invisible en Roblox.
         --   2. Handle BasePart con SpecialMesh hijo  -> pisar MeshId/TextureId/Scale del SM
         --   3. Handle BasePart sin SpecialMesh (legacy)  -> pisar MeshId/TextureID directo
+        local function _applyToAnyHandle(handle, skin, tool)
+            if not handle or not skin then return end
+            -- Forzar visibilidad siempre para evitar que sistemas externos dejen el knife invisible
+            pcall(function() handle.Transparency = 0; handle.LocalTransparencyModifier = 0 end)
+            if handle:IsA("MeshPart") then
+                -- En executor, MeshPart.MeshId SI es escribible (a diferencia de LocalScript).
+                -- Escribir MeshId + TextureID directamente: es la unica forma correcta.
+                -- NUNCA inyectar SpecialMesh en un MeshPart: lo vuelve invisible.
+                if not _skinState.origData[tool].Elements[handle] then
+                    _skinState.origData[tool].Elements[handle] = {
+                        Mesh    = handle.MeshId,
+                        Texture = handle.TextureID,
+                    }
+                end
+                -- Destruir cualquier SpecialMesh inyectado previamente que cause invisibilidad
+                local _existingSM = handle:FindFirstChildOfClass("SpecialMesh")
+                if _existingSM then pcall(function() _existingSM:Destroy() end) end
+                pcall(function()
+                    handle.MeshId    = skin.meshId
+                    handle.TextureID = skin.texId
+                end)
+            else
+                -- BasePart: primero buscar SpecialMesh hijo
+                local specialMesh = handle:FindFirstChildOfClass("SpecialMesh")
+                if specialMesh then
+                    if not _skinState.origData[tool].Elements[specialMesh] then
+                        _skinState.origData[tool].Elements[specialMesh] = {
+                            Mesh    = specialMesh.MeshId,
+                            Texture = specialMesh.TextureId,
+                            Scale   = specialMesh.Scale,
+                        }
+                    end
+                    pcall(function()
+                        specialMesh.MeshId    = skin.meshId
+                        specialMesh.TextureId = skin.texId
+                        specialMesh.Scale     = skin.scale
+                    end)
+                else
+                    -- Fallback legacy: Handle con MeshId directo
+                    if not _skinState.origData[tool].Elements[handle] then
+                        _skinState.origData[tool].Elements[handle] = {
+                            Mesh    = handle.MeshId,
+                            Texture = handle.TextureID,
+                        }
+                    end
+                    pcall(function()
+                        handle.MeshId    = skin.meshId
+                        handle.TextureID = skin.texId
+                    end)
+                end
+            end
+        end
+
+        -- Helper: aplicar skin a todos los handles de un Tool o Model
+        local function _applyToClone(container, skin)
+            if not container or not skin then return end
+            -- El DK_Clone ES el handle clonado directamente (no un Tool con Handle hijo)
+            -- Tratar el container como el handle mismo
+            local function _applyMeshToObj(obj)
+                -- Forzar visibilidad siempre en cualquier BasePart
+                if obj:IsA("BasePart") then
+                    pcall(function() obj.Transparency = 0; obj.LocalTransparencyModifier = 0 end)
+                end
+                if obj:IsA("MeshPart") then
+                    -- FIX INVISIBLE: NUNCA inyectar SpecialMesh en MeshPart — lo vuelve invisible.
+                    -- En executor, MeshPart.MeshId es escribible directo.
+                    -- Destruir SM inyectados previos si existen
+                    local _sm = obj:FindFirstChildOfClass("SpecialMesh")
+                    if _sm then pcall(function() _sm:Destroy() end) end
+                    pcall(function()
+                        obj.MeshId    = skin.meshId
+                        obj.TextureID = skin.texId
+                    end)
+                elseif obj:IsA("SpecialMesh") then
+                    -- SM propio del BasePart (no inyectado): actualizar normalmente
+                    pcall(function()
+                        obj.MeshId    = skin.meshId
+                        obj.TextureId = skin.texId
+                        obj.Scale     = skin.scale
+                    end)
+                end
+            end
+            -- Aplicar al container mismo (es el handle clonado)
+            _applyMeshToObj(container)
+            -- Y a todos sus descendants
+            for _, obj in pairs(container:GetDescendants()) do
+                _applyMeshToObj(obj)
+            end
+        end
+
+        local function _scApplyInner(tool, skin)
+            -- Guardar origData si es la primera vez
+            if not _skinState.origData[tool] then
+                _skinState.origData[tool] = { Grip = tool.Grip, Elements = {} }
+            end
+
+            -- GRIP: NO sobreescribir cuando Dual Knife esta activo.
+            -- El DK usa el RightGrip real del tool para calcular el weld espejo;
+            -- pisarlo con _KNIFE_GRIP_STD deja el knife "acostado" en la mano izquierda.
+            local _isDualKnifeActive = _G._dualKnifeEnabled == true
+            if not _isDualKnifeActive then
+                pcall(function() tool.Grip = skin.grip end)
+            end
+
+            -- Re-aplicar grip en Equipped (mobile puede pisarlo al animar)
+            -- Solo cuando Dual Knife NO esta activo, por la misma razon.
+            if not _skinState._equippedConns then _skinState._equippedConns = {} end
+            if not _skinState._equippedConns[tool] then
+                _skinState._equippedConns[tool] = tool.Equipped:Connect(function()
+                    task.wait(0.016)
+                    if _skinState.enabled and _skinState._equippedConns[tool] then
+                        if not (_G._dualKnifeEnabled == true) then
+                            pcall(function() tool.Grip = skin.grip end)
+                            task.wait(0.1)
+                            pcall(function() tool.Grip = skin.grip end)
+                            task.wait(0.3)
+                            if _skinState.enabled then
+                                pcall(function() tool.Grip = skin.grip end)
+                            end
+                        end
+                    end
+                end)
+            end
+
+            -- MESH + TEXTURE: aplicar directo sobre el Handle (logica Rayfield)
+            local handle = tool:FindFirstChild("Handle")
+            if handle then
+                _applyToAnyHandle(handle, skin, tool)
+            end
+
+            -- Recorrer el resto de descendants por partes decorativas adicionales
+            for _, obj in pairs(tool:GetDescendants()) do
+                if obj.Name ~= "Handle" then
+                    -- Forzar visibilidad en todos los BasePart del tool siempre
+                    if obj:IsA("BasePart") then
+                        pcall(function() obj.Transparency = 0; obj.LocalTransparencyModifier = 0 end)
+                    end
+                    if obj:IsA("SpecialMesh") then
+                        -- SM propio de un BasePart: actualizar normalmente
+                        if not _skinState.origData[tool].Elements[obj] then
+                            _skinState.origData[tool].Elements[obj] = {
+                                Mesh = obj.MeshId, Texture = obj.TextureId, Scale = obj.Scale
+                            }
+                        end
+                        pcall(function()
+                            obj.MeshId    = skin.meshId
+                            obj.TextureId = skin.texId
+                            obj.Scale     = skin.scale
+                        end)
+                    elseif obj:IsA("MeshPart") then
+                        -- FIX INVISIBLE: escribir MeshId+TextureID directo en MeshPart.
+                        -- Nunca inyectar SpecialMesh en MeshPart: lo vuelve invisible.
+                        if not _skinState.origData[tool].Elements[obj] then
+                            _skinState.origData[tool].Elements[obj] = {
+                                Mesh    = obj.MeshId,
+                                Texture = obj.TextureID,
+                            }
+                        end
+                        -- Destruir SM inyectados previos si existen
+                        local _existSM = obj:FindFirstChildOfClass("SpecialMesh")
+                        if _existSM then pcall(function() _existSM:Destroy() end) end
+                        pcall(function()
+                            obj.MeshId    = skin.meshId
+                            obj.TextureID = skin.texId
+                        end)
+                    end
+                end
+            end
+
+            -- HOOK DK_Clone: sincronizar skin al clon dual activo (gun o knife)
+            local _char2 = LocalPlayer.Character
+            local _dkClone = _char2 and _char2:FindFirstChild("DK_Clone")
+            if _dkClone then
+                _applyToClone(_dkClone, skin)
+            end
+        end
+
         local function _scApply(tool, skin, bypass)
             if not tool or not skin then return end
             if not bypass then
                 if _skinState.mode == "gun"   and not _scEsGun(tool)   then return end
                 if _skinState.mode == "knife" and not _scEsKnife(tool) then return end
             end
-            if not _skinState.origData[tool] then
-                _skinState.origData[tool] = { Grip = tool.Grip, Elements = {} }
+            -- FIX MOBILE SKIN: si el tool no tiene SpecialMesh/MeshPart todavia
+            -- (pasa en mobile donde los descendants llegan con delay),
+            -- esperar hasta 2s a que aparezca al menos uno antes de aplicar.
+            local _hasMesh = false
+            for _, obj in pairs(tool:GetDescendants()) do
+                if obj:IsA("SpecialMesh") or obj:IsA("MeshPart") then
+                    _hasMesh = true; break
+                end
             end
-            pcall(function() tool.Grip = skin.grip end)
-
-            -- FIX SCALE INDEPENDIENTE: usar el multiplicador guardado para esta skin especifica
-            -- _skinState.scaleOverrides[skin.name] = multiplicador (por defecto 1.0)
-            local _scaleMult = (_skinState.scaleOverrides and _skinState.scaleOverrides[skin.name]) or 1.0
-            local _effectiveScale = skin.scale * _scaleMult
-
-            -- PASO 1: manejar el Handle directamente (mismo enfoque que actualizarBomba/GoldBomb)
-            local handle = tool:FindFirstChild("Handle")
-            if handle then
-                local existingSM = handle:FindFirstChildOfClass("SpecialMesh")
-                if existingSM then
-                    -- Handle BasePart con SpecialMesh hijo -> pisar el SM
-                    if not _skinState.origData[tool].Elements[existingSM] then
-                        _skinState.origData[tool].Elements[existingSM] = {
-                            Mesh = existingSM.MeshId, Texture = existingSM.TextureId, Scale = existingSM.Scale
-                        }
-                    end
-                    pcall(function()
-                        existingSM.MeshId    = skin.meshId
-                        existingSM.TextureId = skin.texId
-                        existingSM.Scale     = _effectiveScale
-                    end)
-                elseif handle:IsA("MeshPart") then
-                    -- Handle MeshPart moderno
-                    if not _skinState.origData[tool].Elements[handle] then
-                        _skinState.origData[tool].Elements[handle] = {
-                            Mesh = handle.MeshId, Texture = handle.TextureID
-                        }
-                    end
-                    -- Intentar escribir MeshId directo
-                    local meshWriteOk = pcall(function()
-                        handle.MeshId    = skin.meshId
-                        handle.TextureID = skin.texId
-                    end)
-                    if not meshWriteOk then
-                        -- Fallback: inyectar SpecialMesh FileMesh cuando el executor bloquea MeshPart.MeshId
-                        local _smFake = handle:FindFirstChild("_SC_FakeSM")
-                        if not _smFake then
-                            _smFake = Instance.new("SpecialMesh", handle)
-                            _smFake.Name     = "_SC_FakeSM"
-                            _smFake.MeshType = Enum.MeshType.FileMesh
-                            _skinState.origData[tool].Elements[_smFake] = {
-                                Mesh = "", Texture = "", Scale = Vector3.new(1,1,1), _isFakeSM = true
-                            }
+            if not _hasMesh then
+                -- FIX MOBILE v3: timeout extendido a 4s y re-intento cada 0.1s
+                task.spawn(function()
+                    local _t = 0
+                    repeat
+                        task.wait(0.1); _t = _t + 0.1
+                        for _, obj in pairs(tool:GetDescendants()) do
+                            if obj:IsA("SpecialMesh") or obj:IsA("MeshPart") then
+                                _hasMesh = true; break
+                            end
                         end
-                        pcall(function()
-                            _smFake.MeshId    = skin.meshId
-                            _smFake.TextureId = skin.texId
-                            _smFake.Scale     = _effectiveScale
+                    until _hasMesh or _t >= 4 or not tool.Parent
+                    if tool.Parent and _skinState.enabled then
+                        _scApplyInner(tool, skin)
+                        -- Re-aplicar 0.5s despues por si el grip se pisa en mobile
+                        -- Solo cuando Dual Knife NO esta activo (para no dejar el knife acostado)
+                        task.delay(0.5, function()
+                            if tool.Parent and _skinState.enabled and not (_G._dualKnifeEnabled == true) then
+                                pcall(function() tool.Grip = skin.grip end)
+                            end
                         end)
                     end
-                else
-                    -- Handle BasePart sin SpecialMesh (legacy)
-                    if not _skinState.origData[tool].Elements[handle] then
-                        _skinState.origData[tool].Elements[handle] = { Mesh = "", Texture = "" }
-                    end
-                    pcall(function() handle.TextureID = skin.texId end)
-                end
+                end)
+                return
             end
-
-            -- PASO 2: descendientes adicionales (modelos multi-parte), saltando el Handle ya procesado
-            for _, obj in pairs(tool:GetDescendants()) do
-                if obj == handle then
-                    -- ya procesado arriba
-                elseif obj:IsA("SpecialMesh") and obj.Name ~= "_SC_FakeSM" then
-                    if not _skinState.origData[tool].Elements[obj] then
-                        _skinState.origData[tool].Elements[obj] = {
-                            Mesh = obj.MeshId, Texture = obj.TextureId, Scale = obj.Scale
-                        }
-                    end
-                    pcall(function()
-                        obj.MeshId    = skin.meshId
-                        obj.TextureId = skin.texId
-                        obj.Scale     = _effectiveScale
-                    end)
-                elseif obj:IsA("MeshPart") and obj ~= handle then
-                    if not _skinState.origData[tool].Elements[obj] then
-                        _skinState.origData[tool].Elements[obj] = { Mesh = obj.MeshId, Texture = obj.TextureID }
-                    end
-                    pcall(function()
-                        if skin.meshId and skin.meshId ~= "" then obj.MeshId = skin.meshId end
-                        obj.TextureID = skin.texId
-                    end)
-                end
-            end
-            -- Soldar al RightGrip (igual que hub)
-            local char = LocalPlayer.Character
-            local hand = char and (char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm"))
-            if hand then
-                local rg = hand:FindFirstChild("RightGrip")
-                if rg and (rg:IsA("Weld") or rg:IsA("Motor6D")) then
-                    pcall(function() rg.C1 = tool.Grip end)
-                end
-            end
-            -- HOOK DUAL GUN: sincronizar skin al DK_Clone si dual gun esta activo
-            if skin and _skinState.mode == "gun" then
-                local _char2 = LocalPlayer.Character
-                local _dkClone = _char2 and _char2:FindFirstChild("DK_Clone")
-                if _dkClone then
-                    for _, obj in pairs(_dkClone:GetDescendants()) do
-                        if obj:IsA("SpecialMesh") then
-                            pcall(function()
-                                obj.MeshId    = skin.meshId
-                                obj.TextureId = skin.texId
-                                obj.Scale     = _effectiveScale
-                            end)
-                        elseif obj:IsA("MeshPart") then
-                            pcall(function()
-                                if skin.meshId and skin.meshId ~= "" then
-                                    obj.MeshId = skin.meshId
-                                end
-                                obj.TextureID = skin.texId
-                            end)
-                        end
-                    end
-                end
-            end
-            -- SONIDO CUSTOM: si la skin tiene soundId, reemplazar el Gunshot de la gun
-            -- OPT SOUND v2: busqueda amplia en todas las tools del char + workspace, no solo Harvester
-            pcall(function()
-                -- Helper: buscar el Sound "Gunshot" en cualquier tool equipada
-                local function _findGunshotSound()
-                    local _wsChar = workspace:FindFirstChild(LocalPlayer.Name)
-                    local _char   = LocalPlayer.Character
-                    -- Buscar en workspace.NombreJugador (MM2 guarda la gun ahi)
-                    if _wsChar then
-                        for _, tool in ipairs(_wsChar:GetChildren()) do
-                            if tool:IsA("Tool") then
-                                -- Buscar Sounds/Gunshot
-                                local _sounds = tool:FindFirstChild("Sounds")
-                                local _gs = _sounds and _sounds:FindFirstChild("Gunshot")
-                                if _gs and _gs:IsA("Sound") then return _gs end
-                                -- Buscar Gunshot directo en la tool
-                                _gs = tool:FindFirstChild("Gunshot")
-                                if _gs and _gs:IsA("Sound") then return _gs end
-                                -- Buscar recursivo
-                                for _, d in ipairs(tool:GetDescendants()) do
-                                    if d:IsA("Sound") and (d.Name == "Gunshot" or d.Name:lower():find("shoot") or d.Name:lower():find("fire")) then
-                                        return d
-                                    end
-                                end
-                            end
-                        end
-                        -- Buscar en Harvester (nombre legacy MM2)
-                        local _harvester = _wsChar:FindFirstChild("Harvester")
-                        local _sounds = _harvester and _harvester:FindFirstChild("Sounds")
-                        local _gs = _sounds and _sounds:FindFirstChild("Gunshot")
-                        if _gs and _gs:IsA("Sound") then return _gs end
-                    end
-                    -- Buscar en el personaje local tambien
-                    if _char then
-                        for _, tool in ipairs(_char:GetChildren()) do
-                            if tool:IsA("Tool") then
-                                for _, d in ipairs(tool:GetDescendants()) do
-                                    if d:IsA("Sound") and (d.Name == "Gunshot" or d.Name:lower():find("shoot") or d.Name:lower():find("fire")) then
-                                        return d
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    return nil
-                end
-
-                local _gunshot = _findGunshotSound()
-                if _gunshot and _gunshot:IsA("Sound") then
-                    if skin and skin.soundId and skin.soundId ~= "" then
-                        -- Guardar original si no lo hicimos ya (SoundId + Volume)
-                        if not _skinState._origGunshot then
-                            _skinState._origGunshot       = _gunshot.SoundId
-                            _skinState._origGunVolume     = _gunshot.Volume
-                        end
-                        _gunshot.SoundId = skin.soundId
-                        -- Reproducir muy fuerte: Volume 10 (maximo permitido) para scopeta
-                        _gunshot.Volume  = 10
-                        -- Desactivar RollOff para que se escuche igual de fuerte en cualquier distancia
-                        pcall(function() _gunshot.RollOffMaxDistance = 1e9 end)
-                        pcall(function() _gunshot.RollOffMinDistance = 1   end)
-                    else
-                        -- Restaurar original (SoundId + Volume)
-                        if _skinState._origGunshot then
-                            _gunshot.SoundId = _skinState._origGunshot
-                            _gunshot.Volume  = _skinState._origGunVolume or 0.5
-                            pcall(function() _gunshot.RollOffMaxDistance = 10000 end)
-                            _skinState._origGunshot   = nil
-                            _skinState._origGunVolume = nil
-                        end
-                    end
-                else
-                    -- No hay Gunshot en la gun: crear Sound temporal y dispararlo cuando se use
-                    -- Guardar referencia del sound custom en _skinState para limpiarlo al cambiar skin
-                    if skin and skin.soundId and skin.soundId ~= "" then
-                        if not _skinState._customSoundInst then
-                            local _sndParent = workspace
-                            local _wsChar2   = workspace:FindFirstChild(LocalPlayer.Name)
-                            if _wsChar2 then _sndParent = _wsChar2 end
-                            local _snd = Instance.new("Sound", _sndParent)
-                            _snd.Name             = "_ScopetaCustomSound"
-                            _snd.SoundId          = skin.soundId
-                            _snd.Volume           = 10
-                            _snd.RollOffMaxDistance = 1e9
-                            _snd.RollOffMinDistance = 1
-                            _skinState._customSoundInst = _snd
-                        else
-                            _skinState._customSoundInst.SoundId = skin.soundId
-                            _skinState._customSoundInst.Volume  = 10
-                        end
-                    else
-                        -- Limpiar sound custom si existe
-                        if _skinState._customSoundInst then
-                            pcall(function() _skinState._customSoundInst:Destroy() end)
-                            _skinState._customSoundInst = nil
-                        end
-                    end
-                end
-            end)
+            _scApplyInner(tool, skin)
         end
 
         -- Oyente automatico
@@ -39186,10 +39123,6 @@ function CreatePremiumTab()
                 pcall(function() _skinState._charConn:Disconnect() end)
                 _skinState._charConn = nil
             end
-            if _skinState._gunCharConn then
-                pcall(function() _skinState._gunCharConn:Disconnect() end)
-                _skinState._gunCharConn = nil
-            end
             if _skinState._wsConn then
                 pcall(function() _skinState._wsConn:Disconnect() end)
                 _skinState._wsConn = nil
@@ -39198,108 +39131,68 @@ function CreatePremiumTab()
                 pcall(function() _skinState._charPickupConn:Disconnect() end)
                 _skinState._charPickupConn = nil
             end
-        end
 
-        -- FIX SCOPE: funciones movidas fuera del do para ser accesibles desde el selector
-        local function _scTryApplyGun()
-            if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-            task.wait(0.15)
-            if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-            local gun = _findGun and _findGun()
-            if not gun then
-                local wsChar = workspace:FindFirstChild(LocalPlayer.Name)
-                if wsChar then gun = _findGunIn and _findGunIn(wsChar) end
-            end
-            if gun then _scApply(gun, _scGetSkin(), true) end
-        end
-
-        local function _scSetupListener(char)
-            if _skinState._charPickupConn then
-                pcall(function() _skinState._charPickupConn:Disconnect() end)
-            end
-            _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then
-                    task.spawn(_scTryApplyGun)
-                end
-            end)
-            if _skinState._wsConn then
-                pcall(function() _skinState._wsConn:Disconnect() end)
-            end
-            _skinState._wsConn = workspace.DescendantAdded:Connect(function(obj)
+            -- FIX MOBILE: en celu la gun llega via DescendantAdded del workspace,
+            -- no necesariamente como ChildAdded del char. Usamos DescendantAdded
+            -- para capturar cualquier Tool que aparezca (gun en char o en workspace).
+            local function _scTryApplyGun()
                 if not _skinState.enabled then return end
-                if obj:IsA("Tool") then
-                    local n = obj.Name:lower()
-                    if n:find("gun") or n == "gun" or n:find("sheriff") or n:find("revolver") then
+                task.wait(0.15)
+                -- FIX MOBILE: buscar tambien en workspace[playerName] ademas de char/backpack
+                local gun = _findGun and _findGun()
+                if not gun then
+                    local wsChar = workspace:FindFirstChild(LocalPlayer.Name)
+                    if wsChar then gun = _findGunIn and _findGunIn(wsChar) end
+                end
+                if gun then _scApply(gun, _scGetSkin(), true) end
+            end
+
+            local function _scSetupListener(char)
+                -- Listener en el char (PC y mobile - tool equipada directamente)
+                if _skinState._charPickupConn then
+                    pcall(function() _skinState._charPickupConn:Disconnect() end)
+                end
+                _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
                         task.spawn(_scTryApplyGun)
                     end
+                end)
+                -- Listener en DescendantAdded del workspace (mobile / MM2 gun model)
+                -- Solo re-aplicar si es una Tool que puede ser la gun.
+                -- FIX: guardamos la conexion para poder limpiarla al reconstruir el tab.
+                if _skinState._wsConn then
+                    pcall(function() _skinState._wsConn:Disconnect() end)
                 end
-            end)
-            task.delay(0.5,  _scTryApplyGun)
-            task.delay(1.2,  _scTryApplyGun)
-            task.delay(2.5,  _scTryApplyGun)
-            task.delay(4.0,  _scTryApplyGun)
-        end
+                _skinState._wsConn = workspace.DescendantAdded:Connect(function(obj)
+                    if not _skinState.enabled then return end
+                    if obj:IsA("Tool") then
+                        local n = obj.Name:lower()
+                        if n:find("gun") or n == "gun" or n:find("sheriff") or n:find("revolver") then
+                            task.spawn(_scTryApplyGun)
+                        end
+                    end
+                end)
+                -- Re-check extra con delay por si la gun tarda en cargarse en mobile
+                -- FIX MOBILE v4: más delays cubre executors lentos (Delta, Arceus X)
+                task.delay(0.5,  _scTryApplyGun)
+                task.delay(1.2,  _scTryApplyGun)
+                task.delay(2.5,  _scTryApplyGun)
+                task.delay(4.0,  _scTryApplyGun)
+            end
 
-        do
             local _scChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
             _scSetupListener(_scChar)
             _skinState._charConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-                _skinState.origData = {}
-                _scSetupListener(newChar)
-            end)
-        end
-
-        -- -- UI --------------------------------------------------
-        -- Aviso: waiting for knife skins update (encima del selector de Gun)
-        do
-            local _waitFrame = Instance.new("Frame", leftColumn)
-            _waitFrame.Size = UDim2.new(1, -8, 0, 38)
-            _waitFrame.BackgroundColor3 = Color3.fromRGB(6, 4, 14)
-            _waitFrame.BackgroundTransparency = 0
-            _waitFrame.BorderSizePixel = 0
-            Instance.new("UICorner", _waitFrame).CornerRadius = UDim.new(0, 8)
-
-            -- Borde teal glitch
-            local _waitStroke = Instance.new("UIStroke", _waitFrame)
-            _waitStroke.Thickness = 1.2
-            _waitStroke.Color = ThemeColors.Primary
-            _waitStroke.Transparency = 0.3
-            _waitStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-            -- Bloque izquierdo decorativo
-            local _waitAccent = Instance.new("Frame", _waitFrame)
-            _waitAccent.Size = UDim2.new(0, 3, 0.7, 0)
-            _waitAccent.Position = UDim2.new(0, 0, 0.15, 0)
-            _waitAccent.BackgroundColor3 = ThemeColors.Primary
-            _waitAccent.BackgroundTransparency = 0
-            _waitAccent.BorderSizePixel = 0
-            Instance.new("UICorner", _waitAccent).CornerRadius = UDim.new(0, 2)
-
-            local _waitLbl = Instance.new("TextLabel", _waitFrame)
-            _waitLbl.Size = UDim2.new(1, -18, 1, 0)
-            _waitLbl.Position = UDim2.new(0, 12, 0, 0)
-            _waitLbl.BackgroundTransparency = 1
-            _waitLbl.Text = " Waiting for knife skins update..."
-            _waitLbl.TextColor3 = ThemeColors.Primary
-            _waitLbl.Font = Enum.Font.GothamSemibold
-            _waitLbl.TextSize = 11
-            _waitLbl.TextXAlignment = Enum.TextXAlignment.Left
-            _waitLbl.TextYAlignment = Enum.TextYAlignment.Center
-            _waitLbl.ZIndex = 2
-
-            -- Glitch ultra rapido en el borde
-            task.spawn(function()
-                while _waitFrame and _waitFrame.Parent do
-                    task.wait(math.random(2, 5) + math.random() * 0.5)
-                    if not _waitFrame.Parent then break end
-                    pcall(function() _waitStroke.Transparency = 0; _waitStroke.Thickness = 2 end)
-                    task.wait(0.08)  -- OPT: era 0.03 -> 0.08 (reduce CPU)
-                    pcall(function() _waitStroke.Transparency = 0.85; _waitStroke.Thickness = 0.8 end)
-                    task.wait(0.08)  -- OPT: era 0.02 -> 0.08
-                    pcall(function() _waitStroke.Transparency = 0; _waitStroke.Thickness = 1.8 end)
-                    task.wait(0.08)  -- OPT: era 0.025 -> 0.08
-                    pcall(function() _waitStroke.Transparency = 0.3; _waitStroke.Thickness = 1.2 end)
+                -- Re-aplicar al respawnear (importante en mobile donde el char se recarga lento)
+                _skinState.origData = {}  -- limpiar origData del char anterior
+                -- FIX MOBILE v2: limpiar Equipped listeners del char anterior
+                if _skinState._equippedConns then
+                    for _, conn in pairs(_skinState._equippedConns) do
+                        pcall(function() conn:Disconnect() end)
+                    end
+                    _skinState._equippedConns = {}
                 end
+                _scSetupListener(newChar)
             end)
         end
 
@@ -39321,73 +39214,81 @@ function CreatePremiumTab()
                     break
                 end
             end
-            -- [Dual Gun automatico por skin desactivado]
-            -- -------------------------------------------------------------
-            -- FIX AUTO-APPLY: activar siempre, aunque no tenga la gun todavia.
-            -- Los listeners de _scSetupListener se encargan de aplicar cuando aparezca.
+            -- FIX SKIN SWAP: si ya habia una skin aplicada, resetear origData del tool
+            -- actual para que la nueva skin se aplique desde los valores originales
+            -- y no queden capas acumuladas (bug visible en mobile: skin no cambiaba).
+            local _toolActual = _findGun and _findGun()
+            if _toolActual and _skinState.origData[_toolActual] then
+                -- Restaurar valores originales de ese tool antes de aplicar la nueva skin
+                local _data = _skinState.origData[_toolActual]
+                pcall(function() _toolActual.Grip = _data.Grip end)
+                for obj, eData in pairs(_data.Elements) do
+                    if obj and obj.Parent then
+                        pcall(function()
+                            if obj:IsA("SpecialMesh") then
+                                obj.MeshId    = eData.Mesh
+                                obj.TextureId = eData.Texture
+                                obj.Scale     = eData.Scale
+                            elseif obj:IsA("MeshPart") then
+                                -- FIX INVISIBLE: restaurar MeshId + TextureID, destruir SM si hay
+                                if eData.Mesh then obj.MeshId = eData.Mesh end
+                                obj.TextureID = eData.Texture
+                                local _sm = obj:FindFirstChildOfClass("SpecialMesh")
+                                if _sm then pcall(function() _sm:Destroy() end) end
+                            end
+                        end)
+                    end
+                end
+                _skinState.origData[_toolActual] = nil  -- limpiar cache para re-capturar originales
+            end
+            -- FIX MOBILE: activar siempre, incluso si no hay gun ahora mismo.
+            -- El listener de DescendantAdded/ChildAdded va a aplicar la skin
+            -- cuando la gun aparezca (sea en PC o mobile).
             _skinState.enabled = true
-
-            -- FIX: usar _findGun() que busca en char y backpack correctamente (MM2 usa modelo en workspace)
-            local tool = _findGun and _findGun()
+            -- FIX: buscar gun en char, backpack Y en workspace[playerName] (mobile MM2)
+            local function _findGunMobile()
+                local gun = _findGun and _findGun()
+                if gun then return gun end
+                -- En mobile MM2 la gun a veces vive en workspace bajo el nombre del jugador
+                local wsChar = workspace:FindFirstChild(LocalPlayer.Name)
+                if wsChar then
+                    gun = _findGunIn and _findGunIn(wsChar)
+                    if gun then return gun end
+                end
+                return nil
+            end
+            local tool = _findGunMobile()
             if tool then
                 _scApply(tool, _scGetSkin(), true)
             end
-
-            -- FIX AUTO-APPLY NUEVA RONDA: registrar CharacterAdded para re-aplicar
-            -- la skin de gun automaticamente en cada nueva ronda/respawn, igual que knife.
-            if _skinState._gunCharConn then
-                pcall(function() _skinState._gunCharConn:Disconnect() end)
-            end
-            _skinState._gunCharConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-                _skinState.origData = {}
-                _scSetupListener(newChar)
-            end)
-            -- Re-configurar listener en el char actual por si ya estamos en partida
-            local _scCharNow = LocalPlayer.Character
-            if _scCharNow then _scSetupListener(_scCharNow) end
-
-            -- Delays de seguridad para executors lentos / mobile
+            -- Intentar de nuevo con delays por si la gun tarda en cargarse (mobile)
+            -- FIX MOBILE v4: extendido hasta 5s para executors lentos
             task.delay(0.3, function()
-                if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                task.spawn(_scTryApplyGun)
+                if not _skinState.enabled then return end
+                local gun2 = _findGunMobile()
+                if gun2 then _scApply(gun2, _scGetSkin(), true) end
             end)
-            task.delay(1.0, function()
-                if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                task.spawn(_scTryApplyGun)
+            task.delay(0.8, function()
+                if not _skinState.enabled then return end
+                local gun3 = _findGunMobile()
+                if gun3 then _scApply(gun3, _scGetSkin(), true) end
             end)
-            task.delay(2.5, function()
-                if not _skinState.enabled or _skinState.mode ~= "gun" then return end
-                task.spawn(_scTryApplyGun)
+            task.delay(1.5, function()
+                if not _skinState.enabled then return end
+                local gun4 = _findGunMobile()
+                if gun4 then _scApply(gun4, _scGetSkin(), true) end
             end)
-
-            -- FIX DUAL GUN POSE: si Dual Gun esta activo, destruir el clon actual
-            -- para que RenderStepped lo recree con el grip correcto del nuevo skin.
-            if _G._dualGunState and _G._dualGunState.enabled then
-                local _dgChar = LocalPlayer.Character
-                if _dgChar then
-                    for _, obj in ipairs(_dgChar:GetChildren()) do
-                        if obj.Name == "DK_Clone" then obj:Destroy() end
-                    end
-                end
-            end
-
-            CreateCustomNotification("?? GUN SKIN", sel .. " seleccionada!", 3)
+            task.delay(3.0, function()
+                if not _skinState.enabled then return end
+                local gun5 = _findGunMobile()
+                if gun5 then _scApply(gun5, _scGetSkin(), true) end
+            end)
+            task.delay(5.0, function()
+                if not _skinState.enabled then return end
+                local gun6 = _findGunMobile()
+                if gun6 then _scApply(gun6, _scGetSkin(), true) end
+            end)
         end)
-
-        -- SLIDER: Tama?o de la skin de gun SELECCIONADA (independiente por skin)
-        -- Cada skin guarda su propio multiplicador en _skinState.scaleOverrides[skinName]
-        -- El slider se actualiza al cambiar de skin via _G._scGunSizeSliderUpdate
-        do
-            local _gunSizeSlider = CreateSlider(leftColumn, "Tama?o Skin Gun (%)", 10, 300, 100, function(val)
-                local _curSkin = _scGetSkin and _scGetSkin()
-                if not _curSkin or _skinState.mode ~= "gun" then return end
-                -- Guardar el multiplicador SOLO para esta skin (no afecta otras)
-                _skinState.scaleOverrides[_curSkin.name] = val / 100
-                -- Re-aplicar la skin al arma actual con el nuevo scale
-                local tool = _findGun and _findGun()
-                if tool then pcall(function() _scApply(tool, _curSkin, true) end) end
-            end)
-        end
 
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
         do
@@ -39467,21 +39368,12 @@ function CreatePremiumTab()
                         task.spawn(_scTryApplyKnife)
                     end
                 end)
-                -- FIX MURDER NEW ROUND: intentar aplicar inmediatamente + delays por si el
-                -- knife ya esta en el personaje (o llega poco despues del respawn/nueva ronda)
-                task.spawn(_scTryApplyKnife)
-                task.delay(0.5,  function() if _skinState.enabled and _skinState.mode == "knife" and not _G._dualKnifeEnabled then local k = _findKnife(); if k then _scApply(k, _scGetSkin(), true) end end end)
-                task.delay(1.2,  function() if _skinState.enabled and _skinState.mode == "knife" and not _G._dualKnifeEnabled then local k = _findKnife(); if k then _scApply(k, _scGetSkin(), true) end end end)
-                task.delay(2.5,  function() if _skinState.enabled and _skinState.mode == "knife" and not _G._dualKnifeEnabled then local k = _findKnife(); if k then _scApply(k, _scGetSkin(), true) end end end)
-                task.delay(4.0,  function() if _skinState.enabled and _skinState.mode == "knife" and not _G._dualKnifeEnabled then local k = _findKnife(); if k then _scApply(k, _scGetSkin(), true) end end end)
-                task.delay(7.0,  function() if _skinState.enabled and _skinState.mode == "knife" and not _G._dualKnifeEnabled then local k = _findKnife(); if k then _scApply(k, _scGetSkin(), true) end end end)
             end
 
             CreateNebulaSelector(leftColumn, "Skin -- Knife ??", _knifeNames, _knifeNames[1], function(sel)
                 -- Auto-setear modo knife al usar este selector
                 if _skinState.mode ~= "knife" then
                     if _skinState.enabled then _scResetAll(); _skinState.enabled = false end
-                    _skinState.origData = {}  -- FIX: limpiar cache de tools del modo anterior (gun)
                     _skinState.mode = "knife"
                     _skinState.skinIdx = 1
                 end
@@ -39498,27 +39390,6 @@ function CreatePremiumTab()
 
                 if not selectedSkin then return end
 
-                -- REMOVE SKIN: restaurar el knife a su estado original
-                if selectedSkin.removeSkin then
-                    _skinState.enabled = false
-                    _scResetAll()
-                    -- Limpiar listeners para que no se re-aplique en nueva ronda
-                    if _skinState._knifeCharConn then
-                        pcall(function() _skinState._knifeCharConn:Disconnect() end)
-                        _skinState._knifeCharConn = nil
-                    end
-                    if _skinState._knifePickupConn then
-                        pcall(function() _skinState._knifePickupConn:Disconnect() end)
-                        _skinState._knifePickupConn = nil
-                    end
-                    if _skinState._knifeWsConn then
-                        pcall(function() _skinState._knifeWsConn:Disconnect() end)
-                        _skinState._knifeWsConn = nil
-                    end
-                    CreateCustomNotification("? KNIFE SKIN", "Skin removida!", 2)
-                    return
-                end
-
                 -- FIX SKIN SWAP: si ya habia una skin aplicada, restaurar origData antes de aplicar la nueva
                 local _knifeActual = _findKnife()
                 if _knifeActual and _skinState.origData[_knifeActual] then
@@ -39527,16 +39398,16 @@ function CreatePremiumTab()
                     for obj, eData in pairs(_data.Elements) do
                         if obj and obj.Parent then
                             pcall(function()
-                                if eData._isFakeSM then
-                                    -- SpecialMesh inyectado como fallback: destruirlo
-                                    obj:Destroy()
-                                elseif obj:IsA("SpecialMesh") then
+                                if obj:IsA("SpecialMesh") then
                                     obj.MeshId    = eData.Mesh
                                     obj.TextureId = eData.Texture
                                     obj.Scale     = eData.Scale
                                 elseif obj:IsA("MeshPart") then
-                                    if eData.Mesh and eData.Mesh ~= "" then obj.MeshId = eData.Mesh end
+                                    -- FIX INVISIBLE: restaurar MeshId + TextureID, destruir SM si hay
+                                    if eData.Mesh then obj.MeshId = eData.Mesh end
                                     obj.TextureID = eData.Texture
+                                    local _sm = obj:FindFirstChildOfClass("SpecialMesh")
+                                    if _sm then pcall(function() _sm:Destroy() end) end
                                 end
                             end)
                         end
@@ -39574,36 +39445,43 @@ function CreatePremiumTab()
                 end)
 
                 -- Registrar listener del personaje para re-aplicar si el jugador muere/respawnea
-                -- FIX: no yieldar con :Wait() -- si no hay char todavia los listeners ya esperan
-                local char2 = LocalPlayer.Character
-                if char2 then _scSetupKnifeListener(char2) end
+                local char2 = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                _scSetupKnifeListener(char2)
                 if _skinState._knifeCharConn then
                     pcall(function() _skinState._knifeCharConn:Disconnect() end)
                 end
                 _skinState._knifeCharConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
                     _skinState.origData = {}
+                    if _skinState._equippedConns then
+                        for _, conn in pairs(_skinState._equippedConns) do
+                            pcall(function() conn:Disconnect() end)
+                        end
+                        _skinState._equippedConns = {}
+                    end
                     -- FIX DUAL KNIFE: no re-aplicar el skin listener si dual knife esta activo
                     if not _G._dualKnifeEnabled then
                         _scSetupKnifeListener(newChar)
                     end
                 end)
 
+                -- HOOK DUAL KNIFE: aplicar skin al DK_Clone si dual knife esta activo
+                -- Usar _applyToClone que respeta meshPartOnly y forceVisible
+                task.spawn(function()
+                    task.wait(0.2)
+                    local char3 = LocalPlayer.Character
+                    if not char3 then return end
+                    local dkClone = char3:FindFirstChild("DK_Clone")
+                    if dkClone then
+                        _applyToClone(dkClone, selectedSkin)
+                    end
+                end)
+
                 CreateCustomNotification("?? KNIFE SKIN", sel .. " aplicada!", 3)
             end)
-
-            -- SLIDER: Tama?o de la skin de knife SELECCIONADA (independiente por skin)
-            CreateSlider(leftColumn, "Tama?o Skin Knife (%)", 10, 300, 100, function(val)
-                local _curSkin = _scGetSkin and _scGetSkin()
-                if not _curSkin or _skinState.mode ~= "knife" then return end
-                -- Guardar el multiplicador SOLO para esta skin knife
-                _skinState.scaleOverrides[_curSkin.name] = val / 100
-                -- Re-aplicar con nuevo scale
-                local _kn = _findKnife and _findKnife()
-                if _kn then pcall(function() _scApply(_kn, _curSkin, true) end) end
-            end)
         end  -- cierra do knife selector
-    end  -- cierra do SKIN CHANGER (abierto en l?nea 38252)
+        end  -- cierra do skin changer
     -- -- FIN SKIN CHANGER ------------------------------------------
+
 
     -- --------------------------------------------------------------------
     -- ?? CUSTOM MIRAS (CROSSHAIRS) - PREMIUM
