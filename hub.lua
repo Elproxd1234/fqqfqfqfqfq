@@ -38936,6 +38936,16 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
+            {
+                -- Katana Mesh: skin personalizada
+                name      = "Katana Mesh",
+                meshId    = "rbxassetid://104996534591762",
+                texId     = "rbxassetid://129462008300983",
+                scale     = Vector3.new(0.08, 0.08, 0.08),
+                meshSize  = Vector3.new(0.01, 0.01, 0.01),
+                grip      = _KNIFE_GRIP_STD,
+                dualKnife = true,
+            },
 
         }
 
@@ -39011,21 +39021,48 @@ function CreatePremiumTab()
             -- Forzar visibilidad siempre para evitar que sistemas externos dejen el knife invisible
             pcall(function() handle.Transparency = 0; handle.LocalTransparencyModifier = 0 end)
             if handle:IsA("MeshPart") then
-                -- En executor, MeshPart.MeshId SI es escribible (a diferencia de LocalScript).
-                -- Escribir MeshId + TextureID directamente: es la unica forma correcta.
-                -- NUNCA inyectar SpecialMesh en un MeshPart: lo vuelve invisible.
+                -- MeshPart: si la skin tiene scale, crear un FakePart con SpecialMesh encima
+                -- ya que MeshPart.Size es de solo lectura en el cliente.
                 if not _skinState.origData[tool].Elements[handle] then
                     _skinState.origData[tool].Elements[handle] = {
                         Mesh    = handle.MeshId,
                         Texture = handle.TextureID,
                     }
                 end
-                -- Destruir cualquier SpecialMesh inyectado previamente que cause invisibilidad
                 local _existingSM = handle:FindFirstChildOfClass("SpecialMesh")
                 if _existingSM then pcall(function() _existingSM:Destroy() end) end
+                -- Destruir FakePart previo si existe
+                local _oldFake = handle:FindFirstChild("_SkinFakePart")
+                if _oldFake then pcall(function() _oldFake:Destroy() end) end
                 pcall(function()
                     handle.MeshId    = skin.meshId
                     handle.TextureID = skin.texId
+                    handle.Transparency = 1  -- ocultar MeshPart original
+                    -- Crear Part nueva con SpecialMesh para controlar scale libremente
+                    local fakePart = Instance.new("Part")
+                    fakePart.Name         = "_SkinFakePart"
+                    fakePart.Anchored     = false
+                    fakePart.CanCollide   = false
+                    fakePart.Massless     = true
+                    fakePart.Transparency = 0
+                    fakePart.Size         = Vector3.new(0.1, 0.1, 0.1)
+                    fakePart.Color        = handle.Color
+                    fakePart.Material     = Enum.Material.SmoothPlastic
+                    fakePart.CastShadow   = false
+                    local sm = Instance.new("SpecialMesh", fakePart)
+                    sm.MeshType  = Enum.MeshType.FileMesh
+                    sm.MeshId    = skin.meshId
+                    sm.TextureId = skin.texId
+                    sm.Scale     = skin.scale or Vector3.new(0.056, 0.056, 0.056)
+                    fakePart.Parent = handle
+                    -- Soldar el FakePart al handle para que se mueva junto
+                    local weld = Instance.new("Weld", fakePart)
+                    weld.Part0 = handle
+                    weld.Part1 = fakePart
+                    weld.C0    = CFrame.new()
+                    weld.C1    = CFrame.new()
+                    -- Guardar referencia para limpiar al restaurar
+                    _skinState.origData[tool].Elements[handle].FakePart = fakePart
                 end)
             else
                 -- BasePart: primero buscar SpecialMesh hijo
@@ -39070,14 +39107,34 @@ function CreatePremiumTab()
                     pcall(function() obj.Transparency = 0; obj.LocalTransparencyModifier = 0 end)
                 end
                 if obj:IsA("MeshPart") then
-                    -- FIX INVISIBLE: NUNCA inyectar SpecialMesh en MeshPart — lo vuelve invisible.
-                    -- En executor, MeshPart.MeshId es escribible directo.
-                    -- Destruir SM inyectados previos si existen
-                    local _sm = obj:FindFirstChildOfClass("SpecialMesh")
-                    if _sm then pcall(function() _sm:Destroy() end) end
+                    -- FIX: MeshPart en clone -> usar FakePart con SpecialMesh para controlar scale.
+                    local _smOld = obj:FindFirstChildOfClass("SpecialMesh")
+                    if _smOld then pcall(function() _smOld:Destroy() end) end
+                    local _fakeOld = obj:FindFirstChild("_SkinFakePart")
+                    if _fakeOld then pcall(function() _fakeOld:Destroy() end) end
                     pcall(function()
-                        obj.MeshId    = skin.meshId
-                        obj.TextureID = skin.texId
+                        obj.MeshId      = skin.meshId
+                        obj.TextureID   = skin.texId
+                        obj.Transparency = 1
+                        local fakePart = Instance.new("Part")
+                        fakePart.Name         = "_SkinFakePart"
+                        fakePart.Anchored     = false
+                        fakePart.CanCollide   = false
+                        fakePart.Massless     = true
+                        fakePart.Transparency = 0
+                        fakePart.Size         = Vector3.new(0.1, 0.1, 0.1)
+                        fakePart.CastShadow   = false
+                        local sm = Instance.new("SpecialMesh", fakePart)
+                        sm.MeshType  = Enum.MeshType.FileMesh
+                        sm.MeshId    = skin.meshId
+                        sm.TextureId = skin.texId
+                        sm.Scale     = skin.scale or Vector3.new(0.056, 0.056, 0.056)
+                        fakePart.Parent = obj
+                        local weld = Instance.new("Weld", fakePart)
+                        weld.Part0 = obj
+                        weld.Part1 = fakePart
+                        weld.C0    = CFrame.new()
+                        weld.C1    = CFrame.new()
                     end)
                 elseif obj:IsA("SpecialMesh") then
                     -- SM propio del BasePart (no inyectado): actualizar normalmente
@@ -39287,7 +39344,7 @@ function CreatePremiumTab()
                     end
                 end)
                 -- Re-check extra con delay por si la gun tarda en cargarse en mobile
-                -- FIX MOBILE v4: más delays cubre executors lentos (Delta, Arceus X)
+                -- FIX MOBILE v4: m?s delays cubre executors lentos (Delta, Arceus X)
                 task.delay(0.5,  _scTryApplyGun)
                 task.delay(1.2,  _scTryApplyGun)
                 task.delay(2.5,  _scTryApplyGun)
@@ -39347,6 +39404,12 @@ function CreatePremiumTab()
                                 -- FIX INVISIBLE: restaurar MeshId + TextureID, destruir SM si hay
                                 if eData.Mesh then obj.MeshId = eData.Mesh end
                                 obj.TextureID = eData.Texture
+                                -- Restaurar Size si fue modificado por meshSize
+                                if eData.Size then pcall(function() obj.Size = eData.Size end) end
+                                -- Destruir FakePart si fue creado por la skin
+                                if eData.FakePart then pcall(function() eData.FakePart:Destroy() end) end
+                                -- Restaurar visibilidad del handle original
+                                pcall(function() obj.Transparency = 0 end)
                                 local _sm = obj:FindFirstChildOfClass("SpecialMesh")
                                 if _sm then pcall(function() _sm:Destroy() end) end
                             end
@@ -39520,6 +39583,12 @@ function CreatePremiumTab()
                                     -- FIX INVISIBLE: restaurar MeshId + TextureID, destruir SM si hay
                                     if eData.Mesh then obj.MeshId = eData.Mesh end
                                     obj.TextureID = eData.Texture
+                                    -- Restaurar Size si fue modificado por meshSize
+                                    if eData.Size then pcall(function() obj.Size = eData.Size end) end
+                                    -- Destruir FakePart si fue creado por la skin
+                                    if eData.FakePart then pcall(function() eData.FakePart:Destroy() end) end
+                                    -- Restaurar visibilidad del handle original
+                                    pcall(function() obj.Transparency = 0 end)
                                     local _sm = obj:FindFirstChildOfClass("SpecialMesh")
                                     if _sm then pcall(function() _sm:Destroy() end) end
                                 end
@@ -39640,8 +39709,136 @@ function CreatePremiumTab()
 
         CreateAuroraToggle(ccInner, "Rotate Crosshair", function(enabled)
             Settings.cursor.rotation.enabled = enabled
-            if Settings.cursor.enabled then UpdateCustomCursor() end
+            -- FIX: activar rotacion directamente sin depender de que el cursor este enabled
+            if Settings.cursor.enabled then
+                UpdateCustomCursor()
+            elseif enabled then
+                -- Si el cursor no esta activo, activarlo automaticamente para que la rotacion tenga efecto
+                Settings.cursor.enabled = true
+                -- Actualizar el toggle visual de Custom Crosshair
+                if _G._toggleStates then _G._toggleStates["Custom Crosshair"] = true end
+                if _G._toggleApplyStates and _G._toggleApplyStates["Custom Crosshair"] then
+                    pcall(_G._toggleApplyStates["Custom Crosshair"], true, true)
+                end
+                UpdateCustomCursor()
+            end
         end, Settings.cursor.rotation and Settings.cursor.rotation.enabled or false)
+        -- ADD CUSTOM CROSSHAIR SECTION
+        do
+            local _addCCFrame = Instance.new("Frame", ccInner)
+            _addCCFrame.Name = "AddCustomCrosshairFrame"
+            _addCCFrame.Size = UDim2.new(1, -12, 0, 80)
+            _addCCFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+            _addCCFrame.BackgroundTransparency = 0.3
+            _addCCFrame.BorderSizePixel = 0
+            _addCCFrame.ZIndex = 20
+            Instance.new("UICorner", _addCCFrame).CornerRadius = UDim.new(0, 8)
+            local _addCCStroke = Instance.new("UIStroke", _addCCFrame)
+            _addCCStroke.Color = ThemeColors and ThemeColors.Aurora1 or Color3.fromRGB(90, 120, 255)
+            _addCCStroke.Thickness = 1.5
+            _addCCStroke.Transparency = 0.4
+            local _addCCPad = Instance.new("UIPadding", _addCCFrame)
+            _addCCPad.PaddingLeft = UDim.new(0, 8)
+            _addCCPad.PaddingRight = UDim.new(0, 8)
+            _addCCPad.PaddingTop = UDim.new(0, 6)
+            _addCCPad.PaddingBottom = UDim.new(0, 6)
+            -- Titulo
+            local _addCCTitle = Instance.new("TextLabel", _addCCFrame)
+            _addCCTitle.Size = UDim2.new(1, 0, 0, 16)
+            _addCCTitle.Position = UDim2.new(0, 0, 0, 0)
+            _addCCTitle.BackgroundTransparency = 1
+            _addCCTitle.Text = "Add Custom Crosshair"
+            _addCCTitle.Font = Enum.Font.GothamBold
+            _addCCTitle.TextSize = 11
+            _addCCTitle.TextColor3 = ThemeColors and ThemeColors.Aurora1 or Color3.fromRGB(160, 180, 255)
+            _addCCTitle.TextXAlignment = Enum.TextXAlignment.Left
+            _addCCTitle.ZIndex = 21
+            -- Input + boton en fila
+            local _addCCRow = Instance.new("Frame", _addCCFrame)
+            _addCCRow.Size = UDim2.new(1, 0, 0, 32)
+            _addCCRow.Position = UDim2.new(0, 0, 0, 20)
+            _addCCRow.BackgroundTransparency = 1
+            _addCCRow.ZIndex = 21
+            -- TextBox para el ID
+            local _addCCBox = Instance.new("TextBox", _addCCRow)
+            _addCCBox.Name = "CustomCrosshairIDBox"
+            _addCCBox.Size = UDim2.new(1, -74, 1, 0)
+            _addCCBox.Position = UDim2.new(0, 0, 0, 0)
+            _addCCBox.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+            _addCCBox.BackgroundTransparency = 0.1
+            _addCCBox.BorderSizePixel = 0
+            _addCCBox.PlaceholderText = "Crosshair ID..."
+            _addCCBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+            _addCCBox.Text = Settings.cursor.customMiraId or ""
+            _addCCBox.TextColor3 = Color3.fromRGB(230, 230, 255)
+            _addCCBox.Font = Enum.Font.Gotham
+            _addCCBox.TextSize = 12
+            _addCCBox.ClearTextOnFocus = false
+            _addCCBox.ZIndex = 22
+            _addCCBox.ClipsDescendants = true
+            Instance.new("UICorner", _addCCBox).CornerRadius = UDim.new(0, 6)
+            local _boxStroke = Instance.new("UIStroke", _addCCBox)
+            _boxStroke.Color = Color3.fromRGB(80, 100, 200)
+            _boxStroke.Thickness = 1
+            _boxStroke.Transparency = 0.5
+            local _boxPad = Instance.new("UIPadding", _addCCBox)
+            _boxPad.PaddingLeft = UDim.new(0, 6)
+            -- Boton Add
+            local _addCCBtn = Instance.new("TextButton", _addCCRow)
+            _addCCBtn.Name = "AddCrosshairBtn"
+            _addCCBtn.Size = UDim2.new(0, 68, 1, 0)
+            _addCCBtn.Position = UDim2.new(1, -68, 0, 0)
+            _addCCBtn.BackgroundColor3 = ThemeColors and ThemeColors.Aurora1 or Color3.fromRGB(90, 120, 255)
+            _addCCBtn.BackgroundTransparency = 0.1
+            _addCCBtn.BorderSizePixel = 0
+            _addCCBtn.Text = "Add"
+            _addCCBtn.Font = Enum.Font.GothamBold
+            _addCCBtn.TextSize = 13
+            _addCCBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            _addCCBtn.AutoButtonColor = false
+            _addCCBtn.ZIndex = 22
+            Instance.new("UICorner", _addCCBtn).CornerRadius = UDim.new(0, 6)
+            local _btnStroke = Instance.new("UIStroke", _addCCBtn)
+            _btnStroke.Color = Color3.fromRGB(150, 170, 255)
+            _btnStroke.Thickness = 1
+            _btnStroke.Transparency = 0.4
+            -- Hover
+            _addCCBtn.MouseEnter:Connect(function()
+                TweenService:Create(_addCCBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(110, 140, 255), BackgroundTransparency = 0}):Play()
+            end)
+            _addCCBtn.MouseLeave:Connect(function()
+                TweenService:Create(_addCCBtn, TweenInfo.new(0.15), {BackgroundColor3 = ThemeColors and ThemeColors.Aurora1 or Color3.fromRGB(90, 120, 255), BackgroundTransparency = 0.1}):Play()
+            end)
+            -- Logica del boton Add
+            _addCCBtn.Activated:Connect(function()
+                local _rawId = _addCCBox.Text or ""
+                local _cleanId = _rawId:match("%d+")
+                if not _cleanId or _cleanId == "" then
+                    CreateCustomNotification("CROSSHAIR", "Ingresa un ID valido (solo numeros)", 2)
+                    return
+                end
+                Settings.cursor.customMiraId = _cleanId
+                if not Settings.cursor.enabled then
+                    Settings.cursor.enabled = true
+                    if _G._toggleStates then _G._toggleStates["Custom Crosshair"] = true end
+                    if _G._toggleApplyStates and _G._toggleApplyStates["Custom Crosshair"] then
+                        pcall(_G._toggleApplyStates["Custom Crosshair"], true, true)
+                    end
+                end
+                UpdateCustomCursor()
+                CreateCustomNotification("CROSSHAIR", "Mira personalizada aplicada! ID: " .. _cleanId, 3)
+                -- Feedback visual en el boton
+                local _origText = _addCCBtn.Text
+                _addCCBtn.Text = "Added!"
+                _addCCBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+                task.delay(1.2, function()
+                    pcall(function()
+                        _addCCBtn.Text = _origText
+                        _addCCBtn.BackgroundColor3 = ThemeColors and ThemeColors.Aurora1 or Color3.fromRGB(90, 120, 255)
+                    end)
+                end)
+            end)
+        end
     -- -- FIN CUSTOM MIRAS ------------------------------------------
     end  -- cierra do CUSTOM MIRAS
 
@@ -50764,7 +50961,7 @@ function CreateCombatTab()
             if not gui.Parent then gui.Parent = LocalPlayer.PlayerGui end
             _G._pGuiRef = gui
 
-            -- Contenedor raiz (invisible, solo para drag) — igual que bindable
+            -- Contenedor raiz (invisible, solo para drag) ? igual que bindable
             local bg = Instance.new("Frame", gui)
             bg.Name                   = "CapyBindBtn"
             bg.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
@@ -50780,7 +50977,7 @@ function CreateCombatTab()
             local _bgScale = Instance.new("UIScale", bg)
             _bgScale.Scale = 0
 
-            -- Fondo transparente (aparece en hover/press) — igual que bindable
+            -- Fondo transparente (aparece en hover/press) ? igual que bindable
             local pill = Instance.new("Frame", bg)
             pill.Name                   = "Pill"
             pill.AnchorPoint            = Vector2.new(0.5, 0.5)
@@ -50792,7 +50989,7 @@ function CreateCombatTab()
             pill.ZIndex                 = 201
             Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 10)
 
-            -- Borde exterior del color del hub — igual que bindable
+            -- Borde exterior del color del hub ? igual que bindable
             local outerRing = Instance.new("Frame", bg)
             outerRing.Name                   = "OuterRing"
             outerRing.AnchorPoint            = Vector2.new(0.5, 0.5)
@@ -50809,7 +51006,7 @@ function CreateCombatTab()
             outerStroke.Transparency    = 0
             outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-            -- Label centrado con contorno negro — igual que bindable
+            -- Label centrado con contorno negro ? igual que bindable
             local lbl = Instance.new("TextLabel", bg)
             lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
             lbl.Position               = UDim2.fromScale(0.5, 0.5)
@@ -50829,7 +51026,7 @@ function CreateCombatTab()
             lblStroke.Thickness    = 1
             lblStroke.Transparency = 0.5
 
-            -- Boton invisible encima para capturar clicks — igual que bindable
+            -- Boton invisible encima para capturar clicks ? igual que bindable
             local fill = Instance.new("TextButton", bg)
             fill.Name                   = "Fill"
             fill.AnchorPoint            = Vector2.new(0.5, 0.5)
@@ -50841,7 +51038,7 @@ function CreateCombatTab()
             fill.ZIndex                 = 210
             Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 10)
 
-            -- Glow de fondo — igual que bindable
+            -- Glow de fondo ? igual que bindable
             local glow = Instance.new("ImageLabel", bg)
             glow.AnchorPoint            = Vector2.new(0.5, 0.5)
             glow.Position               = UDim2.fromScale(0.5, 0.5)
