@@ -14165,6 +14165,15 @@ do
         local _MSF_CD     = 0.15
 
         local function _msfGetEquippedGun()
+            -- FIX MOBILE MM2: usar _findGun global que busca en char, Backpack
+            -- y workspace[playerName] -- cubre todos los casos donde MM2 pone la gun.
+            -- El bucle anterior solo buscaba en char:GetChildren() y fallaba cuando
+            -- la gun estaba en Backpack o en el workspace model del jugador.
+            if _findGun then
+                local g = _findGun()
+                if g then return g end
+            end
+            -- Fallback local por si _findGun no esta disponible aun
             local char = LocalPlayer.Character
             if not char then return nil end
             for _, t in ipairs(char:GetChildren()) do
@@ -14174,6 +14183,20 @@ do
                     or t:FindFirstChild("GunClient", true)
                     or n:find("gun") or n:find("sheriff") or n:find("revolver") then
                         return t
+                    end
+                end
+            end
+            -- Buscar tambien en el Backpack (gun sin equipar pero lista para usar)
+            local bp = LocalPlayer and LocalPlayer:FindFirstChildOfClass("Backpack")
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") then
+                        local n = t.Name:lower()
+                        if t:FindFirstChild("Shoot", true)
+                        or t:FindFirstChild("GunClient", true)
+                        or n:find("gun") or n:find("sheriff") or n:find("revolver") then
+                            return t
+                        end
                     end
                 end
             end
@@ -14223,7 +14246,17 @@ do
             if _G._dualGunState and _G._dualGunState.enabled then
                 _msfFireDualGun(gun)
             else
-                pcall(function() gun:Activate() end)
+                -- FIX DISPARO MOBILE: intentar gun:Activate() primero (GunClient nativo).
+                -- Si falla o la gun no responde (algunos executors bloquean Activate),
+                -- usar _fireGunMM2 como fallback directo al remote Shoot.
+                local _activated = false
+                pcall(function()
+                    gun:Activate()
+                    _activated = true
+                end)
+                if not _activated and _fireGunMM2 then
+                    _fireGunMM2(gun)
+                end
             end
         end)
 
@@ -14236,7 +14269,15 @@ do
             if _G._dualGunState and _G._dualGunState.enabled then
                 _msfFireDualGun(gun)
             else
-                pcall(function() gun:Activate() end)
+                -- FIX DISPARO MOBILE: mismo fallback que TouchTap
+                local _activated = false
+                pcall(function()
+                    gun:Activate()
+                    _activated = true
+                end)
+                if not _activated and _fireGunMM2 then
+                    _fireGunMM2(gun)
+                end
             end
         end)
     end
