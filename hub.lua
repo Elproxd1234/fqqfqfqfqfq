@@ -38955,12 +38955,12 @@ function CreatePremiumTab()
                 dualKnife = true,
             },
             {
-                -- Knife: mesh custom con agarre dual knife
-                name      = "Knife",
-                meshId    = "rbxassetid://13662643071",
-                texId     = "rbxassetid://13662522227",
-                scale     = Vector3.new(0.059, 0.059, 0.059),
-                grip      = CFrame.new(0.0154595375, -0.020000000, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
+                -- Fang: mesh custom con agarre dual knife
+                name      = "Fang",
+                meshId    = "http://www.roblox.com/asset/?id=117500241",
+                texId     = "http://www.roblox.com/asset/?id=117500388",
+                scale     = Vector3.new(0.4, 0.4, 0.4),
+                grip      = CFrame.new(0.0154595375, -0.060000000, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualKnife = true,
             },
 
