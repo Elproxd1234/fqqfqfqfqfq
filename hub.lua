@@ -39217,17 +39217,12 @@ function CreatePremiumTab()
                 meshId    = "rbxassetid://431951745",
                 texId     = "rbxassetid://431951748",
                 scale     = Vector3.new(0.056, 0.056, 0.056),
-                -- FIX ORIENTACION: grip corregido para que el ca?on apunte al frente (-Z).
-                -- El grip anterior era igual al Luger (rotacion lateral) causando que la
-                -- escopeta saliera de costado en vez de hacia adelante.
-                -- Rotacion: Y->-Z, Z->Y (giro -90 grados en X) igual que Bacon,
-                -- ajustando posicion Y/Z para el largo del mesh de escopeta.
-                grip      = CFrame.new(
-                    0, -0.759000003, -0.314999998,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
-                ),
+                -- FIX ORIENTACION v2: el mesh 431951745 tiene el cañon apuntando hacia
+                -- arriba en espacio local (+Y). Para que quede horizontal apuntando al frente
+                -- se necesita girar +90° en X: Y->Z, Z->-Y.
+                -- Matriz resultante: Right=(1,0,0), Up=(0,0,1), Look=(0,-1,0)
+                -- Posicion Y baja el punto de agarre a la culata; Z centra en el eje.
+                grip      = CFrame.new(0, -0.55, 0, 1, 0, 0, 0, 0, 1, 0, -1, 0),
                 dualGun   = true,
                 shotSound = "rbxassetid://7441077838",  -- sonido custom al disparar
             },
