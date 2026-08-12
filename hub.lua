@@ -49187,7 +49187,7 @@ function CreateCombatTab()
                             -- grip.C0/C1 del RightGrip ya refleja el skin aplicado
                             -- por _scApply (tool.Grip = skin.grip -> Roblox propaga al Motor6D).
                             local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                            w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                            w.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
                             w.C1 = grip.C1
                         else
                             -- DUAL KNIFE: l?gica original ? skin knife override si aplica,
@@ -49200,14 +49200,14 @@ function CreateCombatTab()
                                 if _cSkin and _cSkin.dualKnife and _cSkin.grip then
                                     local sg = _cSkin.grip
                                     local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = sg:GetComponents()
-                                    w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                                    w.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
                                     w.C1 = CFrame.new()
                                     _usedSkinGrip = true
                                 end
                             end
                             if not _usedSkinGrip then
                                 local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                                w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                                w.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
                                 w.C1 = CFrame.new()
                             end
                         end
@@ -49259,7 +49259,7 @@ function CreateCombatTab()
                     -- DUAL GUN: detecci?n de agarre del HUB_celeste.
                     -- grip.C0/C1 del RightGrip ya tiene el grip del skin activo.
                     local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                    weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                    weld.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
                     weld.C1 = grip.C1
                     -- Aplicar mesh/texture del skin al clon
                     pcall(function()
@@ -49294,16 +49294,19 @@ function CreateCombatTab()
                             if _cSkin and _cSkin.dualKnife and _cSkin.grip then
                                 local sg = _cSkin.grip
                                 local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = sg:GetComponents()
-                                weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                                weld.C1 = CFrame.new()
+                                -- FIX ESPEJO ZERQON: formula M*R*M donde M=diag(-1,1,1)
+                                weld.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
+                                weld.C1 = grip.C1
                                 _usedSkinGrip = true
                             end
                         end
                     end
                     if not _usedSkinGrip then
-                        local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                        weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                        weld.C1 = CFrame.new()
+                        local origGrip = _getOrigGripCF and _getOrigGripCF() or grip.C0
+                        local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = origGrip:GetComponents()
+                        -- FIX ESPEJO ZERQON: formula M*R*M donde M=diag(-1,1,1)
+                        weld.C0 = CFrame.new(-px, py, pz, r00, -r01, -r02, -r10, r11, r12, -r20, r21, r22)
+                        weld.C1 = grip.C1
                     end
                 end
             end)
