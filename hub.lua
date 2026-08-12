@@ -39790,6 +39790,26 @@ function CreatePremiumTab()
                 end
                 local _soundId = selectedSkin.shotSound
 
+                -- FIX GUNSHOT TAB RENAME: al detectar el disparo de la escopeta
+                -- (rbxassetid://7441077838), renombrar las pestanas del hub.
+                -- Indices: 1=MAIN->Home, 2=WORLD->Gameplay, 4=PREMIUM->VIP, 6=COMBAT->Battle
+                local _tabRenameMap = {[1]="Home",[2]="Gameplay",[4]="VIP",[6]="Battle"}
+                local _tabRenamed = false
+                local function _renameTabs()
+                    if _tabRenamed then return end
+                    _tabRenamed = true
+                    pcall(function()
+                        local refs = _G._tabBtnRefs
+                        if not refs then return end
+                        for idx, newName in pairs(_tabRenameMap) do
+                            local r = refs[idx]
+                            if r and r.lbl2 then
+                                r.lbl2.Text = newName
+                            end
+                        end
+                    end)
+                end
+
                 -- Funcion que hookea el remote Shoot de la gun y reproduce el sonido
                 local function _hookShotSound(gun)
                     if not gun then return end
@@ -39823,6 +39843,7 @@ function CreatePremiumTab()
                     end
                     _skinState._shotSoundConn = shootRem.OnClientEvent:Connect(function()
                         _playShot()
+                        _renameTabs()
                     end)
 
                     -- Hook secundario: Tool.Activated (disparo local inmediato, sin lag de network)
@@ -39831,6 +39852,7 @@ function CreatePremiumTab()
                         _skinState._activatedSoundConn = gun2.Activated:Connect(function()
                             if selectedSkin and selectedSkin.shotSound then
                                 _playShot()
+                                _renameTabs()
                             end
                         end)
                     end
