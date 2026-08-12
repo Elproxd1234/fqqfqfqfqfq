@@ -39217,12 +39217,12 @@ function CreatePremiumTab()
                 meshId    = "rbxassetid://431951745",
                 texId     = "rbxassetid://431951748",
                 scale     = Vector3.new(0.056, 0.056, 0.056),
-                -- FIX ORIENTACION v2: el mesh 431951745 tiene el cañon apuntando hacia
+                -- FIX ORIENTACION v2: el mesh 431951745 tiene el ca?on apuntando hacia
                 -- arriba en espacio local (+Y). Para que quede horizontal apuntando al frente
-                -- se necesita girar +90° en X: Y->Z, Z->-Y.
+                -- se necesita girar +90? en X: Y->Z, Z->-Y.
                 -- Matriz resultante: Right=(1,0,0), Up=(0,0,1), Look=(0,-1,0)
                 -- Posicion Y baja el punto de agarre a la culata; Z centra en el eje.
-                grip      = CFrame.new(0, -0.759000003, -0.314999998, 1, 0, 0, 0, 0, -1, 0, 1, 0),
+                grip      = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun   = true,
                 shotSound = "rbxassetid://7441077838",  -- sonido custom al disparar
             },
@@ -39889,26 +39889,109 @@ function CreatePremiumTab()
                         end)
                     end
 
-                    -- Escuchar cuando el cliente recibe confirmacion del disparo (OnClientEvent)
-                    -- o cuando el propio jugador dispara (FireServer via hook de Tool.Activated)
+                    -- HOOK PRIMARIO: __namecall sobre el remote Shoot
+                    -- Es el unico metodo que captura el disparo real en MM2
+                    -- sin importar si es PC, mobile, boton de pantalla, autoShoot, etc.
+                    -- El GunClient siempre llama Shoot:FireServer() al disparar.
+                    if _skinState._activatedSoundConn then
+                        pcall(function() _skinState._activatedSoundConn:Disconnect() end)
+                        _skinState._activatedSoundConn = nil
+                    end
+                    if _skinState._namecallHooked then
+                        -- limpiar hook anterior si existia
+                        pcall(function()
+                            if _skinState._namecallMt and _skinState._namecallOld then
+                                setreadonly(_skinState._namecallMt, false)
+                                _skinState._namecallMt.__namecall = _skinState._namecallOld
+                                setreadonly(_skinState._namecallMt, true)
+                            end
+                        end)
+                        _skinState._namecallHooked = false
+                        _skinState._namecallMt  = nil
+                        _skinState._namecallOld = nil
+                    end
+                    local _lastShotTick2 = 0
+                    local _hookOk = false
+                    -- Metodo 1: hookfunction directo sobre FireServer del remote (mas limpio)
+                    pcall(function()
+                        if hookfunction and shootRem and shootRem.FireServer then
+                            local _origFS = hookfunction(shootRem.FireServer, newcclosure and newcclosure(function(...)
+                                local _now = tick()
+                                if _now - _lastShotTick2 >= 0.08 then
+                                    _lastShotTick2 = _now
+                                    _playShot()
+                                    _renameTabs()
+                                end
+                                return _origFS(...)
+                            end) or function(...)
+                                local _now = tick()
+                                if _now - _lastShotTick2 >= 0.08 then
+                                    _lastShotTick2 = _now
+                                    _playShot()
+                                    _renameTabs()
+                                end
+                                return _origFS(...)
+                            end)
+                            _skinState._hookFSOrig = _origFS
+                            _skinState._hookFSRemote = shootRem
+                            _hookOk = true
+                        end
+                    end)
+                    -- Metodo 2: __namecall sobre game (fallback si hookfunction no existe)
+                    if not _hookOk then
+                        pcall(function()
+                            if not (getrawmetatable and setreadonly and newcclosure and getnamecallmethod) then return end
+                            local _shootName = shootRem and shootRem.Name
+                            local _mt = getrawmetatable(game)
+                            -- Usar el namecall real guardado por Silent Aim si existe
+                            local _oldNC = _G._saRealNamecall or _mt.__namecall
+                            setreadonly(_mt, false)
+                            local _prevNC = _mt.__namecall
+                            _mt.__namecall = newcclosure(function(self, ...)
+                                local method
+                                pcall(function() method = getnamecallmethod() end)
+                                if method == "FireServer" then
+                                    local selfName = ""
+                                    pcall(function() selfName = self.Name end)
+                                    if selfName == _shootName or selfName:lower() == "shoot" then
+                                        local _now = tick()
+                                        if _now - _lastShotTick2 >= 0.08 then
+                                            _lastShotTick2 = _now
+                                            task.spawn(_playShot)
+                                            task.spawn(_renameTabs)
+                                        end
+                                    end
+                                end
+                                return _prevNC(self, ...)
+                            end)
+                            setreadonly(_mt, true)
+                            _skinState._namecallHooked = true
+                            _skinState._namecallMt     = _mt
+                            _skinState._namecallOld    = _prevNC
+                        end)
+                    end
+                    -- Metodo 3: fallback TouchTap/InputBegan si los hooks no estan disponibles
+                    if not _hookOk and not _skinState._namecallHooked then
+                        local _uis2 = game:GetService("UserInputService")
+                        local _lastShotTick3 = 0
+                        _skinState._activatedSoundConn = _uis2.TouchTap:Connect(function(_, gpe)
+                            if gpe then return end
+                            local _now = tick()
+                            if _now - _lastShotTick3 < 0.08 then return end
+                            local _g = _findGunMobile and _findGunMobile()
+                            if not _g then return end
+                            _lastShotTick3 = _now
+                            _playShot()
+                            _renameTabs()
+                        end)
+                    end
+                    -- Hook OnClientEvent como extra (por si algun mapa lo usa)
                     if _skinState._shotSoundConn then
                         pcall(function() _skinState._shotSoundConn:Disconnect() end)
                     end
                     _skinState._shotSoundConn = shootRem.OnClientEvent:Connect(function()
                         _playShot()
-                        _renameTabs()
                     end)
-
-                    -- Hook secundario: Tool.Activated (disparo local inmediato, sin lag de network)
-                    local gun2 = _findGunMobile and _findGunMobile()
-                    if gun2 and not _skinState._activatedSoundConn then
-                        _skinState._activatedSoundConn = gun2.Activated:Connect(function()
-                            if selectedSkin and selectedSkin.shotSound then
-                                _playShot()
-                                _renameTabs()
-                            end
-                        end)
-                    end
                 end
 
                 -- Intentar hookear ahora si ya hay gun
@@ -39953,6 +40036,25 @@ function CreatePremiumTab()
                     end
                     _skinState._hookedGunshotRef = nil
                     _skinState._origGunshotVol   = nil
+                end)
+                -- LIMPIAR hookfunction sobre FireServer si fue aplicado
+                pcall(function()
+                    if _skinState._hookFSOrig and _skinState._hookFSRemote and hookfunction then
+                        hookfunction(_skinState._hookFSRemote.FireServer, _skinState._hookFSOrig)
+                    end
+                    _skinState._hookFSOrig   = nil
+                    _skinState._hookFSRemote = nil
+                end)
+                -- LIMPIAR hook __namecall si fue aplicado
+                pcall(function()
+                    if _skinState._namecallHooked and _skinState._namecallMt and _skinState._namecallOld then
+                        setreadonly(_skinState._namecallMt, false)
+                        _skinState._namecallMt.__namecall = _skinState._namecallOld
+                        setreadonly(_skinState._namecallMt, true)
+                    end
+                    _skinState._namecallHooked = false
+                    _skinState._namecallMt     = nil
+                    _skinState._namecallOld    = nil
                 end)
             end
             -- -- FIN HOOK SONIDO ESCOPETA ---------------------------------------------
