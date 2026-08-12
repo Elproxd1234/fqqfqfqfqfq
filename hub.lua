@@ -38914,8 +38914,8 @@ function CreatePremiumTab()
         -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
 
-        -- Grip estandar para todos los knives -- rotacion PARADO (vertical, no acostado)
-        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, -0, 0, 0, 1, 0, -1, 0)
+        -- Grip estandar para todos los knives -- agarre dual knife (WWWWWWWW)
+        local _KNIFE_GRIP_STD = CFrame.new(0, -1, -0.100000001, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
         local _SC_KNIFE_SKINS = {
             {
@@ -38969,7 +38969,7 @@ function CreatePremiumTab()
                 meshId    = "http://www.roblox.com/asset/?id=11442510",
                 texId     = "rbxassetid://10944556659",
                 scale     = Vector3.new(1.5, 1.5, 1.5),
-                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, -1, 0, 0, 0, 0, -1, 0, -1, 0),
+                grip      = CFrame.new(0, -1, -0.15, 1, 0, 0, 0, 0, -1, 0, 1, 0),
                 dualKnife = true,
             },
 
