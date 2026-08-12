@@ -39910,26 +39910,26 @@ function CreatePremiumTab()
                         _skinState._namecallMt  = nil
                         _skinState._namecallOld = nil
                     end
-                    local _lastShotTick2 = 0
+                    -- Throttle compartido por TODOS los metodos: evita duplicados
+                    -- cuando hookfunction + namecall + TouchTap se activan juntos.
+                    -- 0.45s = cooldown real de la gun en MM2 (no puede disparar mas rapido).
+                    _skinState._lastShotTick = _skinState._lastShotTick or 0
+                    local function _throttledShot()
+                        local _now = tick()
+                        if _now - _skinState._lastShotTick < 0.45 then return end
+                        _skinState._lastShotTick = _now
+                        _playShot()
+                        _renameTabs()
+                    end
                     local _hookOk = false
                     -- Metodo 1: hookfunction directo sobre FireServer del remote (mas limpio)
                     pcall(function()
                         if hookfunction and shootRem and shootRem.FireServer then
                             local _origFS = hookfunction(shootRem.FireServer, newcclosure and newcclosure(function(...)
-                                local _now = tick()
-                                if _now - _lastShotTick2 >= 0.08 then
-                                    _lastShotTick2 = _now
-                                    _playShot()
-                                    _renameTabs()
-                                end
+                                _throttledShot()
                                 return _origFS(...)
                             end) or function(...)
-                                local _now = tick()
-                                if _now - _lastShotTick2 >= 0.08 then
-                                    _lastShotTick2 = _now
-                                    _playShot()
-                                    _renameTabs()
-                                end
+                                _throttledShot()
                                 return _origFS(...)
                             end)
                             _skinState._hookFSOrig = _origFS
@@ -39943,7 +39943,6 @@ function CreatePremiumTab()
                             if not (getrawmetatable and setreadonly and newcclosure and getnamecallmethod) then return end
                             local _shootName = shootRem and shootRem.Name
                             local _mt = getrawmetatable(game)
-                            -- Usar el namecall real guardado por Silent Aim si existe
                             local _oldNC = _G._saRealNamecall or _mt.__namecall
                             setreadonly(_mt, false)
                             local _prevNC = _mt.__namecall
@@ -39954,12 +39953,7 @@ function CreatePremiumTab()
                                     local selfName = ""
                                     pcall(function() selfName = self.Name end)
                                     if selfName == _shootName or selfName:lower() == "shoot" then
-                                        local _now = tick()
-                                        if _now - _lastShotTick2 >= 0.08 then
-                                            _lastShotTick2 = _now
-                                            task.spawn(_playShot)
-                                            task.spawn(_renameTabs)
-                                        end
+                                        task.spawn(_throttledShot)
                                     end
                                 end
                                 return _prevNC(self, ...)
@@ -39970,19 +39964,14 @@ function CreatePremiumTab()
                             _skinState._namecallOld    = _prevNC
                         end)
                     end
-                    -- Metodo 3: fallback TouchTap/InputBegan si los hooks no estan disponibles
+                    -- Metodo 3: fallback TouchTap si los hooks no estan disponibles
                     if not _hookOk and not _skinState._namecallHooked then
                         local _uis2 = game:GetService("UserInputService")
-                        local _lastShotTick3 = 0
                         _skinState._activatedSoundConn = _uis2.TouchTap:Connect(function(_, gpe)
                             if gpe then return end
-                            local _now = tick()
-                            if _now - _lastShotTick3 < 0.08 then return end
                             local _g = _findGunMobile and _findGunMobile()
                             if not _g then return end
-                            _lastShotTick3 = _now
-                            _playShot()
-                            _renameTabs()
+                            _throttledShot()
                         end)
                     end
                     -- Hook OnClientEvent como extra (por si algun mapa lo usa)
