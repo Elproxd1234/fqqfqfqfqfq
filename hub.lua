@@ -38936,17 +38936,6 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
-            {
-                -- Katana Mesh: skin personalizada
-                name      = "Katana Mesh",
-                meshId    = "rbxassetid://104996534591762",
-                texId     = "rbxassetid://129462008300983",
-                scale     = Vector3.new(0.08, 0.08, 0.08),
-                meshSize  = Vector3.new(0.01, 0.01, 0.01),
-                grip      = _KNIFE_GRIP_STD,
-                dualKnife = true,
-            },
-
         }
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
@@ -54028,26 +54017,33 @@ minimizeBtn.Activated:Connect(function()
     skullMainFrame.Size = UDim2.new(0, SKULL_SIZE, 0, SKULL_SIZE)
     skullMainFrame.Position = UDim2.new(0.5, 0, 0, 10)
 
-    local rBtn = Instance.new("ImageButton", skullMainFrame)
+    local rBtn = Instance.new("TextButton", skullMainFrame)
     rBtn.Name = "SkullButton"
     rBtn.AnchorPoint = Vector2.new(0.5, 0.5)
     rBtn.Position = UDim2.new(0.5, 0, 0.5, 0)
-    rBtn.Size = UDim2.new(0, 0, 0, 0)
-    rBtn.BackgroundTransparency = 1
-    rBtn.Image = "rbxassetid://100287275990702"
-    rBtn.ImageColor3 = Color3.fromRGB(210, 215, 220)
-    rBtn.ScaleType = Enum.ScaleType.Fit
+    rBtn.Size = UDim2.new(0, SKULL_SIZE * 0.9, 0, SKULL_SIZE * 0.9)
+    rBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    rBtn.BackgroundTransparency = 0.15
+    rBtn.BorderSizePixel = 0
+    rBtn.Text = "?"
+    rBtn.TextColor3 = Color3.fromRGB(210, 215, 220)
+    rBtn.TextSize = 28
+    rBtn.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+    rBtn.AutoButtonColor = false
     rBtn.ZIndex = 100
-
-    TweenService:Create(rBtn, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, SKULL_SIZE * 0.9, 0, SKULL_SIZE * 0.9)
-    }):Play()
+    Instance.new("UICorner", rBtn).CornerRadius = UDim.new(0, 12)
+    local _rBtnStroke = Instance.new("UIStroke", rBtn)
+    _rBtnStroke.Color = Color3.fromRGB(180, 80, 255)
+    _rBtnStroke.Thickness = 2
+    _rBtnStroke.Transparency = 0.3
 
     rBtn.MouseEnter:Connect(function()
-        TweenService:Create(rBtn, TweenInfo.new(0.2), {ImageTransparency = 0.3}):Play()
+        TweenService:Create(rBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(40, 20, 70)}):Play()
+        TweenService:Create(_rBtnStroke, TweenInfo.new(0.15), {Transparency = 0}):Play()
     end)
     rBtn.MouseLeave:Connect(function()
-        TweenService:Create(rBtn, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+        TweenService:Create(rBtn, TweenInfo.new(0.18), {BackgroundTransparency = 0.15, BackgroundColor3 = Color3.fromRGB(25, 25, 35)}):Play()
+        TweenService:Create(_rBtnStroke, TweenInfo.new(0.18), {Transparency = 0.3}):Play()
     end)
 
     rBtn.Activated:Connect(function()
@@ -54070,7 +54066,7 @@ minimizeBtn.Activated:Connect(function()
         end
         local shrink = TweenService:Create(rBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
             Size = UDim2.new(0, 0, 0, 0),
-            ImageTransparency = 1
+            TextTransparency = 1
         })
         shrink:Play()
         shrink.Completed:Connect(function()
