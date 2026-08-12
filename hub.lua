@@ -38937,7 +38937,16 @@ function CreatePremiumTab()
                 dualKnife = true,
             },
             {
-                -- Icebreaker: MeshPart -- IDs capturados via MM2 Skin Analyzer
+                -- Corrupt: SpecialMesh -- IDs capturados via MM2 Skin Analyzer
+                name      = "Corrupt",
+                meshId    = "http://www.roblox.com/asset/?id=121944778",
+                texId     = "http://www.roblox.com/asset/?id=162016526",
+                scale     = Vector3.new(1, 1, 1),
+                grip      = _KNIFE_GRIP_STD,
+                dualKnife = true,
+            },
+            {
+                -- Icebreaker: SpecialMesh -- IDs capturados via MM2 Skin Analyzer
                 name      = "Icebreaker",
                 meshId    = "rbxassetid://6124173614",
                 texId     = "rbxassetid://6124173821",
@@ -38945,7 +38954,6 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
-
         }
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
