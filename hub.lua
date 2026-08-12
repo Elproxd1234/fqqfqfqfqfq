@@ -38910,6 +38910,20 @@ function CreatePremiumTab()
                 ),
                 dualGun = true,
             },
+            {
+                -- DarkShoot: skin personalizada
+                name   = "DarkShoot",
+                meshId = "rbxassetid://15027451531",
+                texId  = "rbxassetid://15027451643",
+                scale  = Vector3.new(1.8, 1.8, 1.8),
+                grip   = CFrame.new(
+                    -0.567565918, -0.124303818, -0.0424308777,
+                    -0.000212550163, 0.0230092816, -0.999735236,
+                    -0.011778634,   0.999665856,   0.0230101906,
+                     0.99993062,    0.0117804073,  5.85317612e-05
+                ),
+                dualGun = true,
+            },
         }
         -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
@@ -39087,7 +39101,7 @@ function CreatePremiumTab()
                     fakePart.Parent = handle
                     -- Soldar el FakePart al handle para que se mueva junto
                     -- FIX ADELANTADO: si la skin define weldOffset, usarlo para
-                    -- alinear el mesh al puño (evita que katanas largas aparezcan adelantadas)
+                    -- alinear el mesh al pu?o (evita que katanas largas aparezcan adelantadas)
                     local weld = Instance.new("Weld", fakePart)
                     weld.Part0 = handle
                     weld.Part1 = fakePart
