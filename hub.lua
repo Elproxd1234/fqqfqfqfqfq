@@ -38965,12 +38965,16 @@ function CreatePremiumTab()
             },
             {
                 -- Purple Katana: mesh custom con agarre dual knife
-                name      = "Purple Katana",
-                meshId    = "http://www.roblox.com/asset/?id=11442510",
-                texId     = "rbxassetid://10944556659",
-                scale     = Vector3.new(1.5, 1.5, 1.5),
-                grip      = CFrame.new(0, -1, -0.15, 1, 0, 0, 0, 0, -1, 0, 1, 0),
-                dualKnife = true,
+                -- FIX ADELANTADO v2: grip ajustado para mano derecha; weldOffset mueve el FakePart hacia atras en Z
+                name       = "Purple Katana",
+                meshId     = "http://www.roblox.com/asset/?id=11442510",
+                texId      = "rbxassetid://10944556659",
+                scale      = Vector3.new(1.5, 1.5, 1.5),
+                -- grip: Y sube/baja el punto de agarre, Z lo adelanta/atrasa, rotacion apunta la hoja hacia arriba
+                grip       = CFrame.new(0, -0.35, -1.10, 0, 0, 1, 0, 1, 0, -1, 0, 0),
+                -- weldOffset: desplaza el FakePart (mesh visible) hacia atras respecto al handle
+                weldOffset = CFrame.new(0, 1.20, -0.40),
+                dualKnife  = true,
             },
 
         }
@@ -39082,10 +39086,12 @@ function CreatePremiumTab()
                     sm.Scale     = skin.scale or Vector3.new(0.056, 0.056, 0.056)
                     fakePart.Parent = handle
                     -- Soldar el FakePart al handle para que se mueva junto
+                    -- FIX ADELANTADO: si la skin define weldOffset, usarlo para
+                    -- alinear el mesh al puño (evita que katanas largas aparezcan adelantadas)
                     local weld = Instance.new("Weld", fakePart)
                     weld.Part0 = handle
                     weld.Part1 = fakePart
-                    weld.C0    = CFrame.new()
+                    weld.C0    = skin.weldOffset or CFrame.new()
                     weld.C1    = CFrame.new()
                     -- Guardar referencia para limpiar al restaurar
                     _skinState.origData[tool].Elements[handle].FakePart = fakePart
@@ -39159,7 +39165,8 @@ function CreatePremiumTab()
                         local weld = Instance.new("Weld", fakePart)
                         weld.Part0 = obj
                         weld.Part1 = fakePart
-                        weld.C0    = CFrame.new()
+                        -- FIX ADELANTADO: respetar weldOffset de la skin (ej. Purple Katana)
+                        weld.C0    = skin.weldOffset or CFrame.new()
                         weld.C1    = CFrame.new()
                     end)
                 elseif obj:IsA("SpecialMesh") then
