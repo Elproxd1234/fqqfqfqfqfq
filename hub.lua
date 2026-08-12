@@ -38915,7 +38915,7 @@ function CreatePremiumTab()
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
 
         -- Grip estandar para todos los knives -- rotacion PARADO (vertical, no acostado)
-        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1)
+        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, -0, 0, 0, 1, 0, -1, 0)
 
         local _SC_KNIFE_SKINS = {
             {
@@ -38960,7 +38960,16 @@ function CreatePremiumTab()
                 meshId    = "http://www.roblox.com/asset/?id=117500241",
                 texId     = "http://www.roblox.com/asset/?id=117500388",
                 scale     = Vector3.new(0.4, 0.4, 0.4),
-                grip      = CFrame.new(0.0154595375, -0.060000000, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
+                grip      = CFrame.new(0.0154595375, -0.060000000, -0.00624334533, 1, 0, -0, 0, 0, 1, 0, -1, 0),
+                dualKnife = true,
+            },
+            {
+                -- Purple Katana: mesh custom con agarre dual knife
+                name      = "Purple Katana",
+                meshId    = "http://www.roblox.com/asset/?id=11442510",
+                texId     = "rbxassetid://10944556659",
+                scale     = Vector3.new(1.5, 1.5, 1.5),
+                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, -1, 0, 0, 0, 0, -1, 0, -1, 0),
                 dualKnife = true,
             },
 
