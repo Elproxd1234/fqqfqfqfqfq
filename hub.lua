@@ -25810,6 +25810,16 @@ function removeCham(player)
         end
         chamHighlight[player] = nil
     end
+    -- FIX DISAPPEAR: restaurar LocalTransparencyModifier en caso de corrupcion
+    if player and player.Character then
+        local char = player.Character
+        for _, part in ipairs(char:GetDescendants()) do
+            if (part:IsA("BasePart") or part:IsA("MeshPart"))
+            and part.LocalTransparencyModifier ~= 0 then
+                pcall(function() part.LocalTransparencyModifier = 0 end)
+            end
+        end
+    end
 end
 
 function updateCham(player)
@@ -25968,6 +25978,16 @@ function removeOutline(player)
     if player and player.Character then
         pcall(function() _limpiarPieceOutline(player.Character) end)
     end
+    -- FIX DISAPPEAR: restaurar LocalTransparencyModifier en caso de corrupcion
+    if player and player.Character then
+        local char = player.Character
+        for _, part in ipairs(char:GetDescendants()) do
+            if (part:IsA("BasePart") or part:IsA("MeshPart"))
+            and part.LocalTransparencyModifier ~= 0 then
+                pcall(function() part.LocalTransparencyModifier = 0 end)
+            end
+        end
+    end
 end
 
 function updateOutline(player)
@@ -26048,6 +26068,18 @@ function removeHighlight(player)
     if hl then
         pcall(function() hl:Destroy() end)
         hlObjects[player] = nil
+    end
+    -- FIX DISAPPEAR: destruir un Highlight con AlwaysOnTop puede corromper
+    -- LocalTransparencyModifier de las partes, dejando al jugador invisible.
+    -- Restaurar a 0 en todas las partes del char al quitar el Highlight.
+    if player and player.Character then
+        local char = player.Character
+        for _, part in ipairs(char:GetDescendants()) do
+            if (part:IsA("BasePart") or part:IsA("MeshPart"))
+            and part.LocalTransparencyModifier ~= 0 then
+                pcall(function() part.LocalTransparencyModifier = 0 end)
+            end
+        end
     end
 end
 
@@ -39111,6 +39143,21 @@ function CreatePremiumTab()
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
+            {
+                -- Escopeta: mesh y textura personalizados + sonido de disparo custom
+                name      = "Escopeta",
+                meshId    = "rbxassetid://431951745",
+                texId     = "rbxassetid://431951748",
+                scale     = Vector3.new(0.056, 0.056, 0.056),
+                grip      = CFrame.new(
+                    0, -0.5, 0.5,
+                    0.999924004,    -0.00871835742, -0.00871835742,
+                    0.00871835742,   0.999961972,   -3.80063248e-05,
+                    0.00871835742,  -3.80063248e-05,  0.999961972
+                ),
+                dualGun   = true,
+                shotSound = "rbxassetid://7441077838",  -- sonido custom al disparar
+            },
         }
         -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
@@ -39699,6 +39746,100 @@ function CreatePremiumTab()
                 local gun6 = _findGunMobile()
                 if gun6 then _scApply(gun6, _scGetSkin(), true) end
             end)
+
+            -- -- HOOK SONIDO ESCOPETA -------------------------------------------------
+            -- Si la skin seleccionada tiene shotSound, enganchar el Remote "Shoot"
+            -- de la gun para reproducir el sonido custom cuando se dispara.
+            if selectedSkin and selectedSkin.shotSound then
+                -- Limpiar hook anterior si existia
+                if _skinState._shotSoundConn then
+                    pcall(function() _skinState._shotSoundConn:Disconnect() end)
+                    _skinState._shotSoundConn = nil
+                end
+                local _soundId = selectedSkin.shotSound
+
+                -- Funcion que hookea el remote Shoot de la gun y reproduce el sonido
+                local function _hookShotSound(gun)
+                    if not gun then return end
+                    local shootRem = getShootRemote and getShootRemote(gun)
+                    -- Fallback: buscar "Shoot" directo en la gun
+                    if not shootRem then
+                        shootRem = gun:FindFirstChild("Shoot", true)
+                    end
+                    if not shootRem or not shootRem:IsA("RemoteEvent") then return end
+
+                    -- Crear Sound en el HRP del jugador para que se escuche posicionado
+                    local function _playShot()
+                        pcall(function()
+                            local char = LocalPlayer.Character
+                            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                            local parent = hrp or workspace
+                            local snd = Instance.new("Sound")
+                            snd.SoundId  = _soundId
+                            snd.Volume   = 1
+                            snd.RollOffMaxDistance = 80
+                            snd.Parent   = parent
+                            snd:Play()
+                            game:GetService("Debris"):AddItem(snd, 4)
+                        end)
+                    end
+
+                    -- Escuchar cuando el cliente recibe confirmacion del disparo (OnClientEvent)
+                    -- o cuando el propio jugador dispara (FireServer via hook de Tool.Activated)
+                    if _skinState._shotSoundConn then
+                        pcall(function() _skinState._shotSoundConn:Disconnect() end)
+                    end
+                    _skinState._shotSoundConn = shootRem.OnClientEvent:Connect(function()
+                        _playShot()
+                    end)
+
+                    -- Hook secundario: Tool.Activated (disparo local inmediato, sin lag de network)
+                    local gun2 = _findGunMobile and _findGunMobile()
+                    if gun2 and not _skinState._activatedSoundConn then
+                        _skinState._activatedSoundConn = gun2.Activated:Connect(function()
+                            if selectedSkin and selectedSkin.shotSound then
+                                _playShot()
+                            end
+                        end)
+                    end
+                end
+
+                -- Intentar hookear ahora si ya hay gun
+                task.spawn(function()
+                    local g = _findGunMobile and _findGunMobile()
+                    if g then _hookShotSound(g) end
+                end)
+                -- Re-intentar con delays por si la gun aparece despues (mobile)
+                task.delay(0.5,  function() local g = _findGunMobile and _findGunMobile(); if g then _hookShotSound(g) end end)
+                task.delay(1.5,  function() local g = _findGunMobile and _findGunMobile(); if g then _hookShotSound(g) end end)
+                task.delay(3.0,  function() local g = _findGunMobile and _findGunMobile(); if g then _hookShotSound(g) end end)
+
+                -- Tambien re-hookear cada vez que el char spawna (nueva ronda)
+                if _skinState._shotCharConn then
+                    pcall(function() _skinState._shotCharConn:Disconnect() end)
+                end
+                _skinState._shotCharConn = LocalPlayer.CharacterAdded:Connect(function()
+                    task.delay(1, function()
+                        local g = _findGunMobile and _findGunMobile()
+                        if g then _hookShotSound(g) end
+                    end)
+                end)
+            else
+                -- Skin sin sonido custom: limpiar hooks de sonido si habia
+                if _skinState._shotSoundConn then
+                    pcall(function() _skinState._shotSoundConn:Disconnect() end)
+                    _skinState._shotSoundConn = nil
+                end
+                if _skinState._activatedSoundConn then
+                    pcall(function() _skinState._activatedSoundConn:Disconnect() end)
+                    _skinState._activatedSoundConn = nil
+                end
+                if _skinState._shotCharConn then
+                    pcall(function() _skinState._shotCharConn:Disconnect() end)
+                    _skinState._shotCharConn = nil
+                end
+            end
+            -- -- FIN HOOK SONIDO ESCOPETA ---------------------------------------------
         end)
 
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
@@ -60312,161 +60453,131 @@ function CreateUseTab()
     end
 
     -- ================================================================
-    -- == HSV COLOR PICKER - Selector tipo gradiente (Hue + Saturation/Brightness)
-    -- Arrastra en el cuadrado para elegir saturacion/brillo.
-    -- Usa el slider de hue para cambiar el tono de color.
+    -- == HTML COLOR PICKER - Grilla con los 141 colores HTML estandar
+    -- Mueve el mouse/dedo sobre el cuadrado para ver nombre y hex.
     -- ================================================================
     do
-        local colorSec = CreateBorderedSectionGlobal(leftColumn, "?? Color Picker")
+        local colorSec = CreateBorderedSectionGlobal(leftColumn, "?? HTML Colors")
 
-        -- Variables de estado HSV
-        local _hue        = 0      -- 0..1
-        local _sat        = 1      -- 0..1
-        local _val        = 0.5    -- 0..1
-        local _isDraggingSV  = false
-        local _isDraggingHue = false
-
-        -- Helper: HSV -> RGB (Color3)
-        local function hsvToColor3(h, s, v)
-            return Color3.fromHSV(h, s, v)
-        end
-
-        -- Helper: actualizar todo el UI con los valores actuales de _hue/_sat/_val
-        local function _updateAll() end  -- se define abajo tras crear los elementos
-
-        -- -- Titulo --------------------------------------------------------------
+        -- Titulo de la seccion
         local colorTitle = Instance.new("TextLabel", colorSec)
-        colorTitle.Size                   = UDim2.new(1, 0, 0, 20)
+        colorTitle.Size                   = UDim2.new(1, 0, 0, 22)
         colorTitle.BackgroundTransparency = 1
-        colorTitle.Text                   = "?? Color Picker"
+        colorTitle.Text                   = "?? HTML Colors (141)"
         colorTitle.TextSize               = 13
         colorTitle.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
         colorTitle.TextColor3             = Color3.fromRGB(220, 100, 130)
         colorTitle.TextXAlignment         = Enum.TextXAlignment.Center
         colorTitle.ZIndex                 = 22
 
-        -- -- Cuadrado SV (Saturacion x Brillo) -----------------------------------
-        -- Dimensiones fijas (se ve bien en mobile y desktop)
-        local SV_SIZE   = 180
-        local HUE_W     = 16
-        local HUE_GAP   = 8
+        -- Lista de los 141 colores HTML { nombre, R, G, B }
+        local HTML_COLORS = {
+            {"AliceBlue",240,248,255},{"AntiqueWhite",250,235,215},{"Aqua",0,255,255},
+            {"Aquamarine",127,255,212},{"Azure",240,255,255},{"Beige",245,245,220},
+            {"Bisque",255,228,196},{"Black",0,0,0},{"BlanchedAlmond",255,235,205},
+            {"Blue",0,0,255},{"BlueViolet",138,43,226},{"Brown",165,42,42},
+            {"BurlyWood",222,184,135},{"CadetBlue",95,158,160},{"Chartreuse",127,255,0},
+            {"Chocolate",210,105,30},{"Coral",255,127,80},{"CornflowerBlue",100,149,237},
+            {"Cornsilk",255,248,220},{"Crimson",220,20,60},{"Cyan",0,255,255},
+            {"DarkBlue",0,0,139},{"DarkCyan",0,139,139},{"DarkGoldenRod",184,134,11},
+            {"DarkGray",169,169,169},{"DarkGreen",0,100,0},{"DarkKhaki",189,183,107},
+            {"DarkMagenta",139,0,139},{"DarkOliveGreen",85,107,47},{"DarkOrange",255,140,0},
+            {"DarkOrchid",153,50,204},{"DarkRed",139,0,0},{"DarkSalmon",233,150,122},
+            {"DarkSeaGreen",143,188,143},{"DarkSlateBlue",72,61,139},{"DarkSlateGray",47,79,79},
+            {"DarkTurquoise",0,206,209},{"DarkViolet",148,0,211},{"DeepPink",255,20,147},
+            {"DeepSkyBlue",0,191,255},{"DimGray",105,105,105},{"DodgerBlue",30,144,255},
+            {"FireBrick",178,34,34},{"FloralWhite",255,250,240},{"ForestGreen",34,139,34},
+            {"Fuchsia",255,0,255},{"Gainsboro",220,220,220},{"GhostWhite",248,248,255},
+            {"Gold",255,215,0},{"GoldenRod",218,165,32},{"Gray",128,128,128},
+            {"Green",0,128,0},{"GreenYellow",173,255,47},{"HoneyDew",240,255,240},
+            {"HotPink",255,105,180},{"IndianRed",205,92,92},{"Indigo",75,0,130},
+            {"Ivory",255,255,240},{"Khaki",240,230,140},{"Lavender",230,230,250},
+            {"LavenderBlush",255,240,245},{"LawnGreen",124,252,0},{"LemonChiffon",255,250,205},
+            {"LightBlue",173,216,230},{"LightCoral",240,128,128},{"LightCyan",224,255,255},
+            {"LightGoldenRodYellow",250,250,210},{"LightGray",211,211,211},{"LightGreen",144,238,144},
+            {"LightPink",255,182,193},{"LightSalmon",255,160,122},{"LightSeaGreen",32,178,170},
+            {"LightSkyBlue",135,206,250},{"LightSlateGray",119,136,153},{"LightSteelBlue",176,196,222},
+            {"LightYellow",255,255,224},{"Lime",0,255,0},{"LimeGreen",50,205,50},
+            {"Linen",250,240,230},{"Magenta",255,0,255},{"Maroon",128,0,0},
+            {"MediumAquaMarine",102,205,170},{"MediumBlue",0,0,205},{"MediumOrchid",186,85,211},
+            {"MediumPurple",147,112,219},{"MediumSeaGreen",60,179,113},{"MediumSlateBlue",123,104,238},
+            {"MediumSpringGreen",0,250,154},{"MediumTurquoise",72,209,204},{"MediumVioletRed",199,21,133},
+            {"MidnightBlue",25,25,112},{"MintCream",245,255,250},{"MistyRose",255,228,225},
+            {"Moccasin",255,228,181},{"NavajoWhite",255,222,173},{"Navy",0,0,128},
+            {"OldLace",253,245,230},{"Olive",128,128,0},{"OliveDrab",107,142,35},
+            {"Orange",255,165,0},{"OrangeRed",255,69,0},{"Orchid",218,112,214},
+            {"PaleGoldenRod",238,232,170},{"PaleGreen",152,251,152},{"PaleTurquoise",175,238,238},
+            {"PaleVioletRed",219,112,147},{"PapayaWhip",255,239,213},{"PeachPuff",255,218,185},
+            {"Peru",205,133,63},{"Pink",255,192,203},{"Plum",221,160,221},
+            {"PowderBlue",176,224,230},{"Purple",128,0,128},{"RebeccaPurple",102,51,153},
+            {"Red",255,0,0},{"RosyBrown",188,143,143},{"RoyalBlue",65,105,225},
+            {"SaddleBrown",139,69,19},{"Salmon",250,128,114},{"SandyBrown",244,164,96},
+            {"SeaGreen",46,139,87},{"SeaShell",255,245,238},{"Sienna",160,82,45},
+            {"Silver",192,192,192},{"SkyBlue",135,206,235},{"SlateBlue",106,90,205},
+            {"SlateGray",112,128,144},{"Snow",255,250,250},{"SpringGreen",0,255,127},
+            {"SteelBlue",70,130,180},{"Tan",210,180,140},{"Teal",0,128,128},
+            {"Thistle",216,191,216},{"Tomato",255,99,71},{"Turquoise",64,224,208},
+            {"Violet",238,130,238},{"Wheat",245,222,179},{"White",255,255,255},
+            {"WhiteSmoke",245,245,245},{"Yellow",255,255,0},{"YellowGreen",154,205,50},
+        }
 
-        -- Wrapper para centrar
-        local svWrapper = Instance.new("Frame", colorSec)
-        svWrapper.Size                   = UDim2.new(1, 0, 0, SV_SIZE + 4)
-        svWrapper.BackgroundTransparency = 1
-        svWrapper.BorderSizePixel        = 0
-        svWrapper.ZIndex                 = 20
+        local COLS = 12
+        local ROWS = math.ceil(#HTML_COLORS / COLS)
+        local CELL = 18  -- px por celda en la grilla (el frame es ~216px ancho aprox)
+        local GRID_W = COLS * CELL
+        local GRID_H = ROWS * CELL
 
-        -- Canvas SV (el cuadrado de color)
-        local svCanvas = Instance.new("Frame", svWrapper)
-        svCanvas.Name             = "SVCanvas"
-        svCanvas.Size             = UDim2.new(0, SV_SIZE, 0, SV_SIZE)
-        svCanvas.AnchorPoint      = Vector2.new(0, 0)
-        svCanvas.Position         = UDim2.new(0, 0, 0, 2)
-        svCanvas.BackgroundColor3 = Color3.fromHSV(0, 1, 1)  -- hue puro
-        svCanvas.BorderSizePixel  = 0
-        svCanvas.ZIndex           = 21
-        svCanvas.ClipsDescendants = true
-        Instance.new("UICorner", svCanvas).CornerRadius = UDim.new(0, 4)
+        -- Frame contenedor de la grilla
+        local gridWrapper = Instance.new("Frame", colorSec)
+        gridWrapper.Size                   = UDim2.new(1, 0, 0, GRID_H + 6)
+        gridWrapper.BackgroundTransparency = 1
+        gridWrapper.BorderSizePixel        = 0
+        gridWrapper.ZIndex                 = 20
+        gridWrapper.ClipsDescendants       = true
 
-        -- Degradado blanco (izquierda->transparente): simula saturacion
-        local gradWhite = Instance.new("UIGradient", svCanvas)
-        gradWhite.Color       = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(1, Color3.new(1,1,1)),
-        })
-        gradWhite.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(1, 1),
-        })
-        gradWhite.Rotation = 0
+        -- Frame de la grilla real (centrado dentro del wrapper)
+        local gridFrame = Instance.new("Frame", gridWrapper)
+        gridFrame.Size                   = UDim2.new(0, GRID_W, 0, GRID_H)
+        gridFrame.AnchorPoint            = Vector2.new(0.5, 0)
+        gridFrame.Position               = UDim2.new(0.5, 0, 0, 3)
+        gridFrame.BackgroundTransparency = 1
+        gridFrame.BorderSizePixel        = 0
+        gridFrame.ZIndex                 = 20
+        gridFrame.ClipsDescendants       = true
 
-        -- Capa negra encima para oscurecer (brillo)
-        local darkLayer = Instance.new("Frame", svCanvas)
-        darkLayer.Size             = UDim2.new(1, 0, 1, 0)
-        darkLayer.BackgroundColor3 = Color3.new(0, 0, 0)
-        darkLayer.BackgroundTransparency = 1  -- se cambia segun _val
-        darkLayer.BorderSizePixel  = 0
-        darkLayer.ZIndex           = 22
-        local gradDark = Instance.new("UIGradient", darkLayer)
-        gradDark.Color       = ColorSequence.new(Color3.new(0,0,0))
-        gradDark.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, 0),
-        })
-        gradDark.Rotation = 90  -- de arriba (transparente) a abajo (negro)
+        -- Crear una celda por color
+        for i, c in ipairs(HTML_COLORS) do
+            local col = (i - 1) % COLS
+            local row = math.floor((i - 1) / COLS)
+            local cell = Instance.new("Frame", gridFrame)
+            cell.Size             = UDim2.new(0, CELL, 0, CELL)
+            cell.Position         = UDim2.new(0, col * CELL, 0, row * CELL)
+            cell.BackgroundColor3 = Color3.fromRGB(c[2], c[3], c[4])
+            cell.BorderSizePixel  = 0
+            cell.ZIndex           = 21
+            -- Tooltip invisible para deteccion de hover
+            local btn = Instance.new("TextButton", cell)
+            btn.Size                   = UDim2.new(1, 0, 1, 0)
+            btn.BackgroundTransparency = 1
+            btn.Text                   = ""
+            btn.ZIndex                 = 25
+            btn.AutoButtonColor        = false
+            btn.MouseEnter:Connect(function()
+                local hex = string.format("#%02X%02X%02X", c[2], c[3], c[4])
+                colorInfoName.Text = c[1]
+                colorInfoHex.Text  = hex
+                colorSwatch.BackgroundColor3 = Color3.fromRGB(c[2], c[3], c[4])
+            end)
+            btn.Activated:Connect(function()
+                local hex = string.format("#%02X%02X%02X", c[2], c[3], c[4])
+                SetClipboard(hex)
+                CreateCustomNotification("COLOR COPIADO", c[1] .. " " .. hex, 2)
+            end)
+        end
 
-        -- Circulo selector (crosshair) dentro del canvas SV
-        local svCursor = Instance.new("Frame", svCanvas)
-        svCursor.Size             = UDim2.new(0, 12, 0, 12)
-        svCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
-        svCursor.Position         = UDim2.new(1, 0, 0, 0)  -- se actualiza
-        svCursor.BackgroundColor3 = Color3.new(1, 1, 1)
-        svCursor.BorderSizePixel  = 0
-        svCursor.ZIndex           = 25
-        Instance.new("UICorner", svCursor).CornerRadius = UDim.new(1, 0)
-        local svCursorStroke = Instance.new("UIStroke", svCursor)
-        svCursorStroke.Color     = Color3.new(0, 0, 0)
-        svCursorStroke.Thickness = 1.5
-
-        -- Input en el canvas SV (drag)
-        local svBtn = Instance.new("TextButton", svCanvas)
-        svBtn.Size                   = UDim2.new(1, 0, 1, 0)
-        svBtn.BackgroundTransparency = 1
-        svBtn.Text                   = ""
-        svBtn.ZIndex                 = 26
-        svBtn.AutoButtonColor        = false
-
-        -- -- Slider de Hue (barra vertical a la derecha del canvas SV) -----------
-        local hueBar = Instance.new("Frame", svWrapper)
-        hueBar.Name             = "HueBar"
-        hueBar.Size             = UDim2.new(0, HUE_W, 0, SV_SIZE)
-        hueBar.AnchorPoint      = Vector2.new(0, 0)
-        hueBar.Position         = UDim2.new(0, SV_SIZE + HUE_GAP, 0, 2)
-        hueBar.BackgroundColor3 = Color3.new(1, 1, 1)
-        hueBar.BorderSizePixel  = 0
-        hueBar.ZIndex           = 21
-        hueBar.ClipsDescendants = true
-        Instance.new("UICorner", hueBar).CornerRadius = UDim.new(0, 4)
-
-        -- Gradiente arcoiris de hue (vertical)
-        local hueGrad = Instance.new("UIGradient", hueBar)
-        hueGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,    Color3.fromHSV(0,   1, 1)),
-            ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17,1, 1)),
-            ColorSequenceKeypoint.new(0.33, Color3.fromHSV(0.33,1, 1)),
-            ColorSequenceKeypoint.new(0.50, Color3.fromHSV(0.50,1, 1)),
-            ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67,1, 1)),
-            ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83,1, 1)),
-            ColorSequenceKeypoint.new(1,    Color3.fromHSV(1,   1, 1)),
-        })
-        hueGrad.Rotation = 90  -- de arriba a abajo
-
-        -- Indicador de hue (linea/triangulo)
-        local hueCursor = Instance.new("Frame", hueBar)
-        hueCursor.Size             = UDim2.new(1, 4, 0, 4)
-        hueCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
-        hueCursor.Position         = UDim2.new(0.5, 0, 0, 0)
-        hueCursor.BackgroundColor3 = Color3.new(1, 1, 1)
-        hueCursor.BorderSizePixel  = 0
-        hueCursor.ZIndex           = 25
-        Instance.new("UICorner", hueCursor).CornerRadius = UDim.new(0, 2)
-        local hueCursorStroke = Instance.new("UIStroke", hueCursor)
-        hueCursorStroke.Color     = Color3.new(0, 0, 0)
-        hueCursorStroke.Thickness = 1
-
-        -- Input en hueBar (drag)
-        local hueBtn = Instance.new("TextButton", hueBar)
-        hueBtn.Size                   = UDim2.new(1, 0, 1, 0)
-        hueBtn.BackgroundTransparency = 1
-        hueBtn.Text                   = ""
-        hueBtn.ZIndex                 = 26
-        hueBtn.AutoButtonColor        = false
-
-        -- -- Panel de info (swatch + nombre hex + RGB) ----------------------------
+        -- Panel de info (swatch + nombre + hex)
         local infoRow = Instance.new("Frame", colorSec)
-        infoRow.Size                   = UDim2.new(1, 0, 0, 38)
+        infoRow.Size                   = UDim2.new(1, 0, 0, 36)
         infoRow.BackgroundColor3       = Color3.fromRGB(30, 6, 10)
         infoRow.BackgroundTransparency = 0.4
         infoRow.BorderSizePixel        = 0
@@ -60474,32 +60585,35 @@ function CreateUseTab()
         Instance.new("UICorner", infoRow).CornerRadius = UDim.new(0, 5)
         Instance.new("UIPadding", infoRow).PaddingLeft = UDim.new(0, 6)
 
+        -- Swatch cuadradito del color activo
         colorSwatch = Instance.new("Frame", infoRow)
-        colorSwatch.Size             = UDim2.new(0, 28, 0, 28)
+        colorSwatch.Size             = UDim2.new(0, 26, 0, 26)
         colorSwatch.AnchorPoint      = Vector2.new(0, 0.5)
         colorSwatch.Position         = UDim2.new(0, 0, 0.5, 0)
-        colorSwatch.BackgroundColor3 = Color3.fromHSV(0, 1, 0.5)
+        colorSwatch.BackgroundColor3 = Color3.fromRGB(240, 248, 255)
         colorSwatch.BorderSizePixel  = 0
         colorSwatch.ZIndex           = 22
         Instance.new("UICorner", colorSwatch).CornerRadius = UDim.new(0, 4)
 
+        -- Nombre del color
         colorInfoName = Instance.new("TextLabel", infoRow)
-        colorInfoName.Size                   = UDim2.new(0.5, 0, 1, 0)
-        colorInfoName.Position               = UDim2.new(0, 36, 0, 0)
+        colorInfoName.Size                   = UDim2.new(0.55, 0, 1, 0)
+        colorInfoName.Position               = UDim2.new(0, 34, 0, 0)
         colorInfoName.BackgroundTransparency = 1
-        colorInfoName.Text                   = "#FF0080"
+        colorInfoName.Text                   = "AliceBlue"
         colorInfoName.TextSize               = 12
-        colorInfoName.FontFace               = Font.fromEnum(Enum.Font.RobotoMono)
+        colorInfoName.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
         colorInfoName.TextColor3             = Color3.fromRGB(255, 255, 255)
         colorInfoName.TextXAlignment         = Enum.TextXAlignment.Left
         colorInfoName.TextYAlignment         = Enum.TextYAlignment.Center
         colorInfoName.ZIndex                 = 22
 
+        -- Hex del color
         colorInfoHex = Instance.new("TextLabel", infoRow)
-        colorInfoHex.Size                   = UDim2.new(0.45, 0, 1, 0)
-        colorInfoHex.Position               = UDim2.new(0.55, 0, 0, 0)
+        colorInfoHex.Size                   = UDim2.new(0.40, 0, 1, 0)
+        colorInfoHex.Position               = UDim2.new(0.60, 0, 0, 0)
         colorInfoHex.BackgroundTransparency = 1
-        colorInfoHex.Text                   = "255, 0, 128"
+        colorInfoHex.Text                   = "#F0F8FF"
         colorInfoHex.TextSize               = 11
         colorInfoHex.FontFace               = Font.fromEnum(Enum.Font.RobotoMono)
         colorInfoHex.TextColor3             = Color3.fromRGB(200, 200, 200)
@@ -60507,127 +60621,20 @@ function CreateUseTab()
         colorInfoHex.TextYAlignment         = Enum.TextYAlignment.Center
         colorInfoHex.ZIndex                 = 22
 
-        -- Hint
+        -- Hint de click
         local hintLabel = Instance.new("TextLabel", colorSec)
-        hintLabel.Size                   = UDim2.new(1, 0, 0, 14)
+        hintLabel.Size                   = UDim2.new(1, 0, 0, 16)
         hintLabel.BackgroundTransparency = 1
-        hintLabel.Text                   = "Arrastra el cuadrado y el slider de hue"
+        hintLabel.Text                   = "Hover = ver color  |  Click = copiar hex"
         hintLabel.TextSize               = 10
         hintLabel.FontFace               = Font.fromEnum(Enum.Font.Gotham)
         hintLabel.TextColor3             = Color3.fromRGB(160, 60, 80)
         hintLabel.TextXAlignment         = Enum.TextXAlignment.Center
         hintLabel.ZIndex                 = 22
 
-        -- -- Funcion central: actualizar todos los elementos visuales -------------
-        _updateAll = function()
-            local c = hsvToColor3(_hue, _sat, _val)
-            local r = math.floor(c.R * 255)
-            local g = math.floor(c.G * 255)
-            local b = math.floor(c.B * 255)
-            local hex = string.format("#%02X%02X%02X", r, g, b)
-
-            -- Swatch y labels
-            colorSwatch.BackgroundColor3 = c
-            colorInfoName.Text = hex
-            colorInfoHex.Text  = r .. ", " .. g .. ", " .. b
-
-            -- Fondo del canvas = hue puro
-            svCanvas.BackgroundColor3 = Color3.fromHSV(_hue, 1, 1)
-
-            -- Cursor SV: X = saturacion, Y = (1-brillo)
-            svCursor.Position = UDim2.new(_sat, 0, 1 - _val, 0)
-
-            -- Cursor Hue: Y = hue dentro de la barra
-            hueCursor.Position = UDim2.new(0.5, 0, _hue, 0)
-        end
-
-        -- Llamada inicial
-        _updateAll()
-
-        -- -- Logica de drag en canvas SV ------------------------------------------
-        local function _onSVInput(inputObj)
-            -- Obtener posicion relativa dentro del canvas
-            local absPos  = svCanvas.AbsolutePosition
-            local absSize = svCanvas.AbsoluteSize
-            local relX = math.clamp((inputObj.Position.X - absPos.X) / absSize.X, 0, 1)
-            local relY = math.clamp((inputObj.Position.Y - absPos.Y) / absSize.Y, 0, 1)
-            _sat = relX
-            _val = 1 - relY
-            _updateAll()
-        end
-
-        svBtn.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _isDraggingSV = true
-                _onSVInput(inp)
-            end
-        end)
-        svBtn.InputChanged:Connect(function(inp)
-            if _isDraggingSV and (inp.UserInputType == Enum.UserInputType.MouseMovement
-                               or inp.UserInputType == Enum.UserInputType.Touch) then
-                _onSVInput(inp)
-            end
-        end)
-        svBtn.InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _isDraggingSV = false
-            end
-        end)
-
-        -- Drag global para no perder el cursor si sale del frame
-        game:GetService("UserInputService").InputChanged:Connect(function(inp)
-            if _isDraggingSV and (inp.UserInputType == Enum.UserInputType.MouseMovement
-                               or inp.UserInputType == Enum.UserInputType.Touch) then
-                _onSVInput(inp)
-            end
-        end)
-        game:GetService("UserInputService").InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _isDraggingSV  = false
-                _isDraggingHue = false
-            end
-        end)
-
-        -- -- Logica de drag en Hue bar --------------------------------------------
-        local function _onHueInput(inputObj)
-            local absPos  = hueBar.AbsolutePosition
-            local absSize = hueBar.AbsoluteSize
-            local relY = math.clamp((inputObj.Position.Y - absPos.Y) / absSize.Y, 0, 1)
-            _hue = relY
-            _updateAll()
-        end
-
-        hueBtn.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _isDraggingHue = true
-                _onHueInput(inp)
-            end
-        end)
-        hueBtn.InputChanged:Connect(function(inp)
-            if _isDraggingHue and (inp.UserInputType == Enum.UserInputType.MouseMovement
-                               or inp.UserInputType == Enum.UserInputType.Touch) then
-                _onHueInput(inp)
-            end
-        end)
-        hueBtn.InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                _isDraggingHue = false
-            end
-        end)
-
-        game:GetService("UserInputService").InputChanged:Connect(function(inp)
-            if _isDraggingHue and (inp.UserInputType == Enum.UserInputType.MouseMovement
-                               or inp.UserInputType == Enum.UserInputType.Touch) then
-                _onHueInput(inp)
-            end
-        end)
-
-        -- -- Boton APPLY COLOR ----------------------------------------------------
+        -- -- Boton APPLY COLOR -------------------------------------------------
+        -- Construye un tema dinamico desde el color seleccionado y repinta
+        -- toggles, bindables, selectores, border y fondo (ImageLabel) del hub.
         local applyBtn = Instance.new("TextButton", colorSec)
         applyBtn.Name                   = "ApplyColorBtn"
         applyBtn.Size                   = UDim2.new(1, -8, 0, 32)
@@ -60714,8 +60721,20 @@ function CreateUseTab()
                 end
             end)
 
+            applyBtn.BackgroundColor3 = dark1
+            applyBtn.TextColor3       = pale
+            applyStroke.Color         = bright
+            task.delay(0.6, function()
+                if applyBtn and applyBtn.Parent then
+                    TweenService:Create(applyBtn, TweenInfo.new(0.3), {
+                        BackgroundColor3 = dark1
+                    }):Play()
+                end
+            end)
+
             local hex  = string.format("#%02X%02X%02X", r, g, b)
-            CreateCustomNotification("HUB RECOLOREADO", hex, 3)
+            local name = colorInfoName.Text or "Color"
+            CreateCustomNotification("HUB RECOLOREADO", name .. " " .. hex, 3)
         end)
 
         -- Boton secundario: restaurar tema original
