@@ -38955,12 +38955,12 @@ function CreatePremiumTab()
                 dualKnife = true,
             },
             {
-                -- Knife custom: parado mirando al frente
-                name      = "Custom",
-                meshId    = "rbxassetid://124317054263790",
-                texId     = "rbxassetid://129462008300983",
-                scale     = Vector3.new(1, 1, 1),
-                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 0, -1, 0, 1, 0),
+                -- Knife: mesh custom con agarre dual knife
+                name      = "Knife",
+                meshId    = "rbxassetid://13662643071",
+                texId     = "rbxassetid://13662522227",
+                scale     = Vector3.new(0.059, 0.059, 0.059),
+                grip      = CFrame.new(0.0154595375, -0.020000000, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualKnife = true,
             },
 
