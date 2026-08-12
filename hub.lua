@@ -38937,12 +38937,12 @@ function CreatePremiumTab()
                 dualKnife = true,
             },
             {
-                -- Katana Mesh: MeshPart -- agarre del Dual Knife
+                -- Katana Mesh: MeshPart -- agarre del Dual Knife, rotado para quedar parado
                 name      = "Katana Mesh",
-                meshId    = "rbxassetid://126843690324711",
+                meshId    = "rbxassetid://114324586478858",
                 texId     = "rbxassetid://105280213845048",
-                scale     = Vector3.new(0.056, 0.056, 0.056),
-                grip      = _KNIFE_GRIP_STD,
+                scale     = Vector3.new(0.08, 0.08, 0.08),
+                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualKnife = true,
             },
         }
