@@ -39176,7 +39176,7 @@ function CreatePremiumTab()
                 meshId    = "rbxassetid://431951745",
                 texId     = "rbxassetid://431951748",
                 scale     = Vector3.new(0.056, 0.056, 0.056),
-                -- FIX ORIENTACION: grip corregido para que el cañon apunte al frente (-Z).
+                -- FIX ORIENTACION: grip corregido para que el ca?on apunte al frente (-Z).
                 -- El grip anterior era igual al Luger (rotacion lateral) causando que la
                 -- escopeta saliera de costado en vez de hacia adelante.
                 -- Rotacion: Y->-Z, Z->Y (giro -90 grados en X) igual que Bacon,
@@ -39820,6 +39820,24 @@ function CreatePremiumTab()
                     end
                     if not shootRem or not shootRem:IsA("RemoteEvent") then return end
 
+                    -- REEMPLAZAR SONIDO: silenciar el Gunshot original del Handle
+                    -- y cambiar su SoundId al de escopeta para que el juego use el correcto
+                    pcall(function()
+                        local handle = gun:FindFirstChild("Handle")
+                        if handle then
+                            local origShot = handle:FindFirstChild("Gunshot")
+                            if origShot and origShot:IsA("Sound") then
+                                -- Guardar valores originales para restaurar despues
+                                _skinState._origGunshotId  = origShot.SoundId
+                                _skinState._origGunshotVol = origShot.Volume
+                                -- Reemplazar SoundId por el de escopeta y subir volumen
+                                origShot.SoundId = _soundId
+                                origShot.Volume  = 1
+                                _skinState._hookedGunshotRef = origShot
+                            end
+                        end
+                    end)
+
                     -- Crear Sound en el HRP del jugador para que se escuche posicionado
                     local function _playShot()
                         pcall(function()
@@ -39892,6 +39910,17 @@ function CreatePremiumTab()
                     pcall(function() _skinState._shotCharConn:Disconnect() end)
                     _skinState._shotCharConn = nil
                 end
+                -- RESTAURAR Gunshot original del Handle si fue reemplazado
+                pcall(function()
+                    local ref = _skinState._hookedGunshotRef
+                    if ref and ref.Parent then
+                        if _skinState._origGunshotId  then ref.SoundId = _skinState._origGunshotId  end
+                        if _skinState._origGunshotVol then ref.Volume  = _skinState._origGunshotVol end
+                    end
+                    _skinState._hookedGunshotRef  = nil
+                    _skinState._origGunshotId     = nil
+                    _skinState._origGunshotVol    = nil
+                end)
             end
             -- -- FIN HOOK SONIDO ESCOPETA ---------------------------------------------
         end)
