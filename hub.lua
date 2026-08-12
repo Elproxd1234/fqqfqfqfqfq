@@ -38936,6 +38936,15 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
+            {
+                -- Icebreaker: MeshPart -- IDs capturados via MM2 Skin Analyzer
+                name      = "Icebreaker",
+                meshId    = "rbxassetid://6124173614",
+                texId     = "rbxassetid://6124173821",
+                scale     = Vector3.new(1.2, 1.2, 1.2),
+                grip      = _KNIFE_GRIP_STD,
+                dualKnife = true,
+            },
 
         }
 
