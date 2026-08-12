@@ -38914,8 +38914,8 @@ function CreatePremiumTab()
         -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
 
-        -- Grip estandar testeado y confirmado para todos los knives (dualKnife)
-        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, -0, 0, 0, 1, 0, -1, 0)
+        -- Grip estandar para todos los knives -- rotacion PARADO (vertical, no acostado)
+        local _KNIFE_GRIP_STD = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1)
 
         local _SC_KNIFE_SKINS = {
             {
@@ -38936,15 +38936,7 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
-            {
-                -- Katana Mesh: MeshPart -- agarre del Dual Knife, rotado para quedar parado
-                name      = "Katana Mesh",
-                meshId    = "rbxassetid://114324586478858",
-                texId     = "rbxassetid://105280213845048",
-                scale     = Vector3.new(0.08, 0.08, 0.08),
-                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 1, 0, 0, 0, -1),
-                dualKnife = true,
-            },
+
         }
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
@@ -39159,7 +39151,7 @@ function CreatePremiumTab()
 
             -- GRIP: NO sobreescribir cuando Dual Knife esta activo.
             -- El DK usa el RightGrip real del tool para calcular el weld espejo;
-            -- pisarlo con _KNIFE_GRIP_STD deja el knife "acostado" en la mano izquierda.
+            -- _KNIFE_GRIP_STD ya usa rotacion PARADO; no pisar el grip cuando Dual Knife esta activo.
             local _isDualKnifeActive = _G._dualKnifeEnabled == true
             if not _isDualKnifeActive then
                 pcall(function() tool.Grip = skin.grip end)
