@@ -39222,7 +39222,7 @@ function CreatePremiumTab()
                 -- se necesita girar +90° en X: Y->Z, Z->-Y.
                 -- Matriz resultante: Right=(1,0,0), Up=(0,0,1), Look=(0,-1,0)
                 -- Posicion Y baja el punto de agarre a la culata; Z centra en el eje.
-                grip      = CFrame.new(0, -0.55, 0, 1, 0, 0, 0, 0, 1, 0, -1, 0),
+                grip      = CFrame.new(0, -0.759000003, -0.314999998, 1, 0, 0, 0, 0, -1, 0, 1, 0),
                 dualGun   = true,
                 shotSound = "rbxassetid://7441077838",  -- sonido custom al disparar
             },
@@ -39856,19 +39856,18 @@ function CreatePremiumTab()
                     end
                     if not shootRem or not shootRem:IsA("RemoteEvent") then return end
 
-                    -- REEMPLAZAR SONIDO: silenciar el Gunshot original del Handle
-                    -- y cambiar su SoundId al de escopeta para que el juego use el correcto
+                    -- SILENCIAR Gunshot original del Handle sin tocar SoundId.
+                    -- NO cambiamos SoundId porque el GunClient de MM2 lo usa internamente
+                    -- para validar el disparo; cambiarlo bloquea el shoot.
+                    -- Solo bajamos Volume a 0 para que no se escuche el sonido viejo,
+                    -- y el sonido custom de escopeta lo reproduce _playShot() por separado.
                     pcall(function()
                         local handle = gun:FindFirstChild("Handle")
                         if handle then
                             local origShot = handle:FindFirstChild("Gunshot")
                             if origShot and origShot:IsA("Sound") then
-                                -- Guardar valores originales para restaurar despues
-                                _skinState._origGunshotId  = origShot.SoundId
                                 _skinState._origGunshotVol = origShot.Volume
-                                -- Reemplazar SoundId por el de escopeta y subir volumen
-                                origShot.SoundId = _soundId
-                                origShot.Volume  = 1
+                                origShot.Volume = 0
                                 _skinState._hookedGunshotRef = origShot
                             end
                         end
@@ -39946,16 +39945,14 @@ function CreatePremiumTab()
                     pcall(function() _skinState._shotCharConn:Disconnect() end)
                     _skinState._shotCharConn = nil
                 end
-                -- RESTAURAR Gunshot original del Handle si fue reemplazado
+                -- RESTAURAR Volume del Gunshot original del Handle
                 pcall(function()
                     local ref = _skinState._hookedGunshotRef
                     if ref and ref.Parent then
-                        if _skinState._origGunshotId  then ref.SoundId = _skinState._origGunshotId  end
-                        if _skinState._origGunshotVol then ref.Volume  = _skinState._origGunshotVol end
+                        if _skinState._origGunshotVol then ref.Volume = _skinState._origGunshotVol end
                     end
-                    _skinState._hookedGunshotRef  = nil
-                    _skinState._origGunshotId     = nil
-                    _skinState._origGunshotVol    = nil
+                    _skinState._hookedGunshotRef = nil
+                    _skinState._origGunshotVol   = nil
                 end)
             end
             -- -- FIN HOOK SONIDO ESCOPETA ---------------------------------------------
