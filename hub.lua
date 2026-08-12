@@ -38854,19 +38854,27 @@ function CreatePremiumTab()
 
         local _SC_GUN_SKINS = {
             {
+                -- RayGun: skin personalizada
+                name   = "RayGun",
+                meshId = "rbxassetid://634222143",
+                texId  = "rbxassetid://634221905",
+                scale  = Vector3.new(1, 1, 1),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                dualGun = true,
+            },
+            {
                 name   = "Luger",
                 meshId = "http://www.roblox.com/asset/?id=95356090",
                 texId  = "http://www.roblox.com/asset/?id=126534866",
                 scale  = Vector3.new(1.7999999523162842, 1.7999999523162842, 1.7999999523162842),
-                -- GRIP: mismo agarre que ElderwoodGun
                 grip   = CFrame.new(
-                    -0.567565918, -0.124303818, -0.0424308777,
-                    -0.000212550163, 0.0230092816, -0.999735236,
-                    -0.011778634,   0.999665856,   0.0230101906,
-                     0.99993062,    0.0117804073,  5.85317612e-05
+                    0, -0.5, 0.5,
+                    0.999924004,    -0.00871835742, -0.00871835742,
+                    0.00871835742,   0.999961972,   -3.80063248e-05,
+                    0.00871835742,  -3.80063248e-05,  0.999961972
                 ),
+                dualGun = true,
             },
-
             {
                 -- Bacon: SpecialMesh, Grip exacto del scanner, GunClient confirmado
                 name   = "Bacon",
@@ -38887,12 +38895,7 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://4210029922",
                 texId  = "rbxassetid://4210038158",
                 scale  = Vector3.new(0.035, 0.035, 0.035),
-                grip   = CFrame.new(
-                    -0.567565918, -0.124303818, -0.0424308777,
-                    -0.000212550163, 0.0230092816, -0.999735236,
-                    -0.011778634,   0.999665856,   0.0230101906,
-                     0.99993062,    0.0117804073,  5.85317612e-05
-                ),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
@@ -38902,12 +38905,7 @@ function CreatePremiumTab()
                 texId  = "rbxassetid://15409041564",
                 scale  = Vector3.new(0.08, 0.08, 0.08),
                 -- GRIP: mismo agarre que ElderwoodGun
-                grip   = CFrame.new(
-                    -0.567565918, -0.124303818, -0.0424308777,
-                    -0.000212550163, 0.0230092816, -0.999735236,
-                    -0.011778634,   0.999665856,   0.0230101906,
-                     0.99993062,    0.0117804073,  5.85317612e-05
-                ),
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
@@ -38915,13 +38913,9 @@ function CreatePremiumTab()
                 name   = "Harvester",
                 meshId = "rbxassetid://7775027413",
                 texId  = "http://www.roblox.com/asset/?id=7775245551",
-                scale  = Vector3.new(0.0599999986588955, 0.0500000000745058, 0.0500000000745058),
-                grip   = CFrame.new(
-                    0, -0.53662109375, 0.498260498046875,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
-                ),
+                scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
+                -- GRIP: mismo agarre que ElderwoodGun
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
             {
@@ -38930,26 +38924,8 @@ function CreatePremiumTab()
                 meshId = "rbxassetid://11868991644",
                 texId  = "rbxassetid://11869075814",
                 scale  = Vector3.new(0.0599999986588955, 0.0500000000745058, 0.0500000000745058),
-                grip   = CFrame.new(
-                    0, -0.581863403320312, 0.0323901176452637,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
-                ),
-                dualGun = true,
-            },
-            {
-                -- RedLuger: skin personalizada
-                name   = "Luger",
-                meshId = "http://www.roblox.com/asset/?id=95356090",
-                texId  = "http://www.roblox.com/asset/?id=126534866",
-                scale  = Vector3.new(1.79999999523162842, 1.79999999523162842, 1.79999999523162842),
-                grip   = CFrame.new(
-                    0, -0.5, 0.5,
-                    1, 0, 0,
-                    0, 0, -1,
-                    0, 1, 0
-                ),
+                -- GRIP: mismo agarre que ElderwoodGun
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
         }
@@ -49214,7 +49190,7 @@ function CreateCombatTab()
                 local char = LocalPlayer.Character
                 if not char then return end
                 -- FIX: buscar la tool que matchea los keywords del modo activo,
-                -- NO la primera tool gen?rica (evita clonar la Gun cuando Dual Knife est? activo)
+                -- NO la primera tool genérica (evita clonar la Gun cuando Dual Knife está activo)
                 local tool = nil
                 for _, t in ipairs(char:GetChildren()) do
                     if t:IsA("Tool") and _dualMatchKeywords(t, keywordList) then
@@ -49240,9 +49216,7 @@ function CreateCombatTab()
                 end
                 local rHand  = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
                 local lHand  = char:FindFirstChild("LeftHand")  or char:FindFirstChild("Left Arm")
-                -- FIX: filtrar por tipo para evitar agarrar un Script/StringValue con ese nombre
-                local _gripRaw = rHand and rHand:FindFirstChild("RightGrip")
-                local grip = (_gripRaw and (_gripRaw:IsA("Motor6D") or _gripRaw:IsA("Weld"))) and _gripRaw or nil
+                local grip   = rHand and rHand:FindFirstChild("RightGrip")
                 if not (handle and grip and lHand) then return end
                 -- Verificar que el handle pertenece a la tool correcta (no a otra tool del char)
                 if handle.Parent ~= tool then return end
@@ -49250,35 +49224,9 @@ function CreateCombatTab()
                 if existing then
                     local w = existing:FindFirstChild("MirrorWeld")
                     if w then
-                        if keywordList == _dualGunKeywords then
-                            -- DUAL GUN: detecci?n de agarre del HUB_celeste.
-                            -- grip.C0/C1 del RightGrip ya refleja el skin aplicado
-                            -- por _scApply (tool.Grip = skin.grip -> Roblox propaga al Motor6D).
-                            local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                            w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                            w.C1 = grip.C1
-                        else
-                            -- DUAL KNIFE: l?gica original ? skin knife override si aplica,
-                            -- fallback a grip.C0 espejado + C1 identidad.
-                            local _usedSkinGrip = false
-                            local sc = _G._skinChangerState
-                            if sc and sc.enabled and sc.mode == "knife" then
-                                local _skinList = _G._SC_KNIFE_SKINS or {}
-                                local _cSkin = _skinList[sc.skinIdx] or _skinList[1]
-                                if _cSkin and _cSkin.dualKnife and _cSkin.grip then
-                                    local sg = _cSkin.grip
-                                    local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = sg:GetComponents()
-                                    w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                                    w.C1 = CFrame.new()
-                                    _usedSkinGrip = true
-                                end
-                            end
-                            if not _usedSkinGrip then
-                                local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                                w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                                w.C1 = CFrame.new()
-                            end
-                        end
+                        local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
+                        w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                        w.C1 = grip.C1
                     end
                     -- FIX DUAL INVISIBLE: mantener el clon visible aunque el handle cambie de transparencia
                     pcall(function() existing.Transparency = 0; existing.LocalTransparencyModifier = 0 end)
@@ -49319,63 +49267,32 @@ function CreateCombatTab()
                 weld.Name  = "MirrorWeld"
                 weld.Part0 = lHand
                 weld.Part1 = clon
+                local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
+                weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                weld.C1 = grip.C1
 
-                local isDualGun   = (keywordList == _dualGunKeywords)
-                local isDualKnife = (keywordList == _dualKnifeKeywords)
-
+                -- HOOK PREMIUM SKIN: solo aplicar skin al clon si es Dual Gun (no Dual Knife)
+                -- FIX: antes aplicaba siempre la skin de gun incluso al clon del knife
+                local isDualGun = (keywordList == _dualGunKeywords)
                 if isDualGun then
-                    -- DUAL GUN: detecci?n de agarre del HUB_celeste.
-                    -- grip.C0/C1 del RightGrip ya tiene el grip del skin activo.
-                    local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                    weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                    weld.C1 = grip.C1
-                    -- Aplicar mesh/texture del skin al clon
                     pcall(function()
                         local sc = _G._skinChangerState
                         if sc and sc.enabled and sc.mode == "gun" then
                             local _skinList = _G._SC_GUN_SKINS or {}
                             local _cSkin = _skinList[sc.skinIdx] or _skinList[1]
-                            if _cSkin then
-                                for _, obj in pairs(clon:GetDescendants()) do
-                                    if obj:IsA("SpecialMesh") then
-                                        pcall(function()
-                                            obj.MeshId    = _cSkin.meshId
-                                            obj.TextureId = _cSkin.texId
-                                            obj.Scale     = _cSkin.scale
-                                        end)
-                                    elseif obj:IsA("MeshPart") then
-                                        pcall(function() obj.TextureID = _cSkin.texId end)
-                                    end
+                            for _, obj in pairs(clon:GetDescendants()) do
+                                if obj:IsA("SpecialMesh") then
+                                    pcall(function()
+                                        obj.MeshId    = _cSkin.meshId
+                                        obj.TextureId = _cSkin.texId
+                                        obj.Scale     = _cSkin.scale
+                                    end)
+                                elseif obj:IsA("MeshPart") then
+                                    pcall(function() obj.TextureID = _cSkin.texId end)
                                 end
                             end
                         end
                     end)
-                else
-                    -- DUAL KNIFE: l?gica original ? skin knife override si aplica,
-                    -- fallback a grip.C0 espejado + C1 identidad.
-                    local _usedSkinGrip = false
-                    if isDualKnife then
-                        local sc = _G._skinChangerState
-                        if sc and sc.enabled and sc.mode == "knife" then
-                            local _skinList = _G._SC_KNIFE_SKINS or {}
-                            local _cSkin = _skinList[sc.skinIdx] or _skinList[1]
-                            if _cSkin and _cSkin.dualKnife and _cSkin.grip then
-                                local sg = _cSkin.grip
-                                local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = sg:GetComponents()
-                                -- FIX ESPEJO ZERQON: formula M*R*M donde M=diag(-1,1,1)
-                                weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                                weld.C1 = grip.C1
-                                _usedSkinGrip = true
-                            end
-                        end
-                    end
-                    if not _usedSkinGrip then
-                        local origGrip = _getOrigGripCF and _getOrigGripCF() or grip.C0
-                        local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = origGrip:GetComponents()
-                        -- FIX ESPEJO ZERQON: formula M*R*M donde M=diag(-1,1,1)
-                        weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
-                        weld.C1 = grip.C1
-                    end
                 end
             end)
 
@@ -49401,8 +49318,6 @@ function CreateCombatTab()
                 local knifeStabbed = events and events:FindFirstChild("KnifeStabbed")
 
                 -- -- LMB/Touch = SLASH cuando SA est OFF (SA lo maneja si est ON) --
-                -- FIX: sin _sp() para que _dkPlaySlot->_dkKillNativeSlash actue en el mismo frame.
-                -- FIX: usar _dkToggle local en vez de _G._dualSlashToggle (global compartido).
                 if isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
                     and not (KnifeSAState and KnifeSAState.enabled) then
                     if state.isAttacking then return end
@@ -49410,63 +49325,54 @@ function CreateCombatTab()
                     if now - (state._lastStab or -999) < 0.85 then return end
                     state.isAttacking = true
                     state._lastStab = now
-                    _dkToggle = not _dkToggle
-                    -- Llamada directa (sin spawn) para que killNativeSlash actue en este frame
-                    if _dkPlaySlot then
-                        _dkPlaySlot(_dkToggle and "slotA" or "slotB", 1.0)
-                    end
+                    _G._dualSlashToggle = not _G._dualSlashToggle
+                    -- Usar _dkPlaySlot (definida despues del toggle, accesible via upvalue del closure externo)
+                    _sp(function()
+                        if _dkPlaySlot then
+                            _dkPlaySlot(_G._dualSlashToggle and "slotA" or "slotB", 1.0)
+                        end
+                    end)
                     local ev = tool:FindFirstChild("Events")
                     local ks = ev and ev:FindFirstChild("KnifeStabbed")
                     if ks then pcall(function() ks:FireServer() end) end
                     _dl(0.85, function() state.isAttacking = false end)
 
-                -- -- RMB/Touch = THROW (Dual Knife ON) ---------------------------
-                -- FIX: RMB en Dual Knife debe tirar el cuchillo (igual que el inputConn
-                -- del toggle), no reproducir una animacion hardcodeada de DualStab
-                -- con un ID externo que puede no existir.
+                -- -- RMB/Touch = DUALSTAB ANIMATION (Dual Knife ON) ---------------------------
                 elseif isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch) then
+                    local now = os.clock()
+                    if now - (state._lastThrow or -999) < 0.8 then return end
+                    state._lastThrow = now
+                    -- Reproducir animacion DualStab
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local animator = hum and hum:FindFirstChildOfClass("Animator")
+                    if animator then
+                        local animObj = Instance.new("Animation")
+                        animObj.AnimationId = "rbxassetid://2470501967"
+                        local ok, track = pcall(function() return animator:LoadAnimation(animObj) end)
+                        if ok and track then
+                            pcall(function() track:Play(0.05) end)
+                        end
+                    end
+                    -- Activar stab en el servidor
+                    local ev = tool:FindFirstChild("Events")
+                    local ks = ev and ev:FindFirstChild("KnifeStabbed")
+                    if ks then pcall(function() ks:FireServer() end) end
+                    _dl(0.8, function() state.isAttacking = false end)
+
+                -- -- LMB/Touch = THROW (modo normal sin Dual) --------------------
+                elseif not isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                    -- Dual Gun: LMB lanza
+                    -- (solo si Knife SA no est activo  si SA est ON, l maneja el LMB)
+                    if KnifeSAState and KnifeSAState.enabled then return end
+                    if not knifeThrown then return end
                     local now = os.clock()
                     if now - (state._lastThrow or -999) < 1.0 then return end
                     state._lastThrow = now
-                    _dkStopAll()
                     local myHRP = char:FindFirstChild("HumanoidRootPart")
-                    local cam   = workspace.CurrentCamera
-                    local targetCF = myHRP
-                        and CFrame.new(myHRP.Position, myHRP.Position + cam.CFrame.LookVector * 100)
+                    local cam = workspace.CurrentCamera
+                    local targetCF = myHRP and CFrame.new(myHRP.Position, myHRP.Position + cam.CFrame.LookVector * 100)
                         or cam.CFrame
-                    if knifeThrown then pcall(function() knifeThrown:FireServer(targetCF, targetCF) end) end
-
-                -- -- LMB/Touch = SHOOT (Dual Gun) ----------------------------------
-                elseif not isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                    -- Dual Gun: LMB dispara usando el remote Shoot de la gun
-                    -- (igual que el GunClient real; no usa KnifeThrown que es del knife)
-                    local now = os.clock()
-                    if now - (state._lastThrow or -999) < 0.6 then return end
-                    state._lastThrow = now
-                    local shootR = getShootRemote and getShootRemote(tool)
-                    if not shootR then return end
-                    local myHRP = char:FindFirstChild("HumanoidRootPart")
-                    local cam   = workspace.CurrentCamera
-                    local gra   = myHRP and myHRP:FindFirstChild("GunRaycastAttachment")
-                    local originPos = (gra and gra.WorldPosition)
-                        or (cam and cam.CFrame.Position)
-                        or (myHRP and myHRP.Position + Vector3.new(0, 1.5, 0))
-                    local targetPos = originPos + (cam and cam.CFrame.LookVector * 500 or Vector3.new(0, 0, -500))
-                    local graWorldCF = gra and gra.WorldCFrame or nil
-                    local originCF, targetCF = buildShootCFrames(originPos, targetPos, graWorldCF)
-                    if not originCF then
-                        originCF = graWorldCF or (myHRP and myHRP.CFrame) or cam.CFrame
-                        local dir = targetPos - originPos
-                        targetCF = dir.Magnitude > 0.01
-                            and CFrame.lookAt(targetPos, originPos)
-                            or (cam and cam.CFrame or originCF)
-                    end
-                    -- Firma 1: Shoot:FireServer(originCF, targetCF) -- GunClient clasico
-                    local ok = pcall(function() shootR:FireServer(originCF, targetCF) end)
-                    if not ok then
-                        -- Firma 2: Shoot:FireServer(1, targetPos) -- GunClient alternativo
-                        pcall(function() shootR:FireServer(1, targetPos) end)
-                    end
+                    pcall(function() knifeThrown:FireServer(targetCF, targetCF) end)
                 end
             end)
         end
