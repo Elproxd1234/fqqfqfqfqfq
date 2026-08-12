@@ -31062,6 +31062,196 @@ function CreateWorldUI_Emotes()
         end
     end
 
+
+    -- ============================================================
+    -- ANIMATION CHANGER -- Selector de animaciones integrado
+    -- ============================================================
+    local _animSec = CreateSection(leftColumn, "", "ANIMATION CHANGER", Color3.fromRGB(80, 20, 120))
+
+    local ANIM_CATEGORIES = {
+        {
+            name  = "Normal",
+            color = Color3.fromRGB(0, 210, 255),
+            anims = {
+                { name = "Ninja",     idle1 = "656117400", idle2 = "656118341", walk = "656121766", run = "656118852", jump = "656117878", climb = "656114359", fall = "656115606" },
+                { name = "Levitation",idle1 = "616006778", idle2 = "616008087", walk = "616013216", run = "616010382", jump = "616008936", climb = "616003713", fall = "616005863" },
+                { name = "Werewolf",  idle1 = "1083195517",idle2 = "1083214717",walk = "1083178339",run = "1083216690",jump = "1083218792",climb = "1083182000",fall = "1083189019" },
+                { name = "Stylish",   idle1 = "616136790", idle2 = "616138447", walk = "616146177", run = "616140816", jump = "616139451", climb = "616133594", fall = "616134815" },
+                { name = "Robot",     idle1 = "616088211", idle2 = "616089559", walk = "616095330", run = "616091570", jump = "616090535", climb = "616086039", fall = "616087089" },
+                { name = "Bubbly",    idle1 = "910004836", idle2 = "910009958", walk = "910034870", run = "910025107", jump = "910016857", climb = nil,         fall = "910001910" },
+                { name = "Cartoony",  idle1 = "742637544", idle2 = "742638445", walk = "742640026", run = "742638842", jump = "742637942", climb = "742636889", fall = "742637151" },
+                { name = "SuperHero", idle1 = "616111295", idle2 = "616113536", walk = "616122287", run = "616117076", jump = "616115533", climb = "616104706", fall = "616108001" },
+                { name = "Knight",    idle1 = "657595757", idle2 = "657568135", walk = "657552124", run = "657564596", jump = "658409194", climb = "658360781", fall = "657600338" },
+                { name = "Zombie",    idle1 = "616158929", idle2 = "616160636", walk = "616168032", run = "616163682", jump = "616161997", climb = "616156119", fall = "616157476" },
+                { name = "Elder",     idle1 = "845397899", idle2 = "845400520", walk = "845403856", run = "845386501", jump = "845398858", climb = "845392038", fall = "845396048" },
+                { name = "Mage",      idle1 = "707742142", idle2 = "707855907", walk = "707897309", run = "707861613", jump = "707853694", climb = "707826056", fall = "707829716" },
+                { name = "Toy",       idle1 = "782841498", idle2 = "782845736", walk = "782843345", run = "782842708", jump = "782847020", climb = "782843869", fall = "782846423" },
+                { name = "Astronaut", idle1 = "891621366", idle2 = "891633237", walk = "891667138", run = "891636393", jump = "891627522", climb = "891609353", fall = "891617961" },
+                { name = "Pirate",    idle1 = "750781874", idle2 = "750782770", walk = "750785693", run = "750783738", jump = "750782230", climb = "750779899", fall = "750780242" },
+                { name = "Vampire",   idle1 = "1083445855",idle2 = "1083450166",walk = "1083473930",run = "1083462077",jump = "1083455352",climb = "1083439238",fall = "1083443587" },
+            },
+        },
+        {
+            name  = "Special",
+            color = Color3.fromRGB(255, 100, 200),
+            anims = {
+                { name = "Popstar",   idle1 = "1212900985",idle2 = "1150842221",walk = "1212980338",run = "1212980348",jump = "1212954642",climb = "1213044953",fall = "1212900995" },
+                { name = "Patrol",    idle1 = "1149612882",idle2 = "1150842221",walk = "1151231493",run = "1150967949",jump = "1148811837",climb = "1148811837",fall = "1148863382" },
+                { name = "Confident", idle1 = "1069977950",idle2 = "1069987858",walk = "1070017263",run = "1070001516",jump = "1069984524",climb = "1069946257",fall = "1069973677" },
+                { name = "Sneaky",    idle1 = "1132473842",idle2 = "1132477671",walk = "1132510133",run = "1132494274",jump = "1132489853",climb = "1132461372",fall = "1132469004" },
+                { name = "Princess",  idle1 = "941003647", idle2 = "941013098", walk = "941028902", run = "941015281", jump = "941008832", climb = "940996062", fall = "941000007" },
+                { name = "Cowboy",    idle1 = "1014390418",idle2 = "1014398616",walk = "1014421541",run = "1014401683",jump = "1014394726",climb = "1014380606",fall = "1014384571" },
+                { name = "Ghost",     idle1 = "616006778", idle2 = "616008087", walk = "616013216", run = "616013216", jump = "616008936", climb = nil,         fall = "616005863" },
+            },
+        },
+        {
+            name  = "Other",
+            color = Color3.fromRGB(100, 255, 150),
+            anims = {
+                { name = "None",         idle1 = "0", idle2 = "0", walk = "0", run = "0", jump = "0", climb = "0", fall = "0" },
+                { name = "Anthro",       idle1 = "2510196951",idle2 = "2510197257",walk = "2510202577",run = "2510198475",jump = "2510197830",climb = "2510192778",fall = "2510195892" },
+            },
+        },
+    }
+
+    local function _applyAnimation(anim)
+        local char = LocalPlayer.Character
+        if not char then CreateCustomNotification("ANIM", "Sin personaje.", 2); return end
+        local animScript = char:FindFirstChild("Animate")
+        if not animScript then CreateCustomNotification("ANIM", "No se encontro Animate.", 2); return end
+        pcall(function()
+            if animScript.idle.Animation1 then animScript.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.idle1 end
+            if animScript.idle.Animation2 then animScript.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.idle2 end
+            if animScript.walk and animScript.walk.WalkAnim then animScript.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.walk end
+            if animScript.run  and animScript.run.RunAnim   then animScript.run.RunAnim.AnimationId   = "http://www.roblox.com/asset/?id=" .. anim.run  end
+            if animScript.jump and animScript.jump.JumpAnim then animScript.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.jump end
+            if anim.climb and animScript.climb and animScript.climb.ClimbAnim then animScript.climb.ClimbAnim.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.climb end
+            if animScript.fall and animScript.fall.FallAnim then animScript.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=" .. anim.fall end
+        end)
+        -- Aplicar saltando para que tome efecto inmediato
+        pcall(function() char.Humanoid.Jump = true end)
+        CreateCustomNotification("ANIM CHANGER", " " .. anim.name .. " aplicado", 2)
+    end
+
+    -- Contenedor principal del selector
+    local _animContainer = Instance.new("Frame", leftColumn)
+    _animContainer.Name                   = "AnimChangerContainer"
+    _animContainer.Size                   = UDim2.new(1, -4, 0, 0)
+    _animContainer.AutomaticSize          = Enum.AutomaticSize.Y
+    _animContainer.BackgroundColor3       = Color3.fromRGB(8, 5, 20)
+    _animContainer.BackgroundTransparency = 0.6
+    _animContainer.BorderSizePixel        = 0
+    Instance.new("UICorner", _animContainer).CornerRadius = UDim.new(0, 12)
+    local _acStroke = Instance.new("UIStroke", _animContainer)
+    _acStroke.Color = Color3.fromRGB(130, 0, 255); _acStroke.Thickness = 1.5; _acStroke.Transparency = 0.2
+    local _acLayout = Instance.new("UIListLayout", _animContainer)
+    _acLayout.Padding = UDim.new(0, 6)
+    _acLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    local _acPad = Instance.new("UIPadding", _animContainer)
+    _acPad.PaddingTop = UDim.new(0, 8); _acPad.PaddingBottom = UDim.new(0, 10)
+    _acPad.PaddingLeft = UDim.new(0, 6); _acPad.PaddingRight = UDim.new(0, 6)
+
+    -- Tabs de categoria
+    local _tabRow = Instance.new("Frame", _animContainer)
+    _tabRow.Name              = "TabRow"
+    _tabRow.Size              = UDim2.new(1, 0, 0, 28)
+    _tabRow.BackgroundTransparency = 1
+    _tabRow.BorderSizePixel   = 0
+    local _tabLayout = Instance.new("UIListLayout", _tabRow)
+    _tabLayout.FillDirection  = Enum.FillDirection.Horizontal
+    _tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    _tabLayout.Padding        = UDim.new(0, 4)
+
+    -- Grid de botones de animacion
+    local _gridFrame = Instance.new("Frame", _animContainer)
+    _gridFrame.Name              = "AnimGrid"
+    _gridFrame.Size              = UDim2.new(1, 0, 0, 0)
+    _gridFrame.AutomaticSize     = Enum.AutomaticSize.Y
+    _gridFrame.BackgroundTransparency = 1
+    _gridFrame.BorderSizePixel   = 0
+    local _gridLayout = Instance.new("UIGridLayout", _gridFrame)
+    _gridLayout.CellSize          = UDim2.new(0.5, -3, 0, 26)
+    _gridLayout.CellPadding       = UDim2.new(0, 4, 0, 4)
+    _gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    _gridLayout.SortOrder         = Enum.SortOrder.LayoutOrder
+
+    local _currentCatIdx = 1
+    local _tabBtns = {}
+
+    local function _showCategory(catIdx)
+        _currentCatIdx = catIdx
+        -- Limpiar grid
+        for _, c in ipairs(_gridFrame:GetChildren()) do
+            if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
+        end
+        local cat = ANIM_CATEGORIES[catIdx]
+        -- Resaltar tab activo
+        for ti, tb in ipairs(_tabBtns) do
+            if ti == catIdx then
+                tb.BackgroundTransparency = 0.1
+                tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                tb.BackgroundTransparency = 0.7
+                tb.TextColor3 = Color3.fromRGB(180, 180, 180)
+            end
+        end
+        -- Crear botones de anims
+        for order, anim in ipairs(cat.anims) do
+            local captured = anim
+            local btn = Instance.new("TextButton", _gridFrame)
+            btn.Name                   = "AnimBtn_" .. anim.name
+            btn.LayoutOrder            = order
+            btn.BackgroundColor3       = Color3.fromRGB(20, 10, 45)
+            btn.BackgroundTransparency = 0.3
+            btn.BorderSizePixel        = 0
+            btn.Text                   = anim.name
+            btn.TextColor3             = cat.color
+            btn.TextSize               = 11
+            btn.Font                   = Enum.Font.Montserrat
+            btn.AutoButtonColor        = false
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            local btnStroke = Instance.new("UIStroke", btn)
+            btnStroke.Color = cat.color; btnStroke.Thickness = 1; btnStroke.Transparency = 0.55
+            btn.MouseEnter:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundTransparency = 0.05, TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.12), {Transparency = 0.1}):Play()
+            end)
+            btn.MouseLeave:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundTransparency = 0.3, TextColor3 = cat.color}):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.12), {Transparency = 0.55}):Play()
+            end)
+            btn.Activated:Connect(function()
+                _applyAnimation(captured)
+                TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(60, 20, 100)}):Play()
+                task.delay(0.25, function()
+                    pcall(function() TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(20, 10, 45)}):Play() end)
+                end)
+            end)
+        end
+    end
+
+    -- Crear tabs
+    for i, cat in ipairs(ANIM_CATEGORIES) do
+        local capturedIdx = i
+        local tb = Instance.new("TextButton", _tabRow)
+        tb.Name                   = "Tab_" .. cat.name
+        tb.Size                   = UDim2.new(0, 72, 1, 0)
+        tb.BackgroundColor3       = cat.color
+        tb.BackgroundTransparency = 0.7
+        tb.BorderSizePixel        = 0
+        tb.Text                   = cat.name
+        tb.TextColor3             = Color3.fromRGB(180, 180, 180)
+        tb.TextSize               = 11
+        tb.Font                   = Enum.Font.Montserrat
+        tb.AutoButtonColor        = false
+        Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 6)
+        tb.Activated:Connect(function() _showCategory(capturedIdx) end)
+        _tabBtns[i] = tb
+    end
+
+    -- Mostrar primera categoria por defecto
+    _showCategory(1)
+
     _makeTPButton("Disable All Bindable Emote Buttons", function()
         for _, emote in ipairs(EMOTES) do
             local bd = EmoteState.bindable[emote.name]
@@ -38855,15 +39045,6 @@ function CreatePremiumTab()
         _G._skinChangerState = _skinState
 
         local _SC_GUN_SKINS = {
-            {
-                -- RayGun: skin personalizada
-                name   = "RayGun",
-                meshId = "rbxassetid://634222143",
-                texId  = "rbxassetid://634221905",
-                scale  = Vector3.new(1, 1, 2),
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
-                dualGun = true,
-            },
             {
                 name   = "Luger",
                 meshId = "http://www.roblox.com/asset/?id=95356090",
@@ -49227,7 +49408,9 @@ function CreateCombatTab()
                     local w = existing:FindFirstChild("MirrorWeld")
                     if w then
                         local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                        w.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                        -- FIX DUAL GUN MIRROR: espejo en X + flip 180 en Y para que el clon no aparezca cortado
+                        local mirrorCF = CFrame.new(-px, py, pz, -r00, -r01, r02, -r10, -r11, r12, r20, r21, -r22)
+                        w.C0 = mirrorCF
                         w.C1 = grip.C1
                     end
                     -- FIX DUAL INVISIBLE: mantener el clon visible aunque el handle cambie de transparencia
@@ -49270,7 +49453,9 @@ function CreateCombatTab()
                 weld.Part0 = lHand
                 weld.Part1 = clon
                 local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                weld.C0 = CFrame.new(-px, py, pz, -r00, r01, r02, -r10, r11, r12, -r20, r21, r22)
+                -- FIX DUAL GUN MIRROR: espejo en X + flip 180 en Y para que el clon no aparezca cortado
+                local mirrorCF = CFrame.new(-px, py, pz, -r00, -r01, r02, -r10, -r11, r12, r20, r21, -r22)
+                weld.C0 = mirrorCF
                 weld.C1 = grip.C1
 
                 -- HOOK PREMIUM SKIN: solo aplicar skin al clon si es Dual Gun (no Dual Knife)
