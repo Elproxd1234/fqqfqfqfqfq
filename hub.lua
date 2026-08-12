@@ -31673,6 +31673,13 @@ end
 
 
 -- QUICK FLING BUTTONS
+-- FIX: _SG_DROP_NAMES/_SG_GUN_NAMES hoisted here (used at line 32088, defined originally at ~37476)
+local _SG_GUN_NAMES  = {Gun=true, SheriffGun=true, HeroGun=true,
+                        GunModel=true, Revolver=true, Pistol=true,
+                        GunDrop=true, DropGun=true}
+local _SG_DROP_NAMES = {GunDrop=true, DropGun=true, Gun=true,
+                        SheriffGun=true, HeroGun=true}
+
 function CreateWorldUI_QuickFlingButtons()
     local _qfSection = CreateSection(leftColumn, "", "QUICK FLING", ThemeColors.Aurora2)
 
@@ -37470,11 +37477,6 @@ SheriffDeadBlock = {
 }
 
 -- OPT: lookup tables compartidas ? se crean UNA sola vez para todo el sistema
-local _SG_GUN_NAMES  = {Gun=true, SheriffGun=true, HeroGun=true,
-                        GunModel=true, Revolver=true, Pistol=true,
-                        GunDrop=true, DropGun=true}
-local _SG_DROP_NAMES = {GunDrop=true, DropGun=true, Gun=true,
-                        SheriffGun=true, HeroGun=true}
 
 -- == STEAL GUN v15 ? usa la misma logica de fling que Fling Murder (_doStealFling) ==
 -- Flingea al sheriff para forzar el drop de la gun, luego la agarra del suelo.
@@ -49190,7 +49192,7 @@ function CreateCombatTab()
                 local char = LocalPlayer.Character
                 if not char then return end
                 -- FIX: buscar la tool que matchea los keywords del modo activo,
-                -- NO la primera tool genérica (evita clonar la Gun cuando Dual Knife está activo)
+                -- NO la primera tool gen?rica (evita clonar la Gun cuando Dual Knife est? activo)
                 local tool = nil
                 for _, t in ipairs(char:GetChildren()) do
                     if t:IsA("Tool") and _dualMatchKeywords(t, keywordList) then
