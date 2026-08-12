@@ -38860,7 +38860,7 @@ function CreatePremiumTab()
                 name   = "RayGun",
                 meshId = "rbxassetid://634222143",
                 texId  = "rbxassetid://634221905",
-                scale  = Vector3.new(1, 1, 1),
+                scale  = Vector3.new(1, 1, 2),
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
