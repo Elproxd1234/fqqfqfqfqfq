@@ -27522,8 +27522,11 @@ function _vcRefreshAll()
         chamHighlight[player] = nil
     end
     -- Limpiar cache de outline
-    for player, hl in pairs(outHighlight or {}) do
-        pcall(function() if hl and hl.Parent then hl:Destroy() end end)
+    -- FIX: outHighlight[player] guarda el char (Model), NO un Highlight instance.
+    -- El outline real son BoxHandleAdornments ("PieceOutline") dentro de cada parte.
+    -- Usar _limpiarPieceOutline en lugar de :Destroy() sobre el char.
+    for player, char in pairs(outHighlight or {}) do
+        pcall(function() if char and char.Parent then _limpiarPieceOutline(char) end end)
         outHighlight[player] = nil
     end
     -- Limpiar cache de box
@@ -28754,13 +28757,29 @@ end, _G._chamDropGun or false)
         end, vh.zombie)
         MiniHeader(inner, "OUTLINE (pinta cuerpo entero)", Color3.fromRGB(160, 220, 255))
         local vo = VisualState.outline
-        CreateAuroraToggle(inner, "Outline Everyone", function(v) vo.everyone=v end, vo.everyone)
-        CreateAuroraToggle(inner, "Outline Murderer Only", function(v) vo.murderer=v end, vo.murderer)
-        CreateAuroraToggle(inner, "Outline Sheriff Only", function(v) vo.sheriff=v end, vo.sheriff)
-        CreateAuroraToggle(inner, "Outline Hero Only", function(v) vo.hero=v end, vo.hero)
-        CreateAuroraToggle(inner, "Outline Assassin Only", function(v) vo.assassin=v end, vo.assassin)
-        CreateAuroraToggle(inner, "Outline Survivor Only", function(v) vo.survivor=v end, vo.survivor)
-        CreateAuroraToggle(inner, "Outline Zombie Only", function(v) vo.zombie=v end, vo.zombie)
+        -- FIX DISAPPEAR: helper que refresca SOLO los outlines sin tocar ESP/Cham highlights.
+        -- Antes los toggles de Outline no tenian callback propio y doToggle llamaba
+        -- _vcRefreshAll() al desactivar, lo cual destruia los highlights de ESP/Cham de
+        -- todos los jugadores haciendolos "desaparecer" hasta el proximo tick del instanceLoop.
+        local function _refreshOutlineOnly(v)
+            if not v then
+                -- Apagar: limpiar BoxHandleAdornments de outline en todos los jugadores
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer then
+                        pcall(removeOutline, p)
+                    end
+                end
+            end
+            -- Forzar tick inmediato del instanceLoop para re-aplicar o confirmar limpieza
+            _G._forceInstanceTick = true
+        end
+        CreateAuroraToggle(inner, "Outline Everyone", function(v) vo.everyone=v; _refreshOutlineOnly(v) end, vo.everyone)
+        CreateAuroraToggle(inner, "Outline Murderer Only", function(v) vo.murderer=v; _refreshOutlineOnly(v) end, vo.murderer)
+        CreateAuroraToggle(inner, "Outline Sheriff Only", function(v) vo.sheriff=v; _refreshOutlineOnly(v) end, vo.sheriff)
+        CreateAuroraToggle(inner, "Outline Hero Only", function(v) vo.hero=v; _refreshOutlineOnly(v) end, vo.hero)
+        CreateAuroraToggle(inner, "Outline Assassin Only", function(v) vo.assassin=v; _refreshOutlineOnly(v) end, vo.assassin)
+        CreateAuroraToggle(inner, "Outline Survivor Only", function(v) vo.survivor=v; _refreshOutlineOnly(v) end, vo.survivor)
+        CreateAuroraToggle(inner, "Outline Zombie Only", function(v) vo.zombie=v; _refreshOutlineOnly(v) end, vo.zombie)
         MiniHeader(inner, "THROWING KNIFE", Color3.fromRGB(255, 80, 40))
         CreateAuroraToggle(inner, "Outline ThrowingKnife", function(v)
             _G._outlineTKEnabled = v
@@ -30122,8 +30141,16 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
         -- FIX: forzar tick inmediato del instanceLoop para que los visuals
         -- se apliquen o limpien en el proximo Heartbeat sin esperar el intervalo
         _G._forceInstanceTick = true
-        -- FIX: al desactivar, forzar limpieza inmediata de todos los visuals
-        if not estado and _vcRefreshAll then
+        -- FIX: al desactivar, forzar limpieza inmediata de todos los visuals.
+        -- FIX DISAPPEAR OUTLINE: los toggles de Outline tienen su propio cleanup
+        -- (_refreshOutlineOnly en el callback) que borra solo BoxHandleAdornments
+        -- sin tocar los ESP/Cham Highlights de otros jugadores.
+        -- Si se usara _vcRefreshAll aqui para toggles de Outline, removeHighlight()
+        -- destruiria los highlights de ESP/Cham de TODOS los jugadores, haciendolos
+        -- "desaparecer" hasta que el instanceLoop los re-cree (hasta 2s de delay).
+        local _nombreLow = nombre:lower()
+        local _isOutlineToggle = _nombreLow:find("^outline ") and not _nombreLow:find("outline throwingknife") and not _nombreLow:find("outline tk")
+        if not estado and _vcRefreshAll and not _isOutlineToggle then
             task.defer(_vcRefreshAll)
         end
     end
@@ -39149,11 +39176,16 @@ function CreatePremiumTab()
                 meshId    = "rbxassetid://431951745",
                 texId     = "rbxassetid://431951748",
                 scale     = Vector3.new(0.056, 0.056, 0.056),
+                -- FIX ORIENTACION: grip corregido para que el cañon apunte al frente (-Z).
+                -- El grip anterior era igual al Luger (rotacion lateral) causando que la
+                -- escopeta saliera de costado en vez de hacia adelante.
+                -- Rotacion: Y->-Z, Z->Y (giro -90 grados en X) igual que Bacon,
+                -- ajustando posicion Y/Z para el largo del mesh de escopeta.
                 grip      = CFrame.new(
-                    0, -0.5, 0.5,
-                    0.999924004,    -0.00871835742, -0.00871835742,
-                    0.00871835742,   0.999961972,   -3.80063248e-05,
-                    0.00871835742,  -3.80063248e-05,  0.999961972
+                    0, -0.759000003, -0.314999998,
+                    1, 0, 0,
+                    0, 0, -1,
+                    0, 1, 0
                 ),
                 dualGun   = true,
                 shotSound = "rbxassetid://7441077838",  -- sonido custom al disparar
