@@ -29886,7 +29886,7 @@ end
 function CreateAuroraToggle(parent, nombre, callback, initialValue)
     local actualParent = _currentMainSectionFrame or parent
     local _trackedCol = (actualParent == leftColumn or (actualParent and actualParent.Parent == leftColumn)) and leftColumn or rightColumn
-    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 26
+    _colHeights[_trackedCol == leftColumn and "left" or "right"] = (_colHeights[_trackedCol == leftColumn and "left" or "right"] or 0) + 36
 
     _G._toggleStates = _G._toggleStates or {}
     local savedState = _G._toggleStates[nombre]
@@ -29917,7 +29917,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     local _knobOffL    = 4
     local _labelTxtSz  = 16
     local _labelWScale = 0.60
-    local _rowH        = 26
+    local _rowH        = 36
     local _toggleRightOff = -6
 
     -- Marco principal: fila compacta casi transparente, fondo barely visible
@@ -29936,7 +29936,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     label.Position         = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text             = nombre
-    label.TextSize         = 14
+    label.TextSize         = 16
     label.FontFace         = Font.fromEnum(Enum.Font.GothamBold)
     label.TextColor3       = Color3.fromRGB(255, 255, 255)
     label.TextXAlignment   = Enum.TextXAlignment.Left
@@ -29956,8 +29956,8 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     end
 
     -- Toggle estilo Combat (pill/switch): track con thumb deslizante y numero 1/0
-    local _TRACK_W, _TRACK_H = 54, 22
-    local _THUMB_W, _THUMB_H = 22, 16
+    local _TRACK_W, _TRACK_H = 76, 32
+    local _THUMB_W, _THUMB_H = 30, 24
     local _THUMB_PAD = 3
     local _C_TRACK_OFF  = Color3.fromRGB(45, 45, 45)
     local _C_TRACK_ON   = Color3.fromRGB(0, 220, 0)
@@ -29995,7 +29995,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     numLabel.BackgroundTransparency = 1
     numLabel.Text                   = estado and "1" or "0"
     numLabel.Font                   = Enum.Font.GothamBold
-    numLabel.TextSize               = 9
+    numLabel.TextSize               = 12
     numLabel.TextColor3             = ThemeColors and ThemeColors.TextPrimary or Color3.fromRGB(255,255,255)
     numLabel.TextXAlignment         = Enum.TextXAlignment.Center
     numLabel.ZIndex                 = 23
@@ -60308,6 +60308,460 @@ function CreateUseTab()
                     end
                 end
             end
+        end)
+    end
+
+    -- ================================================================
+    -- == HSV COLOR PICKER - Selector tipo gradiente (Hue + Saturation/Brightness)
+    -- Arrastra en el cuadrado para elegir saturacion/brillo.
+    -- Usa el slider de hue para cambiar el tono de color.
+    -- ================================================================
+    do
+        local colorSec = CreateBorderedSectionGlobal(leftColumn, "?? Color Picker")
+
+        -- Variables de estado HSV
+        local _hue        = 0      -- 0..1
+        local _sat        = 1      -- 0..1
+        local _val        = 0.5    -- 0..1
+        local _isDraggingSV  = false
+        local _isDraggingHue = false
+
+        -- Helper: HSV -> RGB (Color3)
+        local function hsvToColor3(h, s, v)
+            return Color3.fromHSV(h, s, v)
+        end
+
+        -- Helper: actualizar todo el UI con los valores actuales de _hue/_sat/_val
+        local function _updateAll() end  -- se define abajo tras crear los elementos
+
+        -- -- Titulo --------------------------------------------------------------
+        local colorTitle = Instance.new("TextLabel", colorSec)
+        colorTitle.Size                   = UDim2.new(1, 0, 0, 20)
+        colorTitle.BackgroundTransparency = 1
+        colorTitle.Text                   = "?? Color Picker"
+        colorTitle.TextSize               = 13
+        colorTitle.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        colorTitle.TextColor3             = Color3.fromRGB(220, 100, 130)
+        colorTitle.TextXAlignment         = Enum.TextXAlignment.Center
+        colorTitle.ZIndex                 = 22
+
+        -- -- Cuadrado SV (Saturacion x Brillo) -----------------------------------
+        -- Dimensiones fijas (se ve bien en mobile y desktop)
+        local SV_SIZE   = 180
+        local HUE_W     = 16
+        local HUE_GAP   = 8
+
+        -- Wrapper para centrar
+        local svWrapper = Instance.new("Frame", colorSec)
+        svWrapper.Size                   = UDim2.new(1, 0, 0, SV_SIZE + 4)
+        svWrapper.BackgroundTransparency = 1
+        svWrapper.BorderSizePixel        = 0
+        svWrapper.ZIndex                 = 20
+
+        -- Canvas SV (el cuadrado de color)
+        local svCanvas = Instance.new("Frame", svWrapper)
+        svCanvas.Name             = "SVCanvas"
+        svCanvas.Size             = UDim2.new(0, SV_SIZE, 0, SV_SIZE)
+        svCanvas.AnchorPoint      = Vector2.new(0, 0)
+        svCanvas.Position         = UDim2.new(0, 0, 0, 2)
+        svCanvas.BackgroundColor3 = Color3.fromHSV(0, 1, 1)  -- hue puro
+        svCanvas.BorderSizePixel  = 0
+        svCanvas.ZIndex           = 21
+        svCanvas.ClipsDescendants = true
+        Instance.new("UICorner", svCanvas).CornerRadius = UDim.new(0, 4)
+
+        -- Degradado blanco (izquierda->transparente): simula saturacion
+        local gradWhite = Instance.new("UIGradient", svCanvas)
+        gradWhite.Color       = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(1, Color3.new(1,1,1)),
+        })
+        gradWhite.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        })
+        gradWhite.Rotation = 0
+
+        -- Capa negra encima para oscurecer (brillo)
+        local darkLayer = Instance.new("Frame", svCanvas)
+        darkLayer.Size             = UDim2.new(1, 0, 1, 0)
+        darkLayer.BackgroundColor3 = Color3.new(0, 0, 0)
+        darkLayer.BackgroundTransparency = 1  -- se cambia segun _val
+        darkLayer.BorderSizePixel  = 0
+        darkLayer.ZIndex           = 22
+        local gradDark = Instance.new("UIGradient", darkLayer)
+        gradDark.Color       = ColorSequence.new(Color3.new(0,0,0))
+        gradDark.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(1, 0),
+        })
+        gradDark.Rotation = 90  -- de arriba (transparente) a abajo (negro)
+
+        -- Circulo selector (crosshair) dentro del canvas SV
+        local svCursor = Instance.new("Frame", svCanvas)
+        svCursor.Size             = UDim2.new(0, 12, 0, 12)
+        svCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
+        svCursor.Position         = UDim2.new(1, 0, 0, 0)  -- se actualiza
+        svCursor.BackgroundColor3 = Color3.new(1, 1, 1)
+        svCursor.BorderSizePixel  = 0
+        svCursor.ZIndex           = 25
+        Instance.new("UICorner", svCursor).CornerRadius = UDim.new(1, 0)
+        local svCursorStroke = Instance.new("UIStroke", svCursor)
+        svCursorStroke.Color     = Color3.new(0, 0, 0)
+        svCursorStroke.Thickness = 1.5
+
+        -- Input en el canvas SV (drag)
+        local svBtn = Instance.new("TextButton", svCanvas)
+        svBtn.Size                   = UDim2.new(1, 0, 1, 0)
+        svBtn.BackgroundTransparency = 1
+        svBtn.Text                   = ""
+        svBtn.ZIndex                 = 26
+        svBtn.AutoButtonColor        = false
+
+        -- -- Slider de Hue (barra vertical a la derecha del canvas SV) -----------
+        local hueBar = Instance.new("Frame", svWrapper)
+        hueBar.Name             = "HueBar"
+        hueBar.Size             = UDim2.new(0, HUE_W, 0, SV_SIZE)
+        hueBar.AnchorPoint      = Vector2.new(0, 0)
+        hueBar.Position         = UDim2.new(0, SV_SIZE + HUE_GAP, 0, 2)
+        hueBar.BackgroundColor3 = Color3.new(1, 1, 1)
+        hueBar.BorderSizePixel  = 0
+        hueBar.ZIndex           = 21
+        hueBar.ClipsDescendants = true
+        Instance.new("UICorner", hueBar).CornerRadius = UDim.new(0, 4)
+
+        -- Gradiente arcoiris de hue (vertical)
+        local hueGrad = Instance.new("UIGradient", hueBar)
+        hueGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,    Color3.fromHSV(0,   1, 1)),
+            ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17,1, 1)),
+            ColorSequenceKeypoint.new(0.33, Color3.fromHSV(0.33,1, 1)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromHSV(0.50,1, 1)),
+            ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67,1, 1)),
+            ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83,1, 1)),
+            ColorSequenceKeypoint.new(1,    Color3.fromHSV(1,   1, 1)),
+        })
+        hueGrad.Rotation = 90  -- de arriba a abajo
+
+        -- Indicador de hue (linea/triangulo)
+        local hueCursor = Instance.new("Frame", hueBar)
+        hueCursor.Size             = UDim2.new(1, 4, 0, 4)
+        hueCursor.AnchorPoint      = Vector2.new(0.5, 0.5)
+        hueCursor.Position         = UDim2.new(0.5, 0, 0, 0)
+        hueCursor.BackgroundColor3 = Color3.new(1, 1, 1)
+        hueCursor.BorderSizePixel  = 0
+        hueCursor.ZIndex           = 25
+        Instance.new("UICorner", hueCursor).CornerRadius = UDim.new(0, 2)
+        local hueCursorStroke = Instance.new("UIStroke", hueCursor)
+        hueCursorStroke.Color     = Color3.new(0, 0, 0)
+        hueCursorStroke.Thickness = 1
+
+        -- Input en hueBar (drag)
+        local hueBtn = Instance.new("TextButton", hueBar)
+        hueBtn.Size                   = UDim2.new(1, 0, 1, 0)
+        hueBtn.BackgroundTransparency = 1
+        hueBtn.Text                   = ""
+        hueBtn.ZIndex                 = 26
+        hueBtn.AutoButtonColor        = false
+
+        -- -- Panel de info (swatch + nombre hex + RGB) ----------------------------
+        local infoRow = Instance.new("Frame", colorSec)
+        infoRow.Size                   = UDim2.new(1, 0, 0, 38)
+        infoRow.BackgroundColor3       = Color3.fromRGB(30, 6, 10)
+        infoRow.BackgroundTransparency = 0.4
+        infoRow.BorderSizePixel        = 0
+        infoRow.ZIndex                 = 20
+        Instance.new("UICorner", infoRow).CornerRadius = UDim.new(0, 5)
+        Instance.new("UIPadding", infoRow).PaddingLeft = UDim.new(0, 6)
+
+        colorSwatch = Instance.new("Frame", infoRow)
+        colorSwatch.Size             = UDim2.new(0, 28, 0, 28)
+        colorSwatch.AnchorPoint      = Vector2.new(0, 0.5)
+        colorSwatch.Position         = UDim2.new(0, 0, 0.5, 0)
+        colorSwatch.BackgroundColor3 = Color3.fromHSV(0, 1, 0.5)
+        colorSwatch.BorderSizePixel  = 0
+        colorSwatch.ZIndex           = 22
+        Instance.new("UICorner", colorSwatch).CornerRadius = UDim.new(0, 4)
+
+        colorInfoName = Instance.new("TextLabel", infoRow)
+        colorInfoName.Size                   = UDim2.new(0.5, 0, 1, 0)
+        colorInfoName.Position               = UDim2.new(0, 36, 0, 0)
+        colorInfoName.BackgroundTransparency = 1
+        colorInfoName.Text                   = "#FF0080"
+        colorInfoName.TextSize               = 12
+        colorInfoName.FontFace               = Font.fromEnum(Enum.Font.RobotoMono)
+        colorInfoName.TextColor3             = Color3.fromRGB(255, 255, 255)
+        colorInfoName.TextXAlignment         = Enum.TextXAlignment.Left
+        colorInfoName.TextYAlignment         = Enum.TextYAlignment.Center
+        colorInfoName.ZIndex                 = 22
+
+        colorInfoHex = Instance.new("TextLabel", infoRow)
+        colorInfoHex.Size                   = UDim2.new(0.45, 0, 1, 0)
+        colorInfoHex.Position               = UDim2.new(0.55, 0, 0, 0)
+        colorInfoHex.BackgroundTransparency = 1
+        colorInfoHex.Text                   = "255, 0, 128"
+        colorInfoHex.TextSize               = 11
+        colorInfoHex.FontFace               = Font.fromEnum(Enum.Font.RobotoMono)
+        colorInfoHex.TextColor3             = Color3.fromRGB(200, 200, 200)
+        colorInfoHex.TextXAlignment         = Enum.TextXAlignment.Left
+        colorInfoHex.TextYAlignment         = Enum.TextYAlignment.Center
+        colorInfoHex.ZIndex                 = 22
+
+        -- Hint
+        local hintLabel = Instance.new("TextLabel", colorSec)
+        hintLabel.Size                   = UDim2.new(1, 0, 0, 14)
+        hintLabel.BackgroundTransparency = 1
+        hintLabel.Text                   = "Arrastra el cuadrado y el slider de hue"
+        hintLabel.TextSize               = 10
+        hintLabel.FontFace               = Font.fromEnum(Enum.Font.Gotham)
+        hintLabel.TextColor3             = Color3.fromRGB(160, 60, 80)
+        hintLabel.TextXAlignment         = Enum.TextXAlignment.Center
+        hintLabel.ZIndex                 = 22
+
+        -- -- Funcion central: actualizar todos los elementos visuales -------------
+        _updateAll = function()
+            local c = hsvToColor3(_hue, _sat, _val)
+            local r = math.floor(c.R * 255)
+            local g = math.floor(c.G * 255)
+            local b = math.floor(c.B * 255)
+            local hex = string.format("#%02X%02X%02X", r, g, b)
+
+            -- Swatch y labels
+            colorSwatch.BackgroundColor3 = c
+            colorInfoName.Text = hex
+            colorInfoHex.Text  = r .. ", " .. g .. ", " .. b
+
+            -- Fondo del canvas = hue puro
+            svCanvas.BackgroundColor3 = Color3.fromHSV(_hue, 1, 1)
+
+            -- Cursor SV: X = saturacion, Y = (1-brillo)
+            svCursor.Position = UDim2.new(_sat, 0, 1 - _val, 0)
+
+            -- Cursor Hue: Y = hue dentro de la barra
+            hueCursor.Position = UDim2.new(0.5, 0, _hue, 0)
+        end
+
+        -- Llamada inicial
+        _updateAll()
+
+        -- -- Logica de drag en canvas SV ------------------------------------------
+        local function _onSVInput(inputObj)
+            -- Obtener posicion relativa dentro del canvas
+            local absPos  = svCanvas.AbsolutePosition
+            local absSize = svCanvas.AbsoluteSize
+            local relX = math.clamp((inputObj.Position.X - absPos.X) / absSize.X, 0, 1)
+            local relY = math.clamp((inputObj.Position.Y - absPos.Y) / absSize.Y, 0, 1)
+            _sat = relX
+            _val = 1 - relY
+            _updateAll()
+        end
+
+        svBtn.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _isDraggingSV = true
+                _onSVInput(inp)
+            end
+        end)
+        svBtn.InputChanged:Connect(function(inp)
+            if _isDraggingSV and (inp.UserInputType == Enum.UserInputType.MouseMovement
+                               or inp.UserInputType == Enum.UserInputType.Touch) then
+                _onSVInput(inp)
+            end
+        end)
+        svBtn.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _isDraggingSV = false
+            end
+        end)
+
+        -- Drag global para no perder el cursor si sale del frame
+        game:GetService("UserInputService").InputChanged:Connect(function(inp)
+            if _isDraggingSV and (inp.UserInputType == Enum.UserInputType.MouseMovement
+                               or inp.UserInputType == Enum.UserInputType.Touch) then
+                _onSVInput(inp)
+            end
+        end)
+        game:GetService("UserInputService").InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _isDraggingSV  = false
+                _isDraggingHue = false
+            end
+        end)
+
+        -- -- Logica de drag en Hue bar --------------------------------------------
+        local function _onHueInput(inputObj)
+            local absPos  = hueBar.AbsolutePosition
+            local absSize = hueBar.AbsoluteSize
+            local relY = math.clamp((inputObj.Position.Y - absPos.Y) / absSize.Y, 0, 1)
+            _hue = relY
+            _updateAll()
+        end
+
+        hueBtn.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _isDraggingHue = true
+                _onHueInput(inp)
+            end
+        end)
+        hueBtn.InputChanged:Connect(function(inp)
+            if _isDraggingHue and (inp.UserInputType == Enum.UserInputType.MouseMovement
+                               or inp.UserInputType == Enum.UserInputType.Touch) then
+                _onHueInput(inp)
+            end
+        end)
+        hueBtn.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _isDraggingHue = false
+            end
+        end)
+
+        game:GetService("UserInputService").InputChanged:Connect(function(inp)
+            if _isDraggingHue and (inp.UserInputType == Enum.UserInputType.MouseMovement
+                               or inp.UserInputType == Enum.UserInputType.Touch) then
+                _onHueInput(inp)
+            end
+        end)
+
+        -- -- Boton APPLY COLOR ----------------------------------------------------
+        local applyBtn = Instance.new("TextButton", colorSec)
+        applyBtn.Name                   = "ApplyColorBtn"
+        applyBtn.Size                   = UDim2.new(1, -8, 0, 32)
+        applyBtn.Position               = UDim2.new(0, 4, 0, 0)
+        applyBtn.BackgroundColor3       = Color3.fromRGB(145, 30, 45)
+        applyBtn.BackgroundTransparency = 0.15
+        applyBtn.BorderSizePixel        = 0
+        applyBtn.Text                   = "APPLY COLOR AL HUB"
+        applyBtn.TextSize               = 13
+        applyBtn.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+        applyBtn.TextColor3             = Color3.fromRGB(255, 230, 235)
+        applyBtn.AutoButtonColor        = false
+        applyBtn.ZIndex                 = 23
+        Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 7)
+        local applyStroke = Instance.new("UIStroke", applyBtn)
+        applyStroke.Color           = Color3.fromRGB(220, 80, 110)
+        applyStroke.Thickness       = 1.5
+        applyStroke.Transparency    = 0.1
+        applyStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+        applyBtn.MouseEnter:Connect(function()
+            TweenService:Create(applyBtn, TweenInfo.new(0.10), {BackgroundTransparency = 0}):Play()
+            TweenService:Create(applyStroke, TweenInfo.new(0.10), {Transparency = 0}):Play()
+        end)
+        applyBtn.MouseLeave:Connect(function()
+            TweenService:Create(applyBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.15}):Play()
+            TweenService:Create(applyStroke, TweenInfo.new(0.12), {Transparency = 0.1}):Play()
+        end)
+
+        applyBtn.Activated:Connect(function()
+            local selColor = colorSwatch.BackgroundColor3
+            local r = math.floor(selColor.R * 255)
+            local g = math.floor(selColor.G * 255)
+            local b = math.floor(selColor.B * 255)
+
+            local function darken(c, f)
+                return Color3.fromRGB(
+                    math.clamp(math.floor(c.R*255*f), 0, 255),
+                    math.clamp(math.floor(c.G*255*f), 0, 255),
+                    math.clamp(math.floor(c.B*255*f), 0, 255))
+            end
+            local function lighten(c, f)
+                return Color3.fromRGB(
+                    math.clamp(math.floor(c.R*255 + (255 - c.R*255)*f), 0, 255),
+                    math.clamp(math.floor(c.G*255 + (255 - c.G*255)*f), 0, 255),
+                    math.clamp(math.floor(c.B*255 + (255 - c.B*255)*f), 0, 255))
+            end
+
+            local base   = Color3.fromRGB(r, g, b)
+            local dark1  = darken(base, 0.45)
+            local dark2  = darken(base, 0.60)
+            local bright = lighten(base, 0.25)
+            local pale   = lighten(base, 0.65)
+            local pale2  = lighten(base, 0.40)
+            local mid    = darken(base, 0.75)
+
+            local CUSTOM_NAME = "__CustomHTMLColor__"
+            Themes[CUSTOM_NAME] = {
+                Primary         = base,
+                Secondary       = mid,
+                Accent          = bright,
+                Background      = dark1,
+                BackgroundLight = dark2,
+                TextPrimary     = pale,
+                TextSecondary   = pale2,
+                Aurora1         = base,
+                Aurora2         = bright,
+                Aurora3         = pale2,
+                Aurora4         = mid,
+            }
+
+            pcall(function() ApplyTheme(CUSTOM_NAME) end)
+
+            pcall(function()
+                local bg = _G._hubBgMainImageRef
+                    or (mainFrame and mainFrame:FindFirstChild("HubBackground"))
+                if bg then
+                    TweenService:Create(bg, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {
+                        ImageColor3 = dark1
+                    }):Play()
+                end
+                if glowBorder then
+                    TweenService:Create(glowBorder, TweenInfo.new(0.3), {Color = base}):Play()
+                end
+            end)
+
+            local hex  = string.format("#%02X%02X%02X", r, g, b)
+            CreateCustomNotification("HUB RECOLOREADO", hex, 3)
+        end)
+
+        -- Boton secundario: restaurar tema original
+        local resetBtn = Instance.new("TextButton", colorSec)
+        resetBtn.Name                   = "ResetColorBtn"
+        resetBtn.Size                   = UDim2.new(1, -8, 0, 22)
+        resetBtn.Position               = UDim2.new(0, 4, 0, 0)
+        resetBtn.BackgroundColor3       = Color3.fromRGB(30, 6, 10)
+        resetBtn.BackgroundTransparency = 0.5
+        resetBtn.BorderSizePixel        = 0
+        resetBtn.Text                   = "Restaurar tema original"
+        resetBtn.TextSize               = 11
+        resetBtn.FontFace               = Font.fromEnum(Enum.Font.Gotham)
+        resetBtn.TextColor3             = Color3.fromRGB(180, 80, 100)
+        resetBtn.AutoButtonColor        = false
+        resetBtn.ZIndex                 = 23
+        Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 5)
+        local resetStroke = Instance.new("UIStroke", resetBtn)
+        resetStroke.Color           = Color3.fromRGB(145, 30, 45)
+        resetStroke.Thickness       = 1
+        resetStroke.Transparency    = 0.4
+        resetStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+        resetBtn.MouseEnter:Connect(function()
+            TweenService:Create(resetBtn, TweenInfo.new(0.10), {BackgroundTransparency = 0.2}):Play()
+        end)
+        resetBtn.MouseLeave:Connect(function()
+            TweenService:Create(resetBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.5}):Play()
+        end)
+        resetBtn.Activated:Connect(function()
+            pcall(function() ApplyTheme("Neon Green") end)
+            pcall(function()
+                local bg = _G._hubBgMainImageRef
+                    or (mainFrame and mainFrame:FindFirstChild("HubBackground"))
+                if bg then
+                    TweenService:Create(bg, TweenInfo.new(0.4), {
+                        ImageColor3 = Color3.new(1, 1, 1)
+                    }):Play()
+                end
+                if glowBorder then
+                    TweenService:Create(glowBorder, TweenInfo.new(0.3), {
+                        Color = Color3.fromRGB(210, 85, 100)
+                    }):Play()
+                end
+            end)
+            CreateCustomNotification("RESTAURADO", "Tema original del hub", 2)
         end)
     end
 
