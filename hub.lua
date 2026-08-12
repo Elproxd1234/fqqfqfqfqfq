@@ -38954,6 +38954,16 @@ function CreatePremiumTab()
                 grip      = _KNIFE_GRIP_STD,
                 dualKnife = true,
             },
+            {
+                -- Knife custom: parado mirando al frente
+                name      = "Custom",
+                meshId    = "rbxassetid://124317054263790",
+                texId     = "rbxassetid://129462008300983",
+                scale     = Vector3.new(1, 1, 1),
+                grip      = CFrame.new(0.0154595375, -0.137249783, -0.00624334533, 1, 0, 0, 0, 0, -1, 0, 1, 0),
+                dualKnife = true,
+            },
+
         }
 
         -- Exponer lista de knife skins en _G para que _dualStartArm pueda usarla
@@ -39113,7 +39123,7 @@ function CreatePremiumTab()
                 if obj:IsA("BasePart") then
                     pcall(function() obj.Transparency = 0; obj.LocalTransparencyModifier = 0 end)
                 end
-                if obj:IsA("MeshPart") then
+                if obj:IsA("MeshPart") or (obj:IsA("BasePart") and skin.specialMesh) then
                     -- FIX: MeshPart en clone -> usar FakePart con SpecialMesh para controlar scale.
                     local _smOld = obj:FindFirstChildOfClass("SpecialMesh")
                     if _smOld then pcall(function() _smOld:Destroy() end) end
