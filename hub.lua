@@ -39397,16 +39397,22 @@ function CreatePremiumTab()
             },
             {
                 -- Purple Katana: mesh custom con agarre dual knife
-                -- FIX ADELANTADO v2: grip ajustado para mano derecha; weldOffset mueve el FakePart hacia atras en Z
+                -- FIX PARADO: usar _KNIFE_GRIP_STD igual que Turkey y demas knives
                 name       = "Purple Katana",
                 meshId     = "http://www.roblox.com/asset/?id=11442510",
                 texId      = "rbxassetid://10944556659",
                 scale      = Vector3.new(1.5, 1.5, 1.5),
-                -- grip: Y sube/baja el punto de agarre, Z lo adelanta/atrasa, rotacion apunta la hoja hacia arriba
-                grip       = CFrame.new(0, -0.35, -1.10, 0, 0, 1, 0, 1, 0, -1, 0, 0),
-                -- weldOffset: desplaza el FakePart (mesh visible) hacia atras respecto al handle
-                weldOffset = CFrame.new(0, 1.20, -0.40),
+                grip       = _KNIFE_GRIP_STD,
                 dualKnife  = true,
+            },
+            {
+                -- Cold Katana: mesh custom con agarre dual knife (mismo que Turkey)
+                name      = "Cold Katana",
+                meshId    = "rbxassetid://582120569",
+                texId     = "rbxassetid://582120836",
+                scale     = Vector3.new(0.6, 0.6, 0.6),
+                grip      = _KNIFE_GRIP_STD,
+                dualKnife = true,
             },
 
         }
