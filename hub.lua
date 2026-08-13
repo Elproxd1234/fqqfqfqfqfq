@@ -39211,6 +39211,17 @@ function CreatePremiumTab()
                 grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
                 dualGun = true,
             },
+            {
+                -- Shotgun: skin personalizada con mesh y texture custom
+                name   = "Shotgun",
+                meshId = "rbxassetid://431951745",
+                texId  = "rbxassetid://431951748",
+                -- Scale del Harvester
+                scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
+                -- Grip del Harvester
+                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                dualGun = true,
+            },
         }
         -- FIX: exponer las listas en _G para que _dualStartArm pueda referenciarlas
         _G._SC_GUN_SKINS = _SC_GUN_SKINS
@@ -39801,6 +39812,87 @@ function CreatePremiumTab()
             end)
 
         end)
+
+        -- ==============================================================
+        -- HOOK GUNSHOT SOUND -- Shotgun & Harvester
+        -- Hookea __namecall para interceptar FireServer del remote de
+        -- disparo en el CLIENTE (cuando vos dispara, no cuando otros).
+        -- Reproduces el sonido personalizado localmente al instante.
+        -- Shotgun  -> rbxassetid://7441077838
+        -- Harvester -> rbxassetid://7808472682
+        -- ==============================================================
+        do
+            -- Limpiar hook anterior si existia (re-ejecucion del script)
+            if _G._scGunSoundHookActive and _G._scGunSoundOldNamecall and _G._scGunSoundMt then
+                pcall(function()
+                    setreadonly(_G._scGunSoundMt, false)
+                    _G._scGunSoundMt.__namecall = _G._scGunSoundOldNamecall
+                    setreadonly(_G._scGunSoundMt, true)
+                end)
+                _G._scGunSoundHookActive   = false
+                _G._scGunSoundOldNamecall  = nil
+                _G._scGunSoundMt           = nil
+            end
+
+            -- Helper: reproducir sonido localmente
+            local function _playCustomGunSound(soundId)
+                local s = Instance.new("Sound")
+                s.SoundId = soundId
+                s.Volume = 1
+                s.RollOffMaxDistance = 60
+                s.Parent = workspace
+                s:Play()
+                game:GetService("Debris"):AddItem(s, 4)
+            end
+
+            -- Solo instalar si el executor soporta hookmetamethod
+            if hookmetamethod and getrawmetatable and setreadonly and newcclosure and getnamecallmethod then
+                local mt = getrawmetatable(game)
+                -- Guardar el namecall REAL solo la primera vez (evitar cadena rota en re-ejecucion)
+                if not _G._scGunSoundRealNamecall then
+                    _G._scGunSoundRealNamecall = mt.__namecall
+                end
+                local _origNC = _G._scGunSoundRealNamecall
+
+                setreadonly(mt, false)
+                mt.__namecall = newcclosure(function(self, ...)
+                    local method
+                    pcall(function() method = getnamecallmethod() end)
+
+                    -- Solo interceptar FireServer
+                    if method ~= "FireServer" then
+                        return _origNC(self, ...)
+                    end
+
+                    -- Verificar que es un RemoteEvent de gun (por nombre)
+                    local selfName = ""
+                    pcall(function() selfName = self.Name:lower() end)
+                    local isGunRemote = selfName == "shoot" or selfName == "gunshoot"
+                        or selfName == "gunkill" or selfName == "fakeshoot"
+                        or selfName == "bulletfire" or selfName == "gunfire"
+                        or selfName == "shootremote" or selfName == "gunshot"
+
+                    if isGunRemote and _skinState.enabled and _skinState.mode == "gun" then
+                        local currentSkin = _scGetSkin()
+                        if currentSkin then
+                            if currentSkin.name == "Shotgun" then
+                                _playCustomGunSound("rbxassetid://7441077838")
+                            elseif currentSkin.name == "Harvester" then
+                                _playCustomGunSound("rbxassetid://7808472682")
+                            end
+                        end
+                    end
+
+                    return _origNC(self, ...)
+                end)
+                setreadonly(mt, true)
+
+                _G._scGunSoundHookActive  = true
+                _G._scGunSoundOldNamecall = _origNC
+                _G._scGunSoundMt          = mt
+            end
+        end
+        -- == FIN HOOK GUNSHOT SOUND ==========================================
 
         -- -- SELECTOR KNIFE SKINS (funcional, mismo patron que Gun) -----------
         do
