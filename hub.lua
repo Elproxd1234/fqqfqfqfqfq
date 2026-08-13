@@ -39872,7 +39872,11 @@ function CreatePremiumTab()
                         or selfName == "bulletfire" or selfName == "gunfire"
                         or selfName == "shootremote" or selfName == "gunshot"
 
-                    if isGunRemote and _skinState.enabled and _skinState.mode == "gun" then
+                    -- Sonido GunShot: reproducir siempre que el remote sea "gunshot",
+                    -- sin importar si el skin changer esta activo o no
+                    if selfName == "gunshot" then
+                        _playCustomGunSound("rbxassetid://7441077838")
+                    elseif isGunRemote and _skinState.enabled and _skinState.mode == "gun" then
                         local currentSkin = _scGetSkin()
                         if currentSkin then
                             if currentSkin.name == "Shotgun" then
