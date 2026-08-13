@@ -39218,8 +39218,8 @@ function CreatePremiumTab()
                 texId  = "rbxassetid://431951748",
                 -- Scale del Harvester
                 scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
-                -- Grip del Harvester
-                grip   = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                -- Grip corregido: rotado 180° en Y para que mire al frente
+                grip   = CFrame.new(0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualGun = true,
             },
         }
