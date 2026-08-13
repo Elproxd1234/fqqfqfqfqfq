@@ -12986,7 +12986,7 @@ end
 function CreateButton(parent, nombre, color, callback)
     local actualParent = _currentMainSectionFrame or parent
     local container = Instance.new("Frame", actualParent)
-    container.Size = UDim2.new(1, 0, 0, 38)
+    container.Size = UDim2.new(1, 0, 0, 52)
     container.BackgroundTransparency = 1
 
     -- Padding interior para que el boton no ocupe todo el ancho
@@ -13021,7 +13021,7 @@ function CreateButton(parent, nombre, color, callback)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = convertirFuenteCursor(nombre)
     textLabel.FontFace = Font.fromEnum(Enum.Font.GothamBold)
-    textLabel.TextSize = 11
+    textLabel.TextSize = 14
     textLabel.TextColor3 = ThemeColors.TextPrimary
     textLabel.TextXAlignment = Enum.TextXAlignment.Center
     textLabel.ZIndex = 3
@@ -39216,8 +39216,8 @@ function CreatePremiumTab()
                 name   = "Shotgun",
                 meshId = "rbxassetid://431951745",
                 texId  = "rbxassetid://431951748",
-                -- Scale del Harvester
-                scale  = Vector3.new(0.05999999865889549, 0.05000000074505806, 0.05000000074505806),
+                -- Scale agrandado
+                scale  = Vector3.new(0.08999999865889549, 0.07500000074505806, 0.07500000074505806),
                 -- Grip corregido: rotado 180° en Y para que mire al frente
                 grip   = CFrame.new(0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualGun = true,
