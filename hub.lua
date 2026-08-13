@@ -57708,42 +57708,63 @@ particles = {}
         local _ind    = btn:FindFirstChild("TabIndicator")
         local _capBot = btn:FindFirstChild("TabCapBottom")
 
+        -- Usar colores del selector si estan definidos, si no usar defaults granate
+        local _useCustomColor = _G._tabColorBg ~= nil
+        local _cBg     = _G._tabColorBg     or Color3.fromRGB(90, 15, 22)
+        local _cBgIdle = _G._tabColorBg     or Color3.fromRGB(70, 18, 18)
+        local _cStroke = _G._tabColorStroke or Color3.fromRGB(210, 35, 55)
+        local _cStrokeIdle = _G._tabColorStroke or Color3.fromRGB(160, 20, 20)
+        local _cInd    = _G._tabColorStroke or Color3.fromRGB(255, 60, 90)
+
+        -- Calcular variantes de brillo activo/inactivo desde el color elegido
+        if _useCustomColor then
+            local br = _G._tabColorBg.R; local bg2 = _G._tabColorBg.G; local bb = _G._tabColorBg.B
+            _cBg     = Color3.new(math.min(br*0.60, 1), math.min(bg2*0.60, 1), math.min(bb*0.60, 1))
+            _cBgIdle = Color3.new(math.min(br*0.45, 1), math.min(bg2*0.45, 1), math.min(bb*0.45, 1))
+        end
+
+        -- TweenInfo mas fluido para las animaciones de pestana
+        local _ti_smooth = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
         if isActive then
-            -- Pestana ACTIVA: fondo mas solido, borde brillante rojo, indicador encendido
-            TweenService:Create(btn, _ti_tab, {
-                BackgroundTransparency = 0.05,          -- casi solido (como img activa)
-                BackgroundColor3       = Color3.fromRGB(90, 15, 22),  -- granate intenso
+            -- Pestana ACTIVA: fondo solido, borde brillante, indicador encendido
+            -- Animacion de escala ligera al activar (efecto pop)
+            TweenService:Create(btn, _ti_smooth, {
+                BackgroundTransparency = 0.05,
+                BackgroundColor3       = _cBg,
             }):Play()
-            if stroke then TweenService:Create(stroke, _ti_tab, {
+            if stroke then TweenService:Create(stroke, _ti_smooth, {
                 Transparency = 0,
-                Color        = Color3.fromRGB(210, 35, 55),  -- rojo brillante
-                Thickness    = 2,
+                Color        = _cStroke,
+                Thickness    = 2.2,
             }):Play() end
-            if _ind then TweenService:Create(_ind, _ti_tab, {
-                BackgroundColor3       = Color3.fromRGB(255, 60, 90),  -- indicador encendido
+            if _ind then TweenService:Create(_ind, _ti_smooth, {
+                BackgroundColor3       = _cInd,
                 BackgroundTransparency = 0,
+                Size                   = UDim2.new(0, 3, 0.7, 0),
             }):Play() end
-            if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3       = Color3.fromRGB(255, 230, 235),  -- blanco brillante
+            if lbl2 then TweenService:Create(lbl2, _ti_smooth, {
+                TextColor3       = Color3.fromRGB(255, 255, 255),
                 TextTransparency = 0,
             }):Play() end
         else
-            -- Pestana INACTIVA: semitransparente, borde fino apagado, indicador oculto
-            TweenService:Create(btn, _ti_tab, {
-                BackgroundTransparency = 0.18,          -- semitransparente como img
-                BackgroundColor3       = Color3.fromRGB(70, 18, 18),   -- granate oscuro
+            -- Pestana INACTIVA: semitransparente, borde fino, indicador oculto
+            TweenService:Create(btn, _ti_smooth, {
+                BackgroundTransparency = 0.22,
+                BackgroundColor3       = _cBgIdle,
             }):Play()
-            if stroke then TweenService:Create(stroke, _ti_tab, {
-                Transparency = 0,
-                Color        = Color3.fromRGB(160, 20, 20),  -- rojo oscuro
+            if stroke then TweenService:Create(stroke, _ti_smooth, {
+                Transparency = 0.1,
+                Color        = _cStrokeIdle,
                 Thickness    = 1.5,
             }):Play() end
-            if _ind then TweenService:Create(_ind, _ti_tab, {
-                BackgroundColor3       = Color3.fromRGB(160, 20, 20),
-                BackgroundTransparency = 1,              -- oculto en inactivo
+            if _ind then TweenService:Create(_ind, _ti_smooth, {
+                BackgroundColor3       = _cStrokeIdle,
+                BackgroundTransparency = 1,
+                Size                   = UDim2.new(0, 2, 0.6, 0),
             }):Play() end
-            if lbl2 then TweenService:Create(lbl2, _ti_tab, {
-                TextColor3       = Color3.fromRGB(220, 210, 210),  -- blanco rosado suave
+            if lbl2 then TweenService:Create(lbl2, _ti_smooth, {
+                TextColor3       = Color3.fromRGB(215, 205, 205),
                 TextTransparency = 0,
             }):Play() end
         end
@@ -57832,13 +57853,16 @@ particles = {}
             end
             if _tabCache[idx] then
                 local _tc = _tabCache[idx]
-                _tc.Visible  = true
                 local si = _tc:FindFirstChild("SearchInput", true)
                 if si then si.Text = "" end
-                -- Entrada instant?nea (animaci?n eliminada)
-                _tc.Position = UDim2.new(0, 0, 0, 0)
+                -- Animacion de entrada suave: slide desde la derecha + fade
+                _tc.Position = UDim2.new(0.04, 0, 0, 0)
+                _tc.Visible  = true
+                TweenService:Create(_tc,
+                    TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    {Position = UDim2.new(0, 0, 0, 0)}
+                ):Play()
                 -- FIX DOUBLE COLUMN INVISIBLE: forzar refresh de columnas tras hacerse visible
-                -- Evita que Main aparezca en blanco cuando Double Column esta ON al iniciar
                 task.defer(function()
                     if not _tc or not _tc.Parent then return end
                     local wrapper = _tc:FindFirstChild("TwoColumnWrapper")
@@ -58118,20 +58142,30 @@ particles = {}
 
         local ti = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-        -- Hover: borde mas brillante + fondo ligero
+        -- Hover: borde mas brillante + fondo ligero (respeta color del picker)
         clickRow.MouseEnter:Connect(function()
             if activeTabIdx ~= i then
                 PlayHoverSound()
-                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.05}):Play()
-                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(210, 35, 55), Thickness = 2}):Play()
+                local _hoverStroke = (_G._tabColorStroke or Color3.fromRGB(210, 35, 55))
+                local _hoverBg     = _G._tabColorBg
+                local _hBgColor    = _hoverBg
+                    and Color3.new(math.min(_hoverBg.R*0.65,1), math.min(_hoverBg.G*0.65,1), math.min(_hoverBg.B*0.65,1))
+                    or  Color3.fromRGB(90, 15, 22)
+                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.06, BackgroundColor3 = _hBgColor}):Play()
+                TweenService:Create(btnStroke, ti, {Color = _hoverStroke, Thickness = 2.0}):Play()
                 TweenService:Create(lbl,       ti, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
         end)
         clickRow.MouseLeave:Connect(function()
             if activeTabIdx ~= i then
-                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.18}):Play()
-                TweenService:Create(btnStroke, ti, {Color = Color3.fromRGB(160, 20, 20), Thickness = 1.5}):Play()
-                TweenService:Create(lbl,       ti, {TextColor3 = Color3.fromRGB(220, 210, 210)}):Play()
+                local _idleStroke = (_G._tabColorStroke or Color3.fromRGB(160, 20, 20))
+                local _idleBg     = _G._tabColorBg
+                local _iBgColor   = _idleBg
+                    and Color3.new(math.min(_idleBg.R*0.45,1), math.min(_idleBg.G*0.45,1), math.min(_idleBg.B*0.45,1))
+                    or  Color3.fromRGB(70, 18, 18)
+                TweenService:Create(btn,       ti, {BackgroundTransparency = 0.22, BackgroundColor3 = _iBgColor}):Play()
+                TweenService:Create(btnStroke, ti, {Color = _idleStroke, Thickness = 1.5}):Play()
+                TweenService:Create(lbl,       ti, {TextColor3 = Color3.fromRGB(215, 205, 205)}):Play()
             end
         end)
 
