@@ -8580,35 +8580,74 @@ _G._bindablePosSave   = _G._bindablePosSave or {}
 -- Slots activos: siempre fresco al re-ejecutar (evita slots sucios de runs anteriores)
 _G._bindableActiveSlots = {}
 
-_BIND_CS    = 76   -- tama?o del boton (debe coincidir con BTN_W/BTN_H en MakeCapyBindableFrame)
+-- Registro ordenado de bindables activos (orden de activacion)
+_G._bindableOrderedList = _G._bindableOrderedList or {}
+
+_BIND_CS    = 76   -- tamano del boton (debe coincidir con BTN_W/BTN_H en MakeCapyBindableFrame)
 _BIND_GAP   = 10
-_BIND_COLS  = 99   -- sin limite de columnas: siempre fila horizontal unica
+_BIND_COLS  = 4    -- maximo 4 botones por fila
 _BIND_PAD_X = 12
-_BIND_PAD_Y = 10  -- pegado arriba
+_BIND_PAD_Y = 10   -- margen desde arriba
 
 function _getBindablePosition(slotIndex)
     local col = slotIndex % _BIND_COLS
+    local row = math.floor(slotIndex / _BIND_COLS)
     local x   = _BIND_PAD_X + col * (_BIND_CS + _BIND_GAP)
-    local y   = _BIND_PAD_Y  -- siempre arriba, fila ?nica
+    local y   = _BIND_PAD_Y + row * (_BIND_CS + _BIND_GAP)
     return x, y, _BIND_CS, _BIND_CS
 end
 
--- Asigna el proximo slot libre (no usado por otro bindable activo)
+-- Reposiciona todos los bindables activos segun su orden en la lista
+function _rebuildBindableLayout()
+    local list = _G._bindableOrderedList or {}
+    for i, label in ipairs(list) do
+        local slotIndex = i - 1  -- 0-based
+        local x, y = _getBindablePosition(slotIndex)
+        -- Buscar el bg Frame del bindable y moverlo con tween suave
+        local sg = _G._capyBindRegistry and _G._capyBindRegistry[label]
+        if sg and sg.Parent then
+            local bg = sg:FindFirstChild("CapyBindBtn")
+            if bg then
+                pcall(function()
+                    TweenService:Create(bg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        Position = UDim2.fromOffset(x, y)
+                    }):Play()
+                end)
+            end
+        end
+    end
+end
+
+-- Asigna el proximo slot libre y agrega a la lista ordenada
 function _assignSlot(label)
     if _G._bindableActiveSlots[label] then
         return _G._bindableActiveSlots[label]  -- ya tiene slot, reusar
     end
-    -- Buscar el menor indice libre
-    local used = {}
-    for _, idx in pairs(_G._bindableActiveSlots) do used[idx] = true end
-    local slot = 0
-    while used[slot] do slot = slot + 1 end
+    -- Agregar al final de la lista ordenada
+    local list = _G._bindableOrderedList
+    table.insert(list, label)
+    -- El slot es su posicion en la lista (0-based)
+    local slot = #list - 1
     _G._bindableActiveSlots[label] = slot
     return slot
 end
 
 function _releaseSlot(label)
     _G._bindableActiveSlots[label] = nil
+    -- Remover de la lista ordenada
+    local list = _G._bindableOrderedList
+    for i, l in ipairs(list) do
+        if l == label then
+            table.remove(list, i)
+            break
+        end
+    end
+    -- Recalcular slots de todos los restantes
+    for i, l in ipairs(list) do
+        _G._bindableActiveSlots[l] = i - 1
+    end
+    -- Reposicionar todos con animacion suave
+    task.defer(_rebuildBindableLayout)
 end
 
 -- Registro global: label -> _bindSg, para destruccion directa sin buscar por nombre
@@ -8701,6 +8740,8 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     end
     _G._capyBindRegistry = _G._capyBindRegistry or {}
     _G._capyBindRegistry[labelText] = _bindSg
+    -- Reposicionar todos al agregar uno nuevo (layout en fila de 4)
+    task.defer(_rebuildBindableLayout)
 
     -- FIX PERSISTENCIA: NO destruir el bindable cuando el hub se cierra/re-ejecuta.
     -- Antes este AncestryChanged mataba el boton al cerrar el hub, por eso desaparecia
@@ -9148,6 +9189,8 @@ function createBindableButton(name, color)
         posX = math.clamp(sx, 4, vp.X - BTN_W - 4)
         posY = math.clamp(sy, 4, vp.Y - BTN_H - 4)
     end
+    -- Reposicionar todos al agregar este bindable
+    task.defer(_rebuildBindableLayout)
 
     -- -- CONTENEDOR raiz (invisible, solo para drag) --------------
     local bg = Instance.new("Frame", gui)
@@ -9355,7 +9398,7 @@ function destroyBindableButton(name)
         _BindableButtons[name] = nil
     end
     _destroyNamedBindableGui(name .. "_CapyBtn")
-    _releaseSlot(name)  -- liberar slot del grid
+    _releaseSlot(name)  -- liberar slot del grid (ya llama _rebuildBindableLayout via task.defer)
 end
 
 function updateBindables()
@@ -11395,18 +11438,42 @@ function CreateCustomNotification(titleRaw, message, duration)
         local _notifIsMob = _notifVP.X < 600
         local _notifW = _notifIsMob and math.min(math.floor(_notifVP.X * 0.55), 220) or 260
         local _notifH = _notifIsMob and 60 or 72
+        -- Aplicar forma segun configuracion del usuario
+        local _notifShape = (_G._hubSettings and _G._hubSettings.notifShape) or "Rounded"
+        -- Ajustar altura segun forma
+        if _notifShape == "Banner" then _notifH = _notifIsMob and 44 or 52 end
+        if _notifShape == "Minimal" then _notifH = _notifIsMob and 34 or 40 end
+
         local mainFrame = Instance.new("Frame")
         mainFrame.Size = UDim2.new(0, _notifW, 0, _notifH)
         mainFrame.Position = UDim2.new(1, -8, 1, -50)
         mainFrame.AnchorPoint = Vector2.new(1, 1)
         mainFrame.BackgroundColor3 = ThemeColors.Background
-        mainFrame.BackgroundTransparency = 0.15
+        mainFrame.BackgroundTransparency = (_notifShape == "Minimal") and 0.35 or 0.15
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = notifSG
 
+        -- Radio de esquinas segun forma
+        local _cornerRadius = 6
+        if _notifShape == "Rounded" then _cornerRadius = 6
+        elseif _notifShape == "Sharp"   then _cornerRadius = 0
+        elseif _notifShape == "Pill"    then _cornerRadius = 24
+        elseif _notifShape == "Banner"  then _cornerRadius = 0
+        elseif _notifShape == "Minimal" then _cornerRadius = 10
+        end
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
+        corner.CornerRadius = UDim.new(0, _cornerRadius)
         corner.Parent = mainFrame
+
+        -- Barra lateral de acento (solo en Banner)
+        if _notifShape == "Banner" then
+            local accentBar = Instance.new("Frame", mainFrame)
+            accentBar.Size = UDim2.new(0, 4, 1, 0)
+            accentBar.Position = UDim2.new(0, 0, 0, 0)
+            accentBar.BackgroundColor3 = ThemeColors.Primary
+            accentBar.BorderSizePixel = 0
+            accentBar.ZIndex = 2
+        end
 
         -- Borde con gradiente morado/azul
         local stroke = Instance.new("UIStroke")
@@ -11415,19 +11482,25 @@ function CreateCustomNotification(titleRaw, message, duration)
         stroke.Transparency = 0
         stroke.Parent = mainFrame
 
-        -- Icono checkmark verde
+        -- Icono checkmark verde (oculto en Minimal/Banner)
+        local _iconSize = (_notifShape == "Minimal" or _notifShape == "Banner") and 0 or 26
+        local _iconOffX  = (_notifShape == "Banner") and 14 or 10
         local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.new(0, 26, 0, 26)
-        icon.Position = UDim2.new(0, 10, 0, 10)
+        icon.Size = UDim2.new(0, _iconSize, 0, _iconSize)
+        icon.Position = UDim2.new(0, _iconOffX, 0.5, -13)
         icon.BackgroundTransparency = 1
         icon.Image = "rbxassetid://6031094678"
         icon.ImageColor3 = ThemeColors.Primary
+        icon.Visible = (_notifShape ~= "Minimal" and _notifShape ~= "Banner")
         icon.Parent = mainFrame
 
-        -- Titulo con RichText: "Overdrive H Says:"
+        -- Titulo con RichText
+        local _titleOffX = (_notifShape == "Minimal") and 10 or (_notifShape == "Banner") and 14 or 46
+        local _titleOffY = (_notifShape == "Minimal") and 0 or (_notifShape == "Banner") and 6 or 8
+        local _titleH    = (_notifShape == "Minimal") and _notifH or 20
         local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(1, -55, 0, 20)
-        titleLbl.Position = UDim2.new(0, 46, 0, 8)
+        titleLbl.Size = UDim2.new(1, -(_titleOffX + 8), 0, _titleH)
+        titleLbl.Position = UDim2.new(0, _titleOffX, 0, _titleOffY)
         titleLbl.BackgroundTransparency = 1
         titleLbl.RichText = true
         local _pr = ThemeColors.Primary
@@ -11438,10 +11511,12 @@ function CreateCustomNotification(titleRaw, message, duration)
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
         titleLbl.Parent = mainFrame
 
-        -- Mensaje
+        -- Mensaje (oculto en Minimal)
+        local _descOffX = (_notifShape == "Banner") and 14 or 46
         local descLbl = Instance.new("TextLabel")
-        descLbl.Size = UDim2.new(1, -55, 0, 28)
-        descLbl.Position = UDim2.new(0, 46, 0, 28)
+        descLbl.Size = UDim2.new(1, -(_descOffX + 8), 0, 28)
+        descLbl.Position = UDim2.new(0, _descOffX, 0, (_notifShape == "Banner") and 22 or 28)
+        descLbl.Visible = (_notifShape ~= "Minimal")
         descLbl.BackgroundTransparency = 1
         descLbl.RichText = true
         descLbl.Text = tostring(message)
@@ -39397,12 +39472,13 @@ function CreatePremiumTab()
             },
             {
                 -- Purple Katana: mesh custom con agarre dual knife
-                -- FIX PARADO: usar _KNIFE_GRIP_STD igual que Turkey y demas knives
+                -- FIX PARADO v3: weldOffset rota el mesh 90° en Z para que quede vertical
                 name       = "Purple Katana",
                 meshId     = "http://www.roblox.com/asset/?id=11442510",
                 texId      = "rbxassetid://10944556659",
                 scale      = Vector3.new(1.5, 1.5, 1.5),
                 grip       = _KNIFE_GRIP_STD,
+                weldOffset = CFrame.new(0, 0, 0) * CFrame.Angles(0, 0, math.rad(90)),
                 dualKnife  = true,
             },
             {
@@ -40434,6 +40510,7 @@ function CreateExclusiveTab()
         hubLayoutMode      = 1,    -- 1=SidebarIzq 2=BarraTop 3=SidebarDer 4=BarraBot 5=MiniIzq
         notifDuration      = 3,    -- segundos default de notificaciones
         notifMuted         = false, -- silenciar todas las notificaciones
+        notifShape         = "Rounded",  -- forma de las notificaciones: Rounded, Sharp, Pill, Banner, Minimal
         fpsLimit           = 0,    -- 0 = sin limite
         crosshairHidden    = false,
         hudHidden          = false,
@@ -41799,6 +41876,34 @@ function CreateExclusiveTab()
         _hs().notifDuration = v
         -- Parchear la duracion default globalmente
         _G._notifDefaultDuration = v
+    end)
+
+    -- Selector de forma de notificaciones
+    local _notifShapes = {"Rounded", "Sharp", "Pill", "Banner", "Minimal"}
+    local _notifShapeDesc = {
+        ["Rounded"]  = "Clasica con esquinas redondeadas",
+        ["Sharp"]    = "Bordes rectos sin redondeo",
+        ["Pill"]     = "Completamente circular (capsula)",
+        ["Banner"]   = "Barra horizontal compacta con acento lateral",
+        ["Minimal"]  = "Sin icono, solo texto semitransparente",
+    }
+    local _curShape = HS.notifShape or "Rounded"
+
+    -- Label de descripcion de la forma actual
+    local _shapeDescLbl = Instance.new("TextLabel", notifSec)
+    _shapeDescLbl.Size = UDim2.new(1, -8, 0, 22)
+    _shapeDescLbl.BackgroundTransparency = 1
+    _shapeDescLbl.Text = "  " .. (_notifShapeDesc[_curShape] or "")
+    _shapeDescLbl.TextColor3 = Color3.fromRGB(180, 180, 200)
+    _shapeDescLbl.FontFace = Font.fromEnum(Enum.Font.Gotham)
+    _shapeDescLbl.TextSize = 10
+    _shapeDescLbl.TextXAlignment = Enum.TextXAlignment.Left
+    _shapeDescLbl.ZIndex = 13
+
+    CreateNebulaSelector(notifSec, "Forma de Notificaciones", _notifShapes, _curShape, function(sel)
+        _hs().notifShape = sel
+        _shapeDescLbl.Text = "  " .. (_notifShapeDesc[sel] or "")
+        CreateCustomNotification("PREVIEW", "Asi se ve la forma: " .. sel, 2.5)
     end)
 
     -- Limpiar notificaciones activas
