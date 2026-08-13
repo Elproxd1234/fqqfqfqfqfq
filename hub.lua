@@ -895,9 +895,9 @@ local function _loadConfig()
         end
     end
     -- Restaurar flag de auto-save y sincronizar estado del toggle en UI
-    if saved["Auto Save Config"] ~= nil then
-        _G._autoSaveEnabled = saved["Auto Save Config"]
-        _G._toggleStates["Auto Save Config"] = saved["Auto Save Config"]
+    if saved["Auto Save"] ~= nil then
+        _G._autoSaveEnabled = saved["Auto Save"]
+        _G._toggleStates["Auto Save"] = saved["Auto Save"]
     end
     _G._restoredActiveCount = _restoredActiveCount
     _G._restoredForPlayer = Players.LocalPlayer and Players.LocalPlayer.Name or nil
@@ -906,7 +906,7 @@ end
 -- Flag de auto-save (el toggle en Settings lo puede apagar)
 -- FIX AUTO-SAFE: siempre iniciar en true para garantizar que _saveConfig funcione
 -- desde el primer tick. Si el usuario lo apago manualmente, se restaura desde disco
--- cuando CreateAuroraToggle("Auto Save Config") se crea en el tab Settings.
+-- cuando CreateAuroraToggle("Auto Save") se crea en el tab Settings.
 _G._autoSaveEnabled = true
 
 
@@ -1183,9 +1183,9 @@ end
 -- ===================================================================
 local _LangStrings = {
     [" English"] = {
-        boost = "BOOST", combat = "COMBAT", farm = "FARM", main = "MAIN",
-        premium = "PREMIUM", settings = "SETTINGS", use = "USE",
-        visuals = "VISUALS", world = "WORLD", emotes = "EMOTES",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY", emotes = "EMOTES",
         fling = "FLING", hitbox_expander = "HITBOX EXPANDER",
         walkspeed = "WalkSpeed", jumppower = "JumpPower",
         movement = "MOVEMENT", protections = "PROTECTIONS",
@@ -1214,9 +1214,9 @@ local _LangStrings = {
         info = "INFO", user_info = "User Info",
     },
     [" Espanol"] = {
-        boost = "BOOST", combat = "COMBATE", farm = "GRANJA", main = "PRINCIPAL",
-        premium = "PREMIUM", settings = "CONFIGURACION", use = "USO",
-        visuals = "VISUALES", world = "MUNDO", emotes = "EMOTES",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY", emotes = "EMOTES",
         fling = "LANZAR", hitbox_expander = "EXPANDIR HITBOX",
         walkspeed = "Velocidad", jumppower = "Poder de Salto",
         movement = "MOVIMIENTO", protections = "PROTECCIONES",
@@ -1230,9 +1230,9 @@ local _LangStrings = {
         knife_aura = "Knife Aura 10K activo -- !todos los jugadores!",
         no_knife = "!No tenes el Knife en el inventario!",
         knife_lost = "Knife perdido -- detenido",
-        settings_title = "CONFIGURACION", language_saved = "Idioma guardado: ",
-        theme_applied = "Tema aplicado: ", select_language = " Seleccionar Idioma",
-        select_theme = " Seleccionar Tema", hub_settings = " AJUSTES HUB",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Habilitar Verificacion de Pared (LOS)",
         auto_shoot_gun = "DISPARO AUTOMATICO", auto_shoot_knife = "DISPARO AUTO CUCHILLO VISIBLE",
         shoot_on_knife = "Disparar cuando Cuchillo Visible (Activo)",
@@ -1245,9 +1245,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Info de Usuario",
     },
     [" Portugues"] = {
-        boost = "BOOST", combat = "COMBATE", farm = "FAZENDA", main = "PRINCIPAL",
-        premium = "PREMIUM", settings = "CONFIGURACES", use = "USO",
-        visuals = "VISUAIS", world = "MUNDO",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "ARREMESSAR", hitbox_expander = "EXPANDIR HITBOX",
         walkspeed = "Velocidade", jumppower = "Poder de Pulo",
         movement = "MOVIMENTO", protections = "PROTECES",
@@ -1261,9 +1261,9 @@ local _LangStrings = {
         knife_aura = "Knife Aura 10K ativo -- todos os jogadores!",
         no_knife = "Sem faca no inventario!",
         knife_lost = "Faca perdida -- parado",
-        settings_title = "CONFIGURACES", language_saved = "Idioma salvo: ",
-        theme_applied = "Tema aplicado: ", select_language = " Selecionar Idioma",
-        select_theme = " Selecionar Tema", hub_settings = " AJUSTES HUB",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Habilitar Verificacao de Parede (LOS)",
         auto_shoot_gun = "DISPARO AUTOMATICO", auto_shoot_knife = "DISPARO AUTO FACA VISIVEL",
         shoot_on_knife = "Atirar quando Faca Visivel (Ativo)",
@@ -1276,9 +1276,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Info do Usuario",
     },
     [" French"] = {
-        boost = "BOOST", combat = "COMBAT", farm = "FERME", main = "PRINCIPAL",
-        premium = "PREMIUM", settings = "PARAMETRES", use = "UTILISER",
-        visuals = "VISUELS", world = "MONDE",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "LANCER", hitbox_expander = "EXPANDER HITBOX",
         walkspeed = "Vitesse de Marche", jumppower = "Puissance de Saut",
         movement = "MOUVEMENT", protections = "PROTECTIONS",
@@ -1292,9 +1292,9 @@ local _LangStrings = {
         knife_aura = "Knife Aura 10K actif -- tous les joueurs!",
         no_knife = "Pas de couteau dans l'inventaire!",
         knife_lost = "Couteau perdu -- arrete",
-        settings_title = "PARAMETRES", language_saved = "Langue sauvegardee: ",
-        theme_applied = "Theme applique: ", select_language = " Selectionner Langue",
-        select_theme = " Selectionner Theme", hub_settings = " PARAMETRES HUB",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Activer Verif. Mur (LOS)",
         auto_shoot_gun = "TIR AUTO", auto_shoot_knife = "TIR AUTO COUTEAU VISIBLE",
         shoot_on_knife = "Tirer quand Couteau Visible (Actif)",
@@ -1307,9 +1307,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Info Utilisateur",
     },
     [" German"] = {
-        boost = "BOOST", combat = "KAMPF", farm = "FARM", main = "HAUPT",
-        premium = "PREMIUM", settings = "EINSTELLUNGEN", use = "BENUTZEN",
-        visuals = "VISUALS", world = "WELT",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "SCHLEUDERN", hitbox_expander = "HITBOX ERWEITERN",
         walkspeed = "Gehgeschwindigkeit", jumppower = "Sprungkraft",
         movement = "BEWEGUNG", protections = "SCHUTZ",
@@ -1323,9 +1323,9 @@ local _LangStrings = {
         knife_aura = "Messer Aura 10K aktiv -- alle Spieler!",
         no_knife = "Kein Messer im Inventar!",
         knife_lost = "Messer verloren -- gestoppt",
-        settings_title = "EINSTELLUNGEN", language_saved = "Sprache gespeichert: ",
-        theme_applied = "Thema angewendet: ", select_language = " Sprache auswahlen",
-        select_theme = " Thema auswahlen", hub_settings = " HUB EINSTELLUNGEN",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Wandprufung aktivieren (LOS)",
         auto_shoot_gun = "AUTO SCHUSS", auto_shoot_knife = "AUTO SCHUSS MESSER SICHTBAR",
         shoot_on_knife = "Schiessen wenn Messer sichtbar (Aktiv)",
@@ -1338,9 +1338,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Benutzerinfo",
     },
     [" Italian"] = {
-        boost = "BOOST", combat = "COMBATTIMENTO", farm = "FATTORIA", main = "PRINCIPALE",
-        premium = "PREMIUM", settings = "IMPOSTAZIONI", use = "USA",
-        visuals = "VISUALS", world = "MONDO",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "LANCIO", hitbox_expander = "ESPANDI HITBOX",
         walkspeed = "Velocita di Camminata", jumppower = "Potenza di Salto",
         movement = "MOVIMENTO", protections = "PROTEZIONI",
@@ -1354,9 +1354,9 @@ local _LangStrings = {
         knife_aura = "Knife Aura 10K attiva -- tutti i giocatori!",
         no_knife = "Nessun coltello nell'inventario!",
         knife_lost = "Coltello perso -- fermato",
-        settings_title = "IMPOSTAZIONI", language_saved = "Lingua salvata: ",
-        theme_applied = "Tema applicato: ", select_language = " Seleziona Lingua",
-        select_theme = " Seleziona Tema", hub_settings = " IMPOSTAZIONI HUB",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Abilita Controllo Muro (LOS)",
         auto_shoot_gun = "SPARO AUTO", auto_shoot_knife = "SPARO AUTO COLTELLO VISIBILE",
         shoot_on_knife = "Spara quando Coltello Visibile (Attivo)",
@@ -1369,9 +1369,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Info Utente",
     },
     [" Turkish"] = {
-        boost = "BOOST", combat = "SAVAS", farm = "CIFTLIK", main = "ANA",
-        premium = "PREMIUM", settings = "AYARLAR", use = "KULLAN",
-        visuals = "GORSELLER", world = "DUNYA",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "FIRLATMA", hitbox_expander = "HITBOX GENISLET",
         walkspeed = "Yuruyus Hizi", jumppower = "Ziplama Gucu",
         movement = "HAREKET", protections = "KORUMALAR",
@@ -1385,9 +1385,9 @@ local _LangStrings = {
         knife_aura = "Bicak Aura 10K aktif -- tum oyuncular!",
         no_knife = "Envanterde bicak yok!",
         knife_lost = "Bicak kayboldu -- durduruldu",
-        settings_title = "AYARLAR", language_saved = "Dil kaydedildi: ",
-        theme_applied = "Tema uygulandi: ", select_language = " Dil Sec",
-        select_theme = " Tema Sec", hub_settings = " HUB AYARLARI",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = "Duvar Kontrolunu Etkinlestir (LOS)",
         auto_shoot_gun = "OTOMATIK ATES", auto_shoot_knife = "OTOMATIK ATES BICAK GORUNUR",
         shoot_on_knife = "Bicak Gorunurken Ates Et (Aktif)",
@@ -1400,9 +1400,9 @@ local _LangStrings = {
         info = "INFO", user_info = "Kullanici Bilgisi",
     },
     [" Chinese"] = {
-        boost = "", combat = "", farm = "", main = "",
-        premium = "", settings = "", use = "",
-        visuals = "", world = "",
+        boost = "BOOST", combat = "BATTLE", farm = "FARM", main = "HOME",
+        premium = "VIP", settings = "SETTINGS", use = "USE",
+        visuals = "VISUALS", world = "GAMEPLAY",
         fling = "", hitbox_expander = "",
         walkspeed = "", jumppower = "",
         movement = "", protections = "",
@@ -1416,9 +1416,9 @@ local _LangStrings = {
         knife_aura = " 10K  -- ",
         no_knife = "",
         knife_lost = " -- ",
-        settings_title = "", language_saved = "",
-        theme_applied = "", select_language = " ",
-        select_theme = " ", hub_settings = " HUB ",
+        settings_title = "SETTINGS", language_saved = "Language saved: ",
+        theme_applied = "Theme applied: ", select_language = " Select Language",
+        select_theme = " Select Theme", hub_settings = " HUB SETTINGS",
         enable_wallcheck = " (LOS)",
         auto_shoot_gun = "", auto_shoot_knife = "",
         shoot_on_knife = "",
@@ -9574,53 +9574,75 @@ function updateBindables()
                 shootBtnGui = _saGui
             end
             local function _doShootMurderer()
-                task.spawn(function()
-                    -- ================================================================
-                    -- LOGICA BASADA EN EL GUNCLIENT ORIGINAL DE MM2
-                    -- GunClient firma: gun.Shoot:FireServer(
-                    --   GunRaycastAttachment.WorldCFrame,   <- origen del disparo
-                    --   WeaponService:GetMouseTargetCFrame() <- CFrame del impacto
-                    -- )
-                    -- ================================================================
-                    local myChar = LocalPlayer.Character
-                    if not myChar then return end
-                    local myHum = myChar:FindFirstChildOfClass("Humanoid")
-                    if not myHum or myHum.Health <= 0 then return end
-                    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-                    if not myHRP then return end
+                -- ================================================================
+                -- SHOOT MURDER v2 - CON DETECCION DE ROL SHERIFF
+                -- 1) Verifica que el local player sea Sheriff
+                -- 2) Guarda posicion antes de activar
+                -- 3) TP detras del murder a 5 studs
+                -- 4) Se mantiene pegado (tracking loop)
+                -- 5) Silent Aim - auto shoot con redirect de bala
+                -- 6) Al detectar Gunshot ajeno -> TP a posicion guardada
+                -- ================================================================
 
-                    -- Detectar murderer (target)
-                    local target = findMurderer and findMurderer()
-                    if not target or not target.Character then
-                        CreateCustomNotification("SHOOT", "No hay Murder detectado", 1.5)
-                        return
-                    end
-                    local tChar = target.Character
-                    local tHum  = tChar:FindFirstChildOfClass("Humanoid")
-                    if not tHum or tHum.Health <= 0 then
-                        CreateCustomNotification("SHOOT", "Murder sin vida", 1.5)
-                        return
-                    end
-                    local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-                    if not tHRP then return end
+                -- [1] VERIFICAR ROL: solo funciona si somos Sheriff (o Hero)
+                local myRole = (_roleCache and _roleCache.localRole) or "Innocent"
+                if myRole ~= "Sheriff" and myRole ~= "Hero" then
+                    CreateCustomNotification("SHOOT MURDER", "Solo funciona siendo Sheriff!", 2)
+                    return
+                end
 
-                    -- -- 1. Buscar DefaultGun (igual que GunClient: script.Parent) --
-                    -- Prioridad: mano del player -> backpack
-                    local gun = nil
-                    -- a) En mano: buscar tool con GunClient o nombre DefaultGun
-                    for _, tool in ipairs(myChar:GetChildren()) do
-                        if tool:IsA("Tool") then
-                            if tool.Name == "DefaultGun"
-                            or tool:FindFirstChild("GunClient")
-                            or tool:FindFirstChild("GunServer") then
-                                gun = tool; break
-                            end
+                local myChar = LocalPlayer.Character
+                if not myChar then return end
+                local myHum = myChar:FindFirstChildOfClass("Humanoid")
+                if not myHum or myHum.Health <= 0 then return end
+                local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+                if not myHRP then return end
+
+                -- Detectar murderer (target)
+                local target = findMurderer and findMurderer()
+                if not target or not target.Character then
+                    CreateCustomNotification("SHOOT", "No hay Murder detectado", 1.5)
+                    return
+                end
+                local tChar = target.Character
+                local tHum  = tChar:FindFirstChildOfClass("Humanoid")
+                if not tHum or tHum.Health <= 0 then
+                    CreateCustomNotification("SHOOT", "Murder sin vida", 1.5)
+                    return
+                end
+                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                if not tHRP then return end
+
+                -- [2] GUARDAR POSICION ACTUAL (para volver despues del Gunshot)
+                local savedCF = myHRP.CFrame
+
+                -- [3] TP DETRAS DEL MURDER A 5 STUDS
+                local function _getTpBehindMurder()
+                    local mCF = tHRP.CFrame
+                    -- -LookVector = detras del murder, 5 studs de distancia
+                    local behindPos = mCF.Position - mCF.LookVector * 5
+                    return CFrame.new(behindPos, mCF.Position)
+                end
+
+                pcall(function() myHRP.CFrame = _getTpBehindMurder() end)
+                task.wait(0.08)
+
+                -- Buscar gun
+                local gun = nil
+                for _, tool in ipairs(myChar:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        if tool.Name == "DefaultGun"
+                        or tool:FindFirstChild("GunClient")
+                        or tool:FindFirstChild("GunServer") then
+                            gun = tool; break
                         end
                     end
-                    -- b) En backpack si no esta equipada
-                    local _wasInBackpack = false
-                    if not gun then
-                        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                end
+                local _wasInBackpack = false
+                if not gun then
+                    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                    if bp then
+                        for _, tool in ipairs(bp:GetChildren()) do
                             if tool:IsA("Tool") then
                                 if tool.Name == "DefaultGun"
                                 or tool:FindFirstChild("GunClient")
@@ -9629,139 +9651,237 @@ function updateBindables()
                                 end
                             end
                         end
-                        if gun then
-                            -- Equipar igual que GunClient: myHum:EquipTool
-                            pcall(function() myHum:EquipTool(gun) end)
-                            task.wait(0.06)
-                            -- Re-buscar ahora que esta en mano
-                            for _, tool in ipairs(myChar:GetChildren()) do
-                                if tool == gun or (tool:IsA("Tool") and (
-                                    tool.Name == "DefaultGun"
-                                    or tool:FindFirstChild("GunClient")
-                                    or tool:FindFirstChild("GunServer"))) then
-                                    gun = tool; break
-                                end
+                    end
+                    if gun then
+                        pcall(function() myHum:EquipTool(gun) end)
+                        task.wait(0.06)
+                        for _, tool in ipairs(myChar:GetChildren()) do
+                            if tool == gun or (tool:IsA("Tool") and (
+                                tool.Name == "DefaultGun"
+                                or tool:FindFirstChild("GunClient")
+                                or tool:FindFirstChild("GunServer"))) then
+                                gun = tool; break
                             end
                         end
                     end
-                    -- c) Fallback generico
-                    if not gun then
-                        gun = _findGunIn and (_findGunIn(myChar) or _findGunIn(LocalPlayer.Backpack))
-                    end
-                    if not gun then
-                        CreateCustomNotification("SHOOT", "No hay DefaultGun disponible", 1.5)
-                        return
-                    end
+                end
+                if not gun then
+                    gun = _findGunIn and (_findGunIn(myChar) or _findGunIn(LocalPlayer:FindFirstChildOfClass("Backpack")))
+                end
+                if not gun then
+                    CreateCustomNotification("SHOOT", "No hay DefaultGun disponible", 1.5)
+                    pcall(function() myHRP.CFrame = savedCF end)
+                    return
+                end
 
-                    -- -- 2. GunRaycastAttachment ? exactamente como EnsureGunRaycastAttachment --
-                    -- GunClient busca en HumanoidRootPart; si no existe, lo crea en (0,1.35,-1)
-                    local gra = myHRP:FindFirstChild("GunRaycastAttachment")
-                    if not gra then
-                        gra = Instance.new("Attachment")
-                        gra.Name     = "GunRaycastAttachment"
-                        gra.Position = Vector3.new(0, 1.35, -1)
-                        gra.Parent   = myHRP
-                    end
-                    -- WorldCFrame del attachment (p1 en GunClient = GunRaycastAttachment.WorldCFrame)
-                    local graCF = gra.WorldCFrame
+                -- GunRaycastAttachment
+                local gra = myHRP:FindFirstChild("GunRaycastAttachment")
+                if not gra then
+                    gra = Instance.new("Attachment")
+                    gra.Name     = "GunRaycastAttachment"
+                    gra.Position = Vector3.new(0, 1.35, -1)
+                    gra.Parent   = myHRP
+                end
 
-                    -- -- 3. Calcular targetPos con prediccion SA --------------------------
-                    local partName = (CombatTabState and CombatTabState.saTargetPart) or "Head"
-                    local tPart    = tChar:FindFirstChild(partName)
-                                  or tChar:FindFirstChild("Head")
-                                  or tHRP
+                -- [4] LOOP DE TRACKING (pegado a 5 studs detras del murder)
+                -- + [5] SILENT AIM (auto shoot)
+                -- + [6] DETECCION DE GUNSHOT -> TP a savedCF
 
-                    -- Intentar _saGetTargetCF primero (usa toda la logica de prediccion del SA)
-                    local finalGraCF, finalTargetCF = nil, nil
-                    if _saGetTargetCF then
-                        local ok3, gCF3, tCF3 = pcall(_saGetTargetCF)
-                        if ok3 and gCF3 and tCF3 then
-                            finalGraCF, finalTargetCF = gCF3, tCF3
+                -- Flag de sesion: se cancela si el murder muere o nos matan
+                local _smActive = true
+                local _smConn_gunshot = nil  -- conexion para detectar disparo del murder
+
+                -- Detectar si el murder dispara (Gunshot -> volvemos a savedCF)
+                -- Hookear el RemoteEvent de shoot del juego (OnClientEvent / DescendantAdded)
+                task.spawn(function()
+                    -- Buscar el remote de GunFired en ReplicatedStorage (evento global de disparo)
+                    local RS = game:GetService("ReplicatedStorage")
+                    local gfRemote = nil
+                    -- Intentar paths conocidos de MM2
+                    local function _tryFindGF()
+                        local function tp(root, ...)
+                            local cur = root
+                            for _, k in ipairs({...}) do
+                                if not cur then return nil end
+                                cur = cur:FindFirstChild(k)
+                            end
+                            return (cur and (cur:IsA("RemoteEvent") or cur:IsA("BindableEvent"))) and cur or nil
                         end
-                    end
-
-                    -- Si _saGetTargetCF no retorno nada, construir manualmente
-                    if not (finalGraCF and finalTargetCF) then
-                        -- Calcular targetPos
-                        local targetPos
-                        if CombatTabState and CombatTabState.saUsePrediction and _getCachedPrediction then
-                            targetPos = _getCachedPrediction(target) or tPart.Position
-                        elseif _unifiedBalisticSolver then
-                            local solved = _unifiedBalisticSolver(tPart, tHRP, {usePrediction = true}, target)
-                            targetPos = solved or tPart.Position
-                        else
-                            targetPos = tPart.Position
-                        end
-
-                        local originPos = graCF.Position
-
-                        -- -- 4. Construir CFrames exactamente como _buildSACFrames / GunClient --
-                        -- graCF: posicion del attachment, LookVector apunta al target
-                        -- targetCF: replica WeaponService:GetMouseTargetCFrame()
-                        --   -> CFrame en la posicion del impacto, LookVector de vuelta al shooter
-                        local dir = targetPos - originPos
-                        if dir.Magnitude < 0.01 then return end
-                        local dirU = dir.Unit
-                        local upV  = math.abs(dirU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
-
-                        -- graCF corregido: mantener posicion exacta del attachment, reorientar hacia target
-                        finalGraCF = CFrame.new(graCF.Position) * CFrame.lookAt(Vector3.zero, dirU, upV)
-
-                        -- targetCF: CFrame en targetPos mirando de vuelta al shooter (replica GetMouseTargetCFrame)
-                        local backDir = originPos - targetPos
-                        local backU   = backDir.Magnitude > 0.01 and backDir.Unit or -dirU
-                        local bkUp    = math.abs(backU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
-                        finalTargetCF = CFrame.lookAt(targetPos, targetPos + backU, bkUp)
-                    end
-
-                    if not (finalGraCF and finalTargetCF) then
-                        CreateCustomNotification("SHOOT", "Error calculando CFrames", 1.5)
                         return
+                            tp(RS, "ClientServices", "WeaponService", "GunFired") or
+                            tp(RS, "WeaponEvents", "GunBeam")                     or
+                            tp(RS, "Remotes", "Gameplay", "Shoot")                or
+                            tp(RS, "WeaponEvents", "Shoot")                       or
+                            tp(RS, "Events", "GunFired")
                     end
+                    gfRemote = _tryFindGF()
 
-                    -- -- 5. FireServer exactamente como GunClient: gun.Shoot:FireServer(graCF, targetCF) --
-                    -- El RemoteEvent "Shoot" esta directamente en la gun (v1.Shoot en el GunClient)
-                    local shootRem = gun:FindFirstChild("Shoot")
-                    -- Fallback: buscar en GunServer o GetDescendants
-                    if not (shootRem and shootRem:IsA("RemoteEvent")) then
-                        local gs = gun:FindFirstChild("GunServer")
-                        if gs then
-                            local gsShoot = gs:FindFirstChild("Shoot")
-                            if gsShoot and gsShoot:IsA("RemoteEvent") then
-                                shootRem = gsShoot
+                    if gfRemote then
+                        local _evt = gfRemote:IsA("RemoteEvent") and gfRemote.OnClientEvent or gfRemote.Event
+                        _smConn_gunshot = _evt:Connect(function(shooter, ...)
+                            -- Si el que disparo es el murder -> TP a posicion guardada
+                            if not _smActive then return end
+                            if shooter == target then
+                                _smActive = false
+                                pcall(function() myHRP.CFrame = savedCF end)
+                                CreateCustomNotification("SHOOT MURDER", "Gunshot detectado! TP a posicion guardada", 2)
+                            end
+                        end)
+                    end
+                end)
+
+                -- Loop principal: mantener posicion + silent aim
+                task.spawn(function()
+                    local RS2 = game:GetService("RunService")
+                    local _loopConn = nil
+                    local _shotFired = false
+
+                    -- SILENT AIM: calcular CFrames y disparar
+                    local function _doSilentShot()
+                        if _shotFired then return end
+                        local c2   = LocalPlayer.Character
+                        local h2   = c2 and c2:FindFirstChild("HumanoidRootPart")
+                        if not c2 or not h2 then return end
+                        local tPart = tChar:FindFirstChild(
+                            (CombatTabState and CombatTabState.saTargetPart) or "Head"
+                        ) or tChar:FindFirstChild("Head") or tHRP
+                        local gra2 = h2:FindFirstChild("GunRaycastAttachment")
+                        if not gra2 then
+                            gra2 = Instance.new("Attachment")
+                            gra2.Name = "GunRaycastAttachment"
+                            gra2.Position = Vector3.new(0, 1.35, -1)
+                            gra2.Parent = h2
+                        end
+                        local graCF2 = gra2.WorldCFrame
+
+                        local finalGraCF, finalTargetCF = nil, nil
+                        if _saGetTargetCF then
+                            local ok3, gCF3, tCF3 = pcall(_saGetTargetCF)
+                            if ok3 and gCF3 and tCF3 then
+                                finalGraCF, finalTargetCF = gCF3, tCF3
                             end
                         end
-                    end
-                    if not (shootRem and shootRem:IsA("RemoteEvent")) and getShootRemote then
-                        shootRem = getShootRemote(gun)
-                    end
+                        if not (finalGraCF and finalTargetCF) then
+                            local targetPos
+                            if CombatTabState and CombatTabState.saUsePrediction and _getCachedPrediction then
+                                targetPos = _getCachedPrediction(target) or tPart.Position
+                            else
+                                targetPos = tPart.Position
+                            end
+                            local originPos = graCF2.Position
+                            local dir = targetPos - originPos
+                            if dir.Magnitude < 0.01 then return end
+                            local dirU = dir.Unit
+                            local upV  = math.abs(dirU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
+                            finalGraCF    = CFrame.new(graCF2.Position) * CFrame.lookAt(Vector3.zero, dirU, upV)
+                            local backDir = originPos - targetPos
+                            local backU   = backDir.Magnitude > 0.01 and backDir.Unit or -dirU
+                            local bkUp    = math.abs(backU.Y) > 0.98 and Vector3.xAxis or Vector3.yAxis
+                            finalTargetCF = CFrame.lookAt(targetPos, targetPos + backU, bkUp)
+                        end
+                        if not (finalGraCF and finalTargetCF) then return end
 
-                    if shootRem and shootRem:IsA("RemoteEvent") then
-                        -- Bypass hook del SA para no double-redirect
-                        if CombatTabState then CombatTabState._saBypassHook = true end
-                        -- Disparo con la misma firma que el GunClient original:
-                        -- v1.Shoot:FireServer(GunRaycastAttachment.WorldCFrame, GetMouseTargetCFrame())
-                        pcall(function() shootRem:FireServer(finalGraCF, finalTargetCF) end)
-                        if CombatTabState then CombatTabState._saBypassHook = false end
-                        CreateCustomNotification("SILENT AIM", "-> " .. target.Name, 1.2)
-                    else
-                        -- Fallback: _fireGunMM2 con targetCF correcto
-                        if _fireGunMM2 then
+                        -- Buscar gun actualizado
+                        local gun2 = nil
+                        for _, tool in ipairs(c2:GetChildren()) do
+                            if tool:IsA("Tool") and (
+                                tool.Name == "DefaultGun"
+                                or tool:FindFirstChild("GunClient")
+                                or tool:FindFirstChild("GunServer")) then
+                                gun2 = tool; break
+                            end
+                        end
+                        if not gun2 then
+                            gun2 = _findGunIn and _findGunIn(c2)
+                        end
+                        if not gun2 then return end
+
+                        local shootRem2 = gun2:FindFirstChild("Shoot")
+                        if not (shootRem2 and shootRem2:IsA("RemoteEvent")) then
+                            local gs2 = gun2:FindFirstChild("GunServer")
+                            if gs2 then
+                                local gsS = gs2:FindFirstChild("Shoot")
+                                if gsS and gsS:IsA("RemoteEvent") then shootRem2 = gsS end
+                            end
+                        end
+                        if not (shootRem2 and shootRem2:IsA("RemoteEvent")) and getShootRemote then
+                            shootRem2 = getShootRemote(gun2)
+                        end
+
+                        if shootRem2 and shootRem2:IsA("RemoteEvent") then
+                            _shotFired = true
                             if CombatTabState then CombatTabState._saBypassHook = true end
-                            _fireGunMM2(gun, finalTargetCF)
+                            pcall(function() shootRem2:FireServer(finalGraCF, finalTargetCF) end)
+                            if CombatTabState then CombatTabState._saBypassHook = false end
+                            CreateCustomNotification("SILENT AIM", "-> " .. target.Name, 1.2)
+                        elseif _fireGunMM2 then
+                            _shotFired = true
+                            if CombatTabState then CombatTabState._saBypassHook = true end
+                            _fireGunMM2(gun2, finalTargetCF)
                             if CombatTabState then CombatTabState._saBypassHook = false end
                         end
                     end
 
-                    -- -- 7. Desequipar si vino del backpack ------------------------------
-                    if _wasInBackpack and myHum and myHum.Parent then
-                        task.delay(0.17, function()
-                            pcall(function() myHum:UnequipTools() end)
+                    -- Cada heartbeat: mantenerse detras del murder y disparar
+                    _loopConn = RS2.Heartbeat:Connect(function()
+                        if not _smActive then
+                            _loopConn:Disconnect()
+                            return
+                        end
+                        -- Verificar que el murder y nuestro personaje siguen vivos
+                        local c3 = LocalPlayer.Character
+                        local h3 = c3 and c3:FindFirstChild("HumanoidRootPart")
+                        local hm3 = c3 and c3:FindFirstChildOfClass("Humanoid")
+                        if not h3 or not hm3 or hm3.Health <= 0 then
+                            _smActive = false
+                            _loopConn:Disconnect()
+                            return
+                        end
+                        if not tHRP or not tHRP.Parent or not tChar.Parent then
+                            _smActive = false
+                            _loopConn:Disconnect()
+                            pcall(function() h3.CFrame = savedCF end)
+                            return
+                        end
+                        -- TRACKING: mantenerse a 5 studs detras del murder
+                        pcall(function()
+                            h3.CFrame = _getTpBehindMurder()
                         end)
+                        -- SILENT AIM: disparar una vez
+                        _doSilentShot()
+                    end)
+
+                    -- Esperar a que el disparo ocurra, luego volver a savedCF
+                    local _waited = 0
+                    while _smActive and not _shotFired and _waited < 5 do
+                        task.wait(0.05)
+                        _waited = _waited + 0.05
+                    end
+
+                    -- Detener el loop
+                    _smActive = false
+                    pcall(function() if _loopConn then _loopConn:Disconnect() end end)
+                    pcall(function() if _smConn_gunshot then _smConn_gunshot:Disconnect() end end)
+
+                    -- [6] TP a posicion guardada (la de antes de apretar el boton)
+                    local c4 = LocalPlayer.Character
+                    local h4 = c4 and c4:FindFirstChild("HumanoidRootPart")
+                    if h4 then
+                        pcall(function() h4.CFrame = savedCF end)
+                    end
+
+                    if _wasInBackpack then
+                        local c5 = LocalPlayer.Character
+                        local hm5 = c5 and c5:FindFirstChildOfClass("Humanoid")
+                        if hm5 and hm5.Parent then
+                            task.delay(0.17, function()
+                                pcall(function() hm5:UnequipTools() end)
+                            end)
+                        end
                     end
                 end)
             end
-            -- FIX MOBILE v4: Activated cubre PC (MouseButton1Click) y touch en un solo evento
+                        -- FIX MOBILE v4: Activated cubre PC (MouseButton1Click) y touch en un solo evento
             shootBtnGui.Frame.Activated:Connect(_doShootMurderer)
         end
     else
@@ -39218,7 +39338,7 @@ function CreatePremiumTab()
                 texId  = "rbxassetid://431951748",
                 -- Scale agrandado
                 scale  = Vector3.new(0.08999999865889549, 0.07500000074505806, 0.07500000074505806),
-                -- Grip corregido: rotado 180° en Y para que mire al frente
+                -- Grip corregido: rotado 180? en Y para que mire al frente
                 grip   = CFrame.new(0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, -1),
                 dualGun = true,
             },
@@ -57443,7 +57563,7 @@ particles = {}
     sideLayout.Padding = UDim.new(0, 6)
     sideLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-    local tabNames = {"MAIN", "WORLD", "VISUALS", "PREMIUM", "SETTINGS", "COMBAT", "USE", "EMOTES", "UPDATE"}
+    local tabNames = {"HOME", "GAMEPLAY", "VISUALS", "VIP", "SETTINGS", "BATTLE", "USE", "EMOTES", "UPDATE"}
     local tabFunctions = {CreateMainTab, CreateWorldTab, CreateVisualsTab, CreatePremiumTab, CreateExclusiveTab, CreateCombatTab,
         function() CreateUseTab() end,      -- late binding: CreateUseTab se define despues de esta tabla
         function() CreateEmotesTab() end,   -- late binding: CreateEmotesTab
@@ -58876,7 +58996,7 @@ particles = {}
             end)
         end)
         -- FIX AUTO SAVE: pre-buildear el tab Settings (idx=5) en background
-        -- para que CreateAuroraToggle("Auto Save Config") se ejecute y el toggle
+        -- para que CreateAuroraToggle("Auto Save") se ejecute y el toggle
         -- se auto-active si estaba ON en disco. Sin esto, el toggle solo se crea
         -- cuando el usuario navega a Settings manualmente.
         -- FIX DOUBLE COLUMN: delay aumentado a 1.2s para que SetActiveTab(1) tome el mutex primero
