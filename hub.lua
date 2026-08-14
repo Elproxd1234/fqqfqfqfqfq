@@ -57202,15 +57202,15 @@ _getTargetScale = function()
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
     if _isMobileNow then
-        -- Calcular escala para que el hub de 820x460px quepa con margen de 20px a cada lado
-        local _availW = _vpNow.X - 40
-        local _availH = _vpNow.Y - 40
+        -- Calcular escala para que el hub de 820x460px quepa con margen de 30px a cada lado
+        local _availW = _vpNow.X - 60
+        local _availH = _vpNow.Y - 60
         local _scaleByW = _availW / 820
         local _scaleByH = _availH / 460
         -- Usar la escala mas pequena para que entre en ambas dimensiones
         local _autoScale = math.min(_scaleByW, _scaleByH)
-        -- Clamp: minimo 0.40 para que sea legible, maximo 0.85
-        return math.clamp(_autoScale, 0.40, 0.85)
+        -- Clamp: minimo 0.28 para que sea legible, maximo 0.65
+        return math.clamp(_autoScale, 0.28, 0.65)
     else
         -- FIX TAMA?O REOPEN: usar hubScale guardado para que al cerrar y abrir
         -- el hub mantenga el tama?o que el usuario habia configurado con el slider.
