@@ -57189,8 +57189,8 @@ uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() d
 -- == ESCALA AUTOMATICA POR DISPOSITIVO
 -- Celular: calcula la escala para que 750px quepan en el ancho
 --          disponible con un margen de 4px a cada lado (ancho ligeramente mayor).
---          Luego aplica hubScale (default 130%) sobre esa escala base.
--- PC:      usa el slider hubScale (70-130%, default 130%).
+--          Luego aplica hubScale (default 70%) sobre esa escala base.
+-- PC:      usa el slider hubScale (70-130%, default 70%).
 -- ================================================================
 _getTargetScale = function()
     -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
@@ -57218,8 +57218,8 @@ _getTargetScale = function()
         if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
             return _savedScale / 100
         end
-        -- Fallback: escala base 85% si no hay valor guardado
-        return 0.85
+        -- Fallback: escala base 70% si no hay valor guardado
+        return 0.70
     end
 end
 do
