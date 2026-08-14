@@ -43046,7 +43046,7 @@ function CreateExclusiveTab()
         expiredLbl.BackgroundColor3 = Color3.fromRGB(60, 10, 10)
         expiredLbl.BackgroundTransparency = 0.3
         expiredLbl.BorderSizePixel = 0
-        expiredLbl.Text = "  KEY EXPIRED — Complete verification again"
+        expiredLbl.Text = "  KEY EXPIRED ? Complete verification again"
         expiredLbl.TextColor3 = Color3.fromRGB(255, 68, 85)
         expiredLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
         expiredLbl.TextSize = 11
@@ -43095,7 +43095,7 @@ function CreateExclusiveTab()
                 if _timerConn then _timerConn:Disconnect(); _timerConn = nil end
 
                 -- ================================================================
-                -- AUTO-KICK: La key expiró ? expulsar al jugador con countdown
+                -- AUTO-KICK: La key expir? ? expulsar al jugador con countdown
                 -- Solo se ejecuta UNA vez (flag _G._keyExpiredKickTriggered)
                 -- ================================================================
                 if not _G._keyExpiredKickTriggered then
@@ -43108,8 +43108,8 @@ function CreateExclusiveTab()
                         for _countdown = 10, 1, -1 do
                             pcall(function()
                                 _sg:SetCore("SendNotification", {
-                                    Title = "? ZERQON HUB — KEY EXPIRADA",
-                                    Text  = "Serás expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la página para continuar.",
+                                    Title = "? ZERQON HUB ? KEY EXPIRADA",
+                                    Text  = "Ser?s expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la p?gina para continuar.",
                                     Duration = 1.2,
                                 })
                             end)
@@ -43118,7 +43118,7 @@ function CreateExclusiveTab()
 
                         -- Expulsar al jugador
                         pcall(function()
-                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la página para continuar usando el hub.")
+                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la p?gina para continuar usando el hub.")
                         end)
                     end)
                 end
@@ -43276,7 +43276,7 @@ function CreateExclusiveTab()
         -- El hub mantiene siempre el tamano configurado por el usuario.
         local _prevSetActiveTab = SetActiveTab
         SetActiveTab = function(idx)
-            -- Solo salir de fullscreen si por alguna razon quedó activo (seguridad)
+            -- Solo salir de fullscreen si por alguna razon qued? activo (seguridad)
             if idx ~= 5 and _G._settingsFullscreenActive then
                 _exitFullscreen()
             end
@@ -57202,15 +57202,15 @@ _getTargetScale = function()
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
     if _isMobileNow then
-        -- Calcular escala para que el hub de 750px quepa con margen de 8px a cada lado
-        local _availW = _vpNow.X - 16
-        local _availH = _vpNow.Y - 16
-        local _scaleByW = _availW / 750
-        local _scaleByH = _availH / 420
+        -- Calcular escala para que el hub de 820x460px quepa con margen de 20px a cada lado
+        local _availW = _vpNow.X - 40
+        local _availH = _vpNow.Y - 40
+        local _scaleByW = _availW / 820
+        local _scaleByH = _availH / 460
         -- Usar la escala mas pequena para que entre en ambas dimensiones
         local _autoScale = math.min(_scaleByW, _scaleByH)
-        -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
-        return math.clamp(_autoScale, 0.45, 0.95)
+        -- Clamp: minimo 0.40 para que sea legible, maximo 0.85
+        return math.clamp(_autoScale, 0.40, 0.85)
     else
         -- FIX TAMA?O REOPEN: usar hubScale guardado para que al cerrar y abrir
         -- el hub mantenga el tama?o que el usuario habia configurado con el slider.
@@ -62052,7 +62052,7 @@ do
     _bgStroke.Thickness = 1.5
     _bgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-    -- Panel central (mismo tamaño que el fondo)
+    -- Panel central (mismo tama?o que el fondo)
     local _panel = Instance.new("Frame", _bg)
     _panel.Size = UDim2.new(0, 340, 0, 320)
     _panel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -62414,11 +62414,11 @@ do
         _popBody.BackgroundTransparency = 1
         _popBody.Text =
             "? This hub does NOT steal your data.\n" ..
-            "? Este hub NO roba tu información.\n\n" ..
+            "? Este hub NO roba tu informaci?n.\n\n" ..
             "? No passwords, cookies or tokens\n    are collected at any time.\n" ..
-            "? No se recopilan contraseñas,\n    cookies ni tokens.\n\n" ..
+            "? No se recopilan contrase?as,\n    cookies ni tokens.\n\n" ..
             "?? Only your Roblox UserId is used\n    to generate a session key.\n" ..
-            "?? Solo se usa tu UserId de Roblox\n    para generar la key de sesión."
+            "?? Solo se usa tu UserId de Roblox\n    para generar la key de sesi?n."
         _popBody.TextColor3 = Color3.fromRGB(200, 230, 210)
         _popBody.Font = Enum.Font.Gotham
         _popBody.TextSize = 11
@@ -62907,7 +62907,7 @@ do
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId .. "&t=" .. tostring(_G._keyStartTime)
             elseif _myBinId then
                 -- Bin existente pero sin timestamp local conocido: no pasar &t=
-                -- La web leerá el timestamp de JSONBin y de localStorage.
+                -- La web leer? el timestamp de JSONBin y de localStorage.
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId
             else
                 -- Bin nuevo: pasar timestamp actual como inicio de la key
