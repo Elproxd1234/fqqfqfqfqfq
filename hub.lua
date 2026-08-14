@@ -63000,46 +63000,104 @@ do
         _doOpenVerification()
     end)
 
-    -- AUTO-EXEC: verificar inmediatamente si el bin ya esta en "verified"
-    -- (caso: el usuario ya completo la verificacion en la web y la pagina
-    -- actualizo el bin automaticamente al detectar la key valida).
-    -- Si ya esta verificado, abrir el hub sin mostrar ningun mensaje al usuario.
-    -- AUTO-OPEN: al mismo tiempo, abrir la pagina de verificacion automaticamente
-    -- para que el usuario no tenga que presionar ningun boton.
+    -- ================================================================
+    -- AUTO-VERIFY v4: el script verifica por si mismo sin depender de la pagina web
+    -- 1. Si ya hay bin verified -> abrir hub directo
+    -- 2. Si no -> crear bin, hacer PUT verified, guardar key, abrir hub
+    -- La pagina web es opcional (para celular donde no hay navegador)
+    -- ================================================================
     task.spawn(function()
-        _status.Text = "Checking key..."
+        _status.Text = "Connecting..."
         _status.TextColor3 = Color3.fromRGB(160, 90, 90)
 
-        -- Intentar encontrar el bin existente del token
-        warn("[ZerqonHUB] TOKEN usado: " .. tostring(_myToken))
+        warn("[ZerqonHUB] TOKEN: " .. tostring(_myToken))
+
+        -- PASO 1: buscar bin existente
         local _existingBin = _findBin(_myToken)
-        warn("[ZerqonHUB] BinId encontrado: " .. tostring(_existingBin))
+        warn("[ZerqonHUB] Bin encontrado: " .. tostring(_existingBin))
+
         if _existingBin then
             _myBinId = _existingBin; _G._zerqonBinId = _myBinId
-            local _immediateStatus = _getStatus(_existingBin)
-            warn("[ZerqonHUB] CHECK INMEDIATO: binId=" .. tostring(_existingBin) .. " status=" .. tostring(_immediateStatus))
-            if _immediateStatus == "verified" then
-                -- KEY YA VERIFICADA: abrir hub directamente sin esperar
-                warn("[ZerqonHUB] AUTO-EXEC: Key ya verificada en JSONBin. Abriendo hub...")
-                -- Leer timestamp original del bin para no resetear las 24h
-                pcall(function()
-                    local _resT = _req(
-                        _JSONBIN_URL .. "/" .. _existingBin .. "/latest",
-                        "GET",
-                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                    )
-                    if _resT then
-                        local _okT, _dataT = pcall(function() return _HttpService:JSONDecode(_resT) end)
-                        if _okT and _dataT and _dataT.record and _dataT.record.t then
-                            local _binTRaw = tonumber(_dataT.record.t)
-                            if _binTRaw then
-                                local _binT = _binTRaw > 9999999999 and math.floor(_binTRaw / 1000) or _binTRaw
-                                local _elapsed = os.time() - _binT
-                                if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                                    _G._keyStartTime = _binT
-                                end
-                            end
+            -- PASO 2a: leer el bin completo
+            local _rawFull = _reqWithRetry(
+                _JSONBIN_URL .. "/" .. _existingBin .. "/latest",
+                "GET",
+                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+            )
+            warn("[ZerqonHUB] Bin raw: " .. tostring(_rawFull))
+            if _rawFull then
+                local _okF, _dataF = pcall(function() return _HttpService:JSONDecode(_rawFull) end)
+                if _okF and _dataF and _dataF.record then
+                    local _st = _dataF.record.status
+                    local _tRaw = tonumber(_dataF.record.t)
+                    warn("[ZerqonHUB] status=" .. tostring(_st) .. " t=" .. tostring(_tRaw))
+
+                    if _st == "verified" and _tRaw then
+                        local _tS = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
+                        local _el = os.time() - _tS
+                        if _el >= 0 and _el < _KEY_DURATION then
+                            -- Key vigente: abrir directo
+                            warn("[ZerqonHUB] Key verificada y vigente. Abriendo hub...")
+                            _G._keyStartTime = _tS
+                            _openHub()
+                            return
+                        else
+                            warn("[ZerqonHUB] Key expirada (" .. tostring(_el) .. "s). Renovando...")
                         end
+                    end
+                end
+            end
+        end
+
+        -- PASO 3: crear bin si no existe
+        _status.Text = "Registering..."
+        if not _myBinId then
+            _myBinId = _ensureBin(_myToken); _G._zerqonBinId = _myBinId
+            warn("[ZerqonHUB] Bin creado: " .. tostring(_myBinId))
+        end
+
+        if not _myBinId then
+            warn("[ZerqonHUB] Sin conexion a JSONBin. Mostrando pantalla manual.")
+            _status.Text = "No connection. Press verify."
+            _status.TextColor3 = Color3.fromRGB(220, 80, 80)
+            -- Mostrar boton manual de inmediato si no hay red
+            if _manualBtn and _manualBtn.Parent then
+                _manualBtn.Visible = true
+                _manualBtn.BackgroundTransparency = 0.1
+            end
+            TweenService:Create(_errorLbl, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+            return
+        end
+
+        -- PASO 4: escribir "verified" directamente desde el script
+        _status.Text = "Verifying key..."
+        _status.TextColor3 = Color3.fromRGB(120, 160, 255)
+        local _nowT = os.time()
+        local _putBody = _HttpService:JSONEncode({ token = _myToken, status = "verified", t = _nowT })
+        warn("[ZerqonHUB] PUT verified -> bin=" .. _myBinId)
+        local _putRes = _reqWithRetry(
+            _JSONBIN_URL .. "/" .. _myBinId,
+            "PUT",
+            {
+                ["Content-Type"] = "application/json",
+                ["X-Master-Key"] = _JSONBIN_KEY,
+                ["X-Access-Key"] = _JSONBIN_KEY
+            },
+            _putBody
+        )
+        warn("[ZerqonHUB] PUT response: " .. tostring(_putRes))
+
+        if _putRes then
+            local _okP, _dataP = pcall(function() return _HttpService:JSONDecode(_putRes) end)
+            if _okP and _dataP and (_dataP.record or _dataP.metadata) then
+                warn("[ZerqonHUB] Verificado OK. Guardando y abriendo hub...")
+                _G._keyStartTime = _nowT
+                -- Guardar en archivo local para la proxima sesion
+                pcall(function()
+                    if writefile then
+                        local _uid2 = tostring(_lp and _lp.UserId or "0")
+                        writefile("zerqon_key_" .. _uid2 .. ".txt",
+                            _myToken .. "|" .. _myBinId .. "|" .. tostring(_nowT))
                     end
                 end)
                 _openHub()
@@ -63047,26 +63105,20 @@ do
             end
         end
 
-        -- No habia bin o no estaba verificado: registrar, abrir pagina automaticamente y hacer polling
-        _status.Text = "Registering token..."
-        if not _myBinId then
-            _myBinId = _ensureBin(_myToken); _G._zerqonBinId = _myBinId
+        -- PASO 5 (fallback): el PUT fallo, intentar leer de nuevo por si la pagina lo actualizo
+        warn("[ZerqonHUB] PUT fallo. Verificando si la pagina ya actualizo el bin...")
+        if _checkAndOpen() then return end
+
+        -- Ultimo recurso: mostrar boton manual y seguir haciendo polling
+        warn("[ZerqonHUB] Iniciando polling + mostrando boton manual...")
+        _status.Text = "Waiting for verification..."
+        _status.TextColor3 = Color3.fromRGB(200, 140, 60)
+        if _manualBtn and _manualBtn.Parent then
+            _manualBtn.Visible = true
+            _manualBtn.BackgroundTransparency = 0.1
         end
-        if _myBinId then
-            warn("[ZerqonHUB] Bin registrado: " .. _myBinId)
-            -- AUTO-OPEN: abrir la pagina de verificacion automaticamente sin que el usuario haga nada
-            task.delay(0.5, function()
-                if _lsGui and _lsGui.Parent then
-                    _doOpenVerification()
-                end
-            end)
-        else
-            warn("[ZerqonHUB] No se pudo registrar el bin. Se reintentara al presionar el boton.")
-            _status.Text = "Connection failed."
-            _status.TextColor3 = Color3.fromRGB(220, 80, 80)
-            TweenService:Create(_errorLbl, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                {TextTransparency = 0}):Play()
-        end
+        TweenService:Create(_errorLbl, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+        _startPolling()
     end)
 
     warn("[ZerqonHUB] Auto-key system v3.2 activo (auto-open). Token: " .. _myToken)
