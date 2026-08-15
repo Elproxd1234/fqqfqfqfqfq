@@ -102,21 +102,12 @@ do
 
     -- Leer el archivo ANTES de decidir si borrar
     local _keyStillValid = false
-    local _expectedToken = "ZQT" .. _uid  -- formato nuevo: sin seed de dia
     pcall(function()
         if not readfile then return end
         local _data = readfile(_savePath)
         if not _data or _data == "" then return end
         local _tok, _bid, _startStr = _data:match("^([^|]+)|([^|]+)|(%d+)$")
         if not (_tok and _startStr) then return end
-        -- VALIDAR formato del token: si no coincide con el formato nuevo, descartar
-        -- Esto limpia automaticamente tokens viejos con formato ZQT{uid}S{seed}
-        if _tok ~= _expectedToken then
-            warn("[ZerqonHUB] Token guardado desactualizado (" .. tostring(_tok) .. "). Limpiando para usar token nuevo.")
-            pcall(function() if delfile   then delfile(_savePath)       end end)
-            pcall(function() if writefile then writefile(_savePath, "") end end)
-            return
-        end
         local _startT = tonumber(_startStr)
         if not _startT then return end
         -- Normalizar ms -> s
@@ -127,7 +118,7 @@ do
             _G._zerqonToken       = _tok
             _G._keyStartTime      = _startT
             _G._zerqonBinId       = _bid
-            _G._zerqonSessionSeed = _uid
+            _G._zerqonSessionSeed = _tok:match("S(.+)$") or tostring(math.floor(os.time() / 86400))
             _keyStillValid = true
             warn("[ZerqonHUB] Key valida encontrada en archivo (" .. math.floor((_KEY_DUR - _elapsed) / 3600) .. "h restantes). Reutilizando...")
         end
@@ -21989,13 +21980,15 @@ function CreateMainTab()
         local KEY_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
-        -- TOKEN FIJO: solo por uid, sin seed de dia. Evita que distintos dispositivos
-        -- generen tokens distintos y se pisen mutuamente en JSONBin.
+        -- Reutilizar el mismo token que el key system (formato S), o generarlo si aun no existe
         local function _zqGetToken()
             if _G._zerqonToken then return _G._zerqonToken end
             local lp  = game:GetService("Players").LocalPlayer
             local uid = tostring(lp and lp.UserId or "0")
-            _G._zerqonToken = "ZQT" .. uid
+            if not _G._zerqonSessionSeed then
+                _G._zerqonSessionSeed = tostring(math.floor(os.time() / 86400))
+            end
+            _G._zerqonToken = "ZQT" .. uid .. "S" .. _G._zerqonSessionSeed
             return _G._zerqonToken
         end
 
@@ -43053,7 +43046,7 @@ function CreateExclusiveTab()
         expiredLbl.BackgroundColor3 = Color3.fromRGB(60, 10, 10)
         expiredLbl.BackgroundTransparency = 0.3
         expiredLbl.BorderSizePixel = 0
-        expiredLbl.Text = "  KEY EXPIRED ? Complete verification again"
+        expiredLbl.Text = "  KEY EXPIRED — Complete verification again"
         expiredLbl.TextColor3 = Color3.fromRGB(255, 68, 85)
         expiredLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
         expiredLbl.TextSize = 11
@@ -43102,7 +43095,7 @@ function CreateExclusiveTab()
                 if _timerConn then _timerConn:Disconnect(); _timerConn = nil end
 
                 -- ================================================================
-                -- AUTO-KICK: La key expir? ? expulsar al jugador con countdown
+                -- AUTO-KICK: La key expiró ? expulsar al jugador con countdown
                 -- Solo se ejecuta UNA vez (flag _G._keyExpiredKickTriggered)
                 -- ================================================================
                 if not _G._keyExpiredKickTriggered then
@@ -43115,8 +43108,8 @@ function CreateExclusiveTab()
                         for _countdown = 10, 1, -1 do
                             pcall(function()
                                 _sg:SetCore("SendNotification", {
-                                    Title = "? ZERQON HUB ? KEY EXPIRADA",
-                                    Text  = "Ser?s expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la p?gina para continuar.",
+                                    Title = "? ZERQON HUB — KEY EXPIRADA",
+                                    Text  = "Serás expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la página para continuar.",
                                     Duration = 1.2,
                                 })
                             end)
@@ -43125,7 +43118,7 @@ function CreateExclusiveTab()
 
                         -- Expulsar al jugador
                         pcall(function()
-                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la p?gina para continuar usando el hub.")
+                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la página para continuar usando el hub.")
                         end)
                     end)
                 end
@@ -43270,24 +43263,17 @@ function CreateExclusiveTab()
             ):Play()
         end
 
-        -- Entrar a fullscreen SOLO si el tab activo es Settings al momento de buildear
-        -- FIX: antes entraba a fullscreen aunque Settings se pre-buildeara en background,
-        -- agrandando el hub mientras el usuario estaba en HOME u otra pestana.
-        task.defer(function()
-            if activeTabIdx == 5 then
-                _enterFullscreen()
-            end
-        end)
+        -- Entrar a fullscreen al construir Settings (ya estamos en Settings)
+        task.defer(_enterFullscreen)
 
-        -- FIX TAMANO: Settings ya NO hace fullscreen al entrar ni al salir.
-        -- El hub mantiene siempre el tamano configurado por el usuario.
+        -- Hookear SetActiveTab para salir de fullscreen al cambiar de tab
         local _prevSetActiveTab = SetActiveTab
         SetActiveTab = function(idx)
-            -- Solo salir de fullscreen si por alguna razon qued? activo (seguridad)
             if idx ~= 5 and _G._settingsFullscreenActive then
                 _exitFullscreen()
+            elseif idx == 5 then
+                task.defer(_enterFullscreen)
             end
-            -- idx == 5: NO llamar _enterFullscreen
             _prevSetActiveTab(idx)
         end
 
@@ -57196,8 +57182,8 @@ uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() d
 -- == ESCALA AUTOMATICA POR DISPOSITIVO
 -- Celular: calcula la escala para que 750px quepan en el ancho
 --          disponible con un margen de 4px a cada lado (ancho ligeramente mayor).
---          Luego aplica hubScale (default 70%) sobre esa escala base.
--- PC:      usa el slider hubScale (70-130%, default 70%).
+--          Luego aplica hubScale (default 130%) sobre esa escala base.
+-- PC:      usa el slider hubScale (70-130%, default 130%).
 -- ================================================================
 _getTargetScale = function()
     -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
@@ -57209,15 +57195,15 @@ _getTargetScale = function()
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
     if _isMobileNow then
-        -- Calcular escala para que el hub de 820x460px quepa con margen de 30px a cada lado
-        local _availW = _vpNow.X - 60
-        local _availH = _vpNow.Y - 60
-        local _scaleByW = _availW / 820
-        local _scaleByH = _availH / 460
+        -- Calcular escala para que el hub de 750px quepa con margen de 8px a cada lado
+        local _availW = _vpNow.X - 16
+        local _availH = _vpNow.Y - 16
+        local _scaleByW = _availW / 750
+        local _scaleByH = _availH / 420
         -- Usar la escala mas pequena para que entre en ambas dimensiones
         local _autoScale = math.min(_scaleByW, _scaleByH)
-        -- Clamp: minimo 0.28 para que sea legible, maximo 0.65
-        return math.clamp(_autoScale, 0.28, 0.65)
+        -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
+        return math.clamp(_autoScale, 0.45, 0.95)
     else
         -- FIX TAMA?O REOPEN: usar hubScale guardado para que al cerrar y abrir
         -- el hub mantenga el tama?o que el usuario habia configurado con el slider.
@@ -57225,8 +57211,8 @@ _getTargetScale = function()
         if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
             return _savedScale / 100
         end
-        -- Fallback: escala base 70% si no hay valor guardado
-        return 0.70
+        -- Fallback: escala base 85% si no hay valor guardado
+        return 0.85
     end
 end
 do
@@ -61743,23 +61729,6 @@ do
     local _lp          = _Players.LocalPlayer
     local _KEY_DURATION = 24 * 3600  -- 24 horas en segundos
 
-    -- HTTP request universal (soporte para todos los executors) - definida aqui para uso en _tryAutoExec
-    local function _httpReqEarly(url, method, headers, body)
-        local opts = { Url = url, Method = method or "GET", Headers = headers or {}, Body = body or "" }
-        local ok, res
-        ok, res = pcall(function() if request then return request(opts) end end)
-        if ok and res and res.Body then return res.Body end
-        ok, res = pcall(function() if syn and syn.request then return syn.request(opts) end end)
-        if ok and res and res.Body then return res.Body end
-        ok, res = pcall(function() if http and http.request then return http.request(opts) end end)
-        if ok and res and res.Body then return res.Body end
-        if (method or "GET") == "GET" then
-            ok, res = pcall(function() return game:HttpGet(url, true) end)
-            if ok and res then return res end
-        end
-        return nil
-    end
-
     -- AUTOSAVE: intentar leer key guardada en archivo local o JSONBin.
     -- Si existe y no expiro, abrir el hub directamente sin pantalla de verificacion.
     local function _tryAutoExec()
@@ -61768,68 +61737,24 @@ do
         -- -- METODO 0: key ya restaurada por el bloque de limpieza (lo mas rapido) --
         -- El bloque LIMPIEZA DE KEY al inicio ya leyo el archivo y restauro
         -- _G._zerqonToken y _G._keyStartTime si la key era valida.
-        -- FIX: verifica contra JSONBin para obtener el t real de la pagina web,
-        -- evitando que el hub use cualquier timestamp local incorrecto.
-        if _G._zerqonToken and _G._keyStartTime and _G._zerqonBinId then
-            -- Leer JSONBin para obtener el t oficial de la pagina
-            local _binResM0 = nil
-            pcall(function()
-                _binResM0 = _httpReqEarly(
-                    _JSONBIN_URL .. "/" .. _G._zerqonBinId .. "/latest",
-                    "GET",
-                    { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                )
-            end)
-            local _startT0 = _G._keyStartTime
-            local _m0Skip = false
-            if _binResM0 then
-                local _okM0, _dataM0 = pcall(function() return _HttpService:JSONDecode(_binResM0) end)
-                if _okM0 and _dataM0 and _dataM0.record then
-                    local _stM0 = _dataM0.record.status
-                    local _tRawM0 = tonumber(_dataM0.record.t)
-                    if _stM0 == "verified" and _tRawM0 then
-                        local _tSM0 = _tRawM0 > 9999999999 and math.floor(_tRawM0 / 1000) or _tRawM0
-                        local _elM0 = os.time() - _tSM0
-                        if _elM0 >= 0 and _elM0 < _KEY_DURATION then
-                            -- Usar el t del bin (el real de la pagina)
-                            _startT0 = _tSM0
-                            _G._keyStartTime = _tSM0
-                        else
-                            -- Key expirada en JSONBin
-                            _G._zerqonToken = nil; _G._keyStartTime = nil
-                            _G._zerqonBinId = nil; _G._zerqonSessionSeed = nil
-                            warn("[ZerqonHUB] METODO 0: Key expirada en JSONBin. Se requiere nueva verificacion.")
-                            _m0Skip = true
-                        end
-                    elseif _stM0 ~= "verified" then
-                        -- No verificada: no abrir
-                        _G._zerqonToken = nil; _G._keyStartTime = nil
-                        _G._zerqonBinId = nil; _G._zerqonSessionSeed = nil
-                        warn("[ZerqonHUB] METODO 0: bin no verificado. Se requiere verificacion.")
-                        _m0Skip = true
-                    end
-                end
+        -- Si esos globals existen y son validos, abrir el hub directamente.
+        if _G._zerqonToken and _G._keyStartTime then
+            local _elapsed0 = os.time() - _G._keyStartTime
+            if _elapsed0 >= 0 and _elapsed0 < _KEY_DURATION then
+                warn("[ZerqonHUB] METODO 0: Key en memoria valida (" ..
+                    math.floor((_KEY_DURATION - _elapsed0) / 3600) .. "h restantes). Abriendo hub sin verificacion...")
+                task.spawn(function()
+                    task.wait(0.5)
+                    pcall(function() abrirHub() end)
+                end)
+                return true
+            else
+                -- Expiro: limpiar para que no interfiera con el resto del flujo
+                _G._zerqonToken       = nil
+                _G._keyStartTime      = nil
+                _G._zerqonBinId       = nil
+                _G._zerqonSessionSeed = nil
             end
-            if not _m0Skip then
-                local _elapsed0 = os.time() - _startT0
-                if _elapsed0 >= 0 and _elapsed0 < _KEY_DURATION then
-                    warn("[ZerqonHUB] METODO 0: Key en memoria valida (" ..
-                        math.floor((_KEY_DURATION - _elapsed0) / 3600) .. "h restantes). Abriendo hub sin verificacion...")
-                    task.spawn(function()
-                        task.wait(0.5)
-                        pcall(function() abrirHub() end)
-                    end)
-                    return true
-                else
-                    _G._zerqonToken       = nil
-                    _G._keyStartTime      = nil
-                    _G._zerqonBinId       = nil
-                    _G._zerqonSessionSeed = nil
-                end
-            end
-        elseif _G._zerqonToken and _G._keyStartTime then
-            -- Hay token pero sin binId: limpiar para forzar verificacion limpia
-            _G._zerqonToken = nil; _G._keyStartTime = nil; _G._zerqonSessionSeed = nil
         end
 
         -- -- METODO 1: archivo local (readfile/writefile) ------------------
@@ -61843,59 +61768,21 @@ do
                     local _startTRaw = tonumber(_startStr)
                     if _startTRaw then
                         local _startT = _startTRaw > 9999999999 and math.floor(_startTRaw / 1000) or _startTRaw
-                        local _m1Valid = true
-                        -- FIX: verificar contra JSONBin para obtener el t real de la pagina
-                        local _binResM1 = _httpReqEarly(
-                            _JSONBIN_URL .. "/" .. _bid .. "/latest",
-                            "GET",
-                            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                        )
-                        if _binResM1 then
-                            local _okM1, _dataM1 = pcall(function() return _HttpService:JSONDecode(_binResM1) end)
-                            if _okM1 and _dataM1 and _dataM1.record then
-                                local _stM1 = _dataM1.record.status
-                                local _tRawM1 = tonumber(_dataM1.record.t)
-                                if _stM1 == "verified" and _tRawM1 then
-                                    local _tSM1 = _tRawM1 > 9999999999 and math.floor(_tRawM1 / 1000) or _tRawM1
-                                    local _elM1 = os.time() - _tSM1
-                                    if _elM1 >= 0 and _elM1 < _KEY_DURATION then
-                                        -- Usar el t real del bin (puede diferir del archivo)
-                                        _startT = _tSM1
-                                    else
-                                        pcall(function() delfile(_savePath) end)
-                                        pcall(function() writefile(_savePath, "") end)
-                                        warn("[ZerqonHUB] Key expirada en JSONBin. Se requiere nueva verificacion.")
-                                        _m1Valid = false
-                                    end
-                                else
-                                    -- bin no verified: limpiar y pedir nueva verificacion
-                                    pcall(function() delfile(_savePath) end)
-                                    pcall(function() writefile(_savePath, "") end)
-                                    warn("[ZerqonHUB] Bin no verificado en JSONBin. Se requiere verificacion.")
-                                    _m1Valid = false
-                                end
-                            end
-                        end
-                        if _m1Valid then
-                            local _elapsed = os.time() - _startT
-                            if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                                _G._zerqonToken       = _tok
-                                _G._keyStartTime      = _startT
-                                _G._zerqonBinId       = _bid
-                                _G._zerqonSessionSeed = tostring(_lp and _lp.UserId or "0")
-                                -- Actualizar el archivo con el t correcto del bin
-                                pcall(function() writefile(_savePath, _tok .. "|" .. _bid .. "|" .. tostring(_startT)) end)
-                                warn("[ZerqonHUB] AUTOSAVE (archivo): Key valida (" .. math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub...")
-                                task.spawn(function()
-                                    task.wait(0.5)
-                                    pcall(function() abrirHub() end)
-                                end)
-                                return true
-                            else
-                                pcall(function() delfile(_savePath) end)
-                                pcall(function() writefile(_savePath, "") end)
-                                warn("[ZerqonHUB] Key expirada en archivo. Se requiere nueva verificacion.")
-                            end
+                        local _elapsed = os.time() - _startT
+                        if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                            _G._zerqonToken       = _tok
+                            _G._keyStartTime      = _startT
+                            _G._zerqonSessionSeed = _tok:match("S(.+)$") or tostring(math.floor(os.time() / 86400))
+                            warn("[ZerqonHUB] AUTOSAVE (archivo): Key valida (" .. math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub...")
+                            task.spawn(function()
+                                task.wait(0.5)
+                                pcall(function() abrirHub() end)
+                            end)
+                            return true
+                        else
+                            pcall(function() delfile(_savePath) end)
+                            pcall(function() writefile(_savePath, "") end)
+                            warn("[ZerqonHUB] Key expirada en archivo. Se requiere nueva verificacion.")
                         end
                     end
                 end
@@ -61924,53 +61811,66 @@ do
 
         warn("[ZerqonHUB] AUTO-CHECK JSONBin: buscando key activa para uid=" .. uid)
 
-        -- TOKEN FIJO: un solo bin por uid, sin seeds de dia.
-        -- Asi PC y celu siempre leen el mismo bin y ven el mismo tiempo restante.
-        local _candidateTok = "ZQT" .. uid
-        local _binRes = _httpReq(
-            _JSONBIN_URL .. "?x-bin-name=" .. _candidateTok,
-            "GET",
-            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-        )
-        if _binRes then
-            local _okB, _dataB = pcall(function() return _HttpService:JSONDecode(_binRes) end)
-            if _okB and _dataB and _dataB.metadata and _dataB.metadata.id then
-                local _binId = _dataB.metadata.id
-                local _latestRes = _httpReq(
-                    _JSONBIN_URL .. "/" .. _binId .. "/latest",
-                    "GET",
-                    { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                )
-                if _latestRes then
-                    local _okL, _dataL = pcall(function() return _HttpService:JSONDecode(_latestRes) end)
-                    if _okL and _dataL and _dataL.record then
-                        local _rec = _dataL.record
-                        if _rec.status == "verified" and _rec.t then
-                            local _tRaw = tonumber(_rec.t)
-                            if _tRaw then
-                                local _startT = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
-                                local _elapsed = os.time() - _startT
-                                if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                                    _G._zerqonToken  = _candidateTok
-                                    _G._keyStartTime = _startT
-                                    _G._zerqonBinId  = _binId
-                                    warn("[ZerqonHUB] AUTO-CHECK JSONBin: Key verificada encontrada (" ..
-                                        math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub SIN verificacion...")
-                                    if _canFile then
-                                        local _savePath2 = "zerqon_key_" .. uid .. ".txt"
-                                        pcall(function()
-                                            writefile(_savePath2, _candidateTok .. "|" .. _binId .. "|" .. tostring(_startT))
+        -- Genera los posibles tokens del usuario para los ultimos 2 dias (por si
+        -- el dia cambio justo entre sesiones pero la key de 24h sigue siendo valida)
+        local _nowSeed = math.floor(os.time() / 86400)
+        local _seedsToCheck = {}
+        for _si = 0, 1 do
+            table.insert(_seedsToCheck, tostring(_nowSeed - _si))
+        end
+
+        for _, _seed in ipairs(_seedsToCheck) do
+            local _candidateTok = "ZQT" .. uid .. "S" .. _seed
+            local _binRes = _httpReq(
+                _JSONBIN_URL .. "?x-bin-name=" .. _candidateTok,
+                "GET",
+                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+            )
+            if _binRes then
+                local _okB, _dataB = pcall(function() return _HttpService:JSONDecode(_binRes) end)
+                if _okB and _dataB and _dataB.metadata and _dataB.metadata.id then
+                    local _binId = _dataB.metadata.id
+                    -- Leer estado actual del bin
+                    local _latestRes = _httpReq(
+                        _JSONBIN_URL .. "/" .. _binId .. "/latest",
+                        "GET",
+                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                    )
+                    if _latestRes then
+                        local _okL, _dataL = pcall(function() return _HttpService:JSONDecode(_latestRes) end)
+                        if _okL and _dataL and _dataL.record then
+                            local _rec = _dataL.record
+                            if _rec.status == "verified" and _rec.t then
+                                local _tRaw = tonumber(_rec.t)
+                                if _tRaw then
+                                    local _startT = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
+                                    local _elapsed = os.time() - _startT
+                                    if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                                        -- KEY VALIDA EN JSONBIN: auto-exec sin navegador
+                                        _G._zerqonToken       = _candidateTok
+                                        _G._keyStartTime      = _startT
+                                        _G._zerqonSessionSeed = _seed
+                                        warn("[ZerqonHUB] AUTO-CHECK JSONBin: Key verificada encontrada (" ..
+                                            math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub SIN verificacion...")
+                                        -- Guardar en archivo para la proxima sesion (si hay readfile/writefile)
+                                        if _canFile then
+                                            local _savePath2 = "zerqon_key_" .. uid .. ".txt"
+                                            pcall(function()
+                                                writefile(_savePath2, _candidateTok .. "|" .. _binId .. "|" .. tostring(_startT))
+                                            end)
+                                        end
+                                        task.spawn(function()
+                                            task.wait(0.5)
+                                            pcall(function() abrirHub() end)
                                         end)
+                                        return true
                                     end
-                                    task.spawn(function()
-                                        task.wait(0.5)
-                                        pcall(function() abrirHub() end)
-                                    end)
-                                    return true
                                 end
                             end
                         end
                     end
+                    -- Bin encontrado pero no verified o expirado: no seguir buscando
+                    break
                 end
             end
         end
@@ -61990,10 +61890,16 @@ do
     local function _getToken()
         if _G._zerqonToken then return _G._zerqonToken end
         local uid = tostring(_lp and _lp.UserId or "0")
-        -- TOKEN FIJO por uid: sin seed de dia para que PC y celu usen siempre
-        -- el mismo bin en JSONBin. La duracion se controla por el campo 't' del bin.
-        _G._zerqonToken = "ZQT" .. uid
-        _G._zerqonSessionSeed = uid  -- mantener por compatibilidad con codigo que lo lea
+        -- Incluimos la hora de inicio de sesion (tick al primer uso) para que
+        -- cada sesion de juego tenga su propio token unico, pero no cambie
+        -- mientras el jugador sigue en la misma sesion.
+        if not _G._zerqonSessionSeed then
+            -- Token estable por DIA (86400s). Antes era por hora y causaba que al
+            -- re-ejecutar el script o volver al juego el token cambiara -> bin distinto
+            -- -> la web no encontraba la key guardada y la "reiniciaba" desde cero.
+            _G._zerqonSessionSeed = tostring(math.floor(os.time() / 86400))
+        end
+        _G._zerqonToken = "ZQT" .. uid .. "S" .. _G._zerqonSessionSeed
         return _G._zerqonToken
     end
 
@@ -62101,13 +62007,8 @@ do
     end
 
     -- ----------------------------------------------------------------
-    -- ================================================================
-    -- PANTALLA DE KEY - NUEVA UI ANIMADA
-    -- Fase 1: aparece avatar + nombre del jugador con animacion
-    -- Fase 2: avatar/nombre desaparecen, aparece spinner + "Detecting key..."
-    -- Si detecta key -> carga hub
-    -- Si no -> muestra "Please copy the key link and paste it in your browser"
-    -- ================================================================
+    -- PANTALLA DE VERIFICACION (Nuevo diseno - estilo rojo oscuro)
+    -- ----------------------------------------------------------------
     local _lsGui = Instance.new("ScreenGui")
     _lsGui.Name = "ZerqonKeyScreen"
     _lsGui.ResetOnSpawn = false
@@ -62123,454 +62024,362 @@ do
     pcall(function() _lsGui.Parent = _lsParent end)
     if not _lsGui.Parent then _lsGui.Parent = _lp.PlayerGui end
 
-    -- Fondo compacto: solo el panel flotante (sin cubrir toda la pantalla)
+    -- ================================================================
+    -- FONDO SEMI-TRANSPARENTE OSCURO (cubre toda la pantalla)
+    -- ================================================================
     local _bg = Instance.new("Frame", _lsGui)
-    _bg.Size = UDim2.new(0, 360, 0, 340)
-    _bg.AnchorPoint = Vector2.new(0.5, 0.5)
-    _bg.Position = UDim2.new(0.5, 0, 0.5, 0)
-    _bg.BackgroundColor3 = Color3.fromRGB(8, 4, 4)
-    _bg.BackgroundTransparency = 0.08
+    _bg.Size = UDim2.new(1, 0, 1, 0)
+    _bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    _bg.BackgroundTransparency = 0.45
     _bg.BorderSizePixel = 0
     _bg.ZIndex = 1
-    local _bgCorner = Instance.new("UICorner", _bg)
-    _bgCorner.CornerRadius = UDim.new(0, 18)
-    local _bgStroke = Instance.new("UIStroke", _bg)
-    _bgStroke.Color = Color3.fromRGB(180, 40, 40)
-    _bgStroke.Thickness = 1.5
-    _bgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-    -- Panel central (mismo tama?o que el fondo)
+    -- ================================================================
+    -- PANEL PRINCIPAL (estilo imagen de referencia: borde rojo, fondo oscuro)
+    -- ================================================================
     local _panel = Instance.new("Frame", _bg)
-    _panel.Size = UDim2.new(0, 340, 0, 320)
-    _panel.AnchorPoint = Vector2.new(0.5, 0.5)
-    _panel.Position = UDim2.new(0.5, 0, 0.5, 0)
-    _panel.BackgroundTransparency = 1
+    _panel.Size = UDim2.new(0, 460, 0, 430)
+    _panel.Position = UDim2.new(0.5, -230, 0.5, -215)
+    _panel.BackgroundColor3 = Color3.fromRGB(18, 10, 10)
+    _panel.BackgroundTransparency = 0.05
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 2
+    Instance.new("UICorner", _panel).CornerRadius = UDim.new(0, 10)
+
+    -- Borde rojo
+    local _stroke = Instance.new("UIStroke", _panel)
+    _stroke.Color = Color3.fromRGB(180, 30, 30)
+    _stroke.Thickness = 2
+    _stroke.Transparency = 0
+    _stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    -- Linea superior roja (accent)
+    local _topLine = Instance.new("Frame", _panel)
+    _topLine.Size = UDim2.new(1, 0, 0, 3)
+    _topLine.Position = UDim2.new(0, 0, 0, 0)
+    _topLine.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    _topLine.BorderSizePixel = 0
+    _topLine.ZIndex = 3
+    Instance.new("UICorner", _topLine).CornerRadius = UDim.new(0, 10)
+
+    -- Boton X (cerrar / minimizar)
+    local _closeBtn = Instance.new("TextButton", _panel)
+    _closeBtn.Size = UDim2.new(0, 32, 0, 32)
+    _closeBtn.Position = UDim2.new(1, -40, 0, 8)
+    _closeBtn.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    _closeBtn.BorderSizePixel = 0
+    _closeBtn.Text = "X"
+    _closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    _closeBtn.Font = Enum.Font.GothamBold
+    _closeBtn.TextSize = 14
+    _closeBtn.AutoButtonColor = false
+    _closeBtn.ZIndex = 10
+    Instance.new("UICorner", _closeBtn).CornerRadius = UDim.new(0, 6)
+    _closeBtn.Activated:Connect(function()
+        TweenService:Create(_panel, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 460, 0, 0),
+            Position = UDim2.new(0.5, -230, 0.5, 0),
+            BackgroundTransparency = 1
+        }):Play()
+        task.delay(0.3, function() pcall(function() _lsGui:Destroy() end) end)
+    end)
+    _closeBtn.MouseEnter:Connect(function()
+        TweenService:Create(_closeBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(220, 50, 50)}):Play()
+    end)
+    _closeBtn.MouseLeave:Connect(function()
+        TweenService:Create(_closeBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(160, 30, 30)}):Play()
+    end)
 
     -- ================================================================
-    -- FASE 1: AVATAR + NOMBRE DEL JUGADOR
+    -- NOMBRE DEL JUGADOR (arriba del panel)
     -- ================================================================
-    local _phase1 = Instance.new("Frame", _panel)
-    _phase1.Size = UDim2.new(1, 0, 1, 0)
-    _phase1.BackgroundTransparency = 1
-    _phase1.ZIndex = 3
-    _phase1.Visible = true
+    local _playerNameLbl = Instance.new("TextLabel", _panel)
+    _playerNameLbl.Size = UDim2.new(1, -50, 0, 22)
+    _playerNameLbl.Position = UDim2.new(0, 14, 0, 14)
+    _playerNameLbl.BackgroundTransparency = 1
+    _playerNameLbl.Text = tostring(_lp and _lp.Name or "Player")
+    _playerNameLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    _playerNameLbl.Font = Enum.Font.Gotham
+    _playerNameLbl.TextSize = 14
+    _playerNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    _playerNameLbl.ZIndex = 3
 
-    -- Contenedor avatar (circulo con borde rojo pulsante)
-    local _avatarContainer = Instance.new("Frame", _phase1)
-    _avatarContainer.Size = UDim2.new(0, 130, 0, 130)
-    _avatarContainer.AnchorPoint = Vector2.new(0.5, 0)
-    _avatarContainer.Position = UDim2.new(0.5, 0, 0, 20)
-    _avatarContainer.BackgroundTransparency = 1
-    _avatarContainer.ZIndex = 4
+    -- ================================================================
+    -- AVATAR DEL JUGADOR (grande, centrado)
+    -- ================================================================
+    local _avatarFrame = Instance.new("Frame", _panel)
+    _avatarFrame.Size = UDim2.new(0, 110, 0, 110)
+    _avatarFrame.Position = UDim2.new(0.5, -55, 0, 44)
+    _avatarFrame.BackgroundTransparency = 1
+    _avatarFrame.BorderSizePixel = 0
+    _avatarFrame.ZIndex = 3
 
-    local _avatarImg = Instance.new("ImageLabel", _avatarContainer)
+    local _avatarImg = Instance.new("ImageLabel", _avatarFrame)
     _avatarImg.Size = UDim2.new(1, 0, 1, 0)
-    _avatarImg.BackgroundColor3 = Color3.fromRGB(30, 10, 10)
-    _avatarImg.BackgroundTransparency = 0
-    _avatarImg.ZIndex = 5
-    _avatarImg.ImageTransparency = 1  -- empieza invisible para animar
-    Instance.new("UICorner", _avatarImg).CornerRadius = UDim.new(1, 0)
+    _avatarImg.BackgroundTransparency = 1
+    _avatarImg.ZIndex = 4
+    Instance.new("UICorner", _avatarImg).CornerRadius = UDim.new(0.5, 0)
+    -- Cargar thumbnail del avatar del jugador
+    local _userId = _lp and _lp.UserId or 0
+    pcall(function()
+        local _thumbType = Enum.ThumbnailType.HeadShot
+        local _thumbSize = Enum.ThumbnailSize.Size420x420
+        local _imgUrl, _isReady = game:GetService("Players"):GetUserThumbnailAsync(_userId, _thumbType, _thumbSize)
+        _avatarImg.Image = _imgUrl
+    end)
+
+    -- Borde circular rojo alrededor del avatar
     local _avatarStroke = Instance.new("UIStroke", _avatarImg)
-    _avatarStroke.Color = Color3.fromRGB(210, 40, 40)
+    _avatarStroke.Color = Color3.fromRGB(190, 35, 35)
     _avatarStroke.Thickness = 3
     _avatarStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-    -- Cargar thumbnail del jugador
-    local _userId = _lp and _lp.UserId or 0
-    task.spawn(function()
-        pcall(function()
-            local _imgUrl = game:GetService("Players"):GetUserThumbnailAsync(
-                _userId,
-                Enum.ThumbnailType.HeadShot,
-                Enum.ThumbnailSize.Size420x420
-            )
-            _avatarImg.Image = _imgUrl
-        end)
-    end)
-
-    -- Nombre del jugador
-    local _nameLbl = Instance.new("TextLabel", _phase1)
-    _nameLbl.Size = UDim2.new(1, 0, 0, 36)
-    _nameLbl.AnchorPoint = Vector2.new(0.5, 0)
-    _nameLbl.Position = UDim2.new(0.5, 0, 0, 162)
-    _nameLbl.BackgroundTransparency = 1
-    _nameLbl.Text = tostring(_lp and _lp.Name or "Player")
-    _nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _nameLbl.Font = Enum.Font.GothamBold
-    _nameLbl.TextSize = 26
-    _nameLbl.TextXAlignment = Enum.TextXAlignment.Center
-    _nameLbl.TextTransparency = 1  -- empieza invisible
-    _nameLbl.ZIndex = 4
-
-    -- Subtitulo "Welcome back" debajo del nombre
-    local _welcomeSub = Instance.new("TextLabel", _phase1)
-    _welcomeSub.Size = UDim2.new(1, 0, 0, 22)
-    _welcomeSub.AnchorPoint = Vector2.new(0.5, 0)
-    _welcomeSub.Position = UDim2.new(0.5, 0, 0, 202)
-    _welcomeSub.BackgroundTransparency = 1
-    _welcomeSub.Text = "Welcome back"
-    _welcomeSub.TextColor3 = Color3.fromRGB(180, 60, 60)
-    _welcomeSub.Font = Enum.Font.Gotham
-    _welcomeSub.TextSize = 15
-    _welcomeSub.TextXAlignment = Enum.TextXAlignment.Center
-    _welcomeSub.TextTransparency = 1
-    _welcomeSub.ZIndex = 4
-
     -- ================================================================
-    -- FASE 2: SPINNER + TEXTO "Detecting key..." / mensaje de error
+    -- WELCOME: [nombre del jugador] (grande, debajo del avatar)
     -- ================================================================
-    local _phase2 = Instance.new("Frame", _panel)
-    _phase2.Size = UDim2.new(1, 0, 1, 0)
-    _phase2.BackgroundTransparency = 1
-    _phase2.ZIndex = 3
-    _phase2.Visible = false  -- oculta hasta que termine la fase 1
+    local _welcomeLbl = Instance.new("TextLabel", _panel)
+    _welcomeLbl.Size = UDim2.new(1, -20, 0, 30)
+    _welcomeLbl.Position = UDim2.new(0, 10, 0, 162)
+    _welcomeLbl.BackgroundTransparency = 1
+    _welcomeLbl.Text = "Welcome: " .. tostring(_lp and _lp.Name or "Player")
+    _welcomeLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    _welcomeLbl.Font = Enum.Font.GothamBold
+    _welcomeLbl.TextSize = 20
+    _welcomeLbl.TextXAlignment = Enum.TextXAlignment.Center
+    _welcomeLbl.ZIndex = 3
 
-    -- Spinner: arco giratorio (ImageLabel con imagen de arco)
-    local _spinnerOuter = Instance.new("Frame", _phase2)
-    _spinnerOuter.Size = UDim2.new(0, 90, 0, 90)
-    _spinnerOuter.AnchorPoint = Vector2.new(0.5, 0)
-    _spinnerOuter.Position = UDim2.new(0.5, 0, 0, 50)
-    _spinnerOuter.BackgroundTransparency = 1
-    _spinnerOuter.ZIndex = 4
-
-    -- Pista del spinner (circulo completo oscuro)
-    local _spinTrack = Instance.new("Frame", _spinnerOuter)
-    _spinTrack.Size = UDim2.new(1, 0, 1, 0)
-    _spinTrack.BackgroundColor3 = Color3.fromRGB(40, 12, 12)
-    _spinTrack.BorderSizePixel = 0
-    _spinTrack.ZIndex = 4
-    Instance.new("UICorner", _spinTrack).CornerRadius = UDim.new(1, 0)
-    local _spinTrackStroke = Instance.new("UIStroke", _spinTrack)
-    _spinTrackStroke.Color = Color3.fromRGB(60, 18, 18)
-    _spinTrackStroke.Thickness = 5
-    _spinTrackStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-    -- Arco giratorio: frame que rota con un borde rojo visible solo en un lado
-    local _spinArc = Instance.new("Frame", _spinnerOuter)
-    _spinArc.Size = UDim2.new(1, 0, 1, 0)
-    _spinArc.BackgroundTransparency = 1
-    _spinArc.ZIndex = 5
-    local _spinArcStroke = Instance.new("UIStroke", _spinArc)
-    _spinArcStroke.Color = Color3.fromRGB(220, 45, 45)
-    _spinArcStroke.Thickness = 5
-    _spinArcStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    Instance.new("UICorner", _spinArc).CornerRadius = UDim.new(1, 0)
-
-    -- Mascara: mitad del circulo tapada con un frame del color del panel compacto
-    local _spinMask = Instance.new("Frame", _spinnerOuter)
-    _spinMask.Size = UDim2.new(0.5, 0, 1, 2)
-    _spinMask.Position = UDim2.new(0, 0, 0, -1)
-    _spinMask.BackgroundColor3 = Color3.fromRGB(10, 5, 5)
-    _spinMask.BorderSizePixel = 0
-    _spinMask.ZIndex = 6
-
-    -- Icono de llave en el centro del spinner
-    local _keyIcon = Instance.new("TextLabel", _spinnerOuter)
-    _keyIcon.Size = UDim2.new(0, 40, 0, 40)
-    _keyIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-    _keyIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
-    _keyIcon.BackgroundTransparency = 1
-    _keyIcon.Text = "??"
-    _keyIcon.TextSize = 22
-    _keyIcon.ZIndex = 7
-
-    -- Texto principal "Detecting key..."
-    local _detectLbl = Instance.new("TextLabel", _phase2)
-    _detectLbl.Size = UDim2.new(1, -20, 0, 30)
-    _detectLbl.AnchorPoint = Vector2.new(0.5, 0)
-    _detectLbl.Position = UDim2.new(0.5, 0, 0, 158)
-    _detectLbl.BackgroundTransparency = 1
-    _detectLbl.Text = "Detecting key..."
-    _detectLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _detectLbl.Font = Enum.Font.GothamBold
-    _detectLbl.TextSize = 20
-    _detectLbl.TextXAlignment = Enum.TextXAlignment.Center
-    _detectLbl.TextTransparency = 0
-    _detectLbl.ZIndex = 4
-
-    -- Subtexto de estado (dots animados, cambia segun estado)
-    local _status = Instance.new("TextLabel", _phase2)
-    _status.Size = UDim2.new(1, -20, 0, 22)
-    _status.AnchorPoint = Vector2.new(0.5, 0)
-    _status.Position = UDim2.new(0.5, 0, 0, 192)
+    -- Status label (invisible pero necesario para la logica de polling)
+    local _status = Instance.new("TextLabel", _panel)
+    _status.Size = UDim2.new(1, -20, 0, 16)
+    _status.Position = UDim2.new(0, 10, 0, 196)
     _status.BackgroundTransparency = 1
-    _status.Text = "Checking..."
-    _status.TextColor3 = Color3.fromRGB(160, 90, 90)
-    _status.Font = Enum.Font.Gotham
-    _status.TextSize = 13
+    _status.Text = "Verificando..."
+    _status.TextColor3 = Color3.fromRGB(160, 100, 100)
+    _status.Font = Enum.Font.Code
+    _status.TextSize = 11
     _status.TextXAlignment = Enum.TextXAlignment.Center
-    _status.TextTransparency = 0
-    _status.ZIndex = 4
+    _status.ZIndex = 3
 
-    -- Mensaje de error / instruccion (oculto hasta que falle)
-    local _errorLbl = Instance.new("TextLabel", _phase2)
-    _errorLbl.Size = UDim2.new(1, -30, 0, 50)
-    _errorLbl.AnchorPoint = Vector2.new(0.5, 0)
-    _errorLbl.Position = UDim2.new(0.5, 0, 0, 230)
-    _errorLbl.BackgroundTransparency = 1
-    _errorLbl.Text = "Please copy the key link\nand paste it in your browser"
-    _errorLbl.TextColor3 = Color3.fromRGB(220, 80, 80)
-    _errorLbl.Font = Enum.Font.Gotham
-    _errorLbl.TextSize = 14
-    _errorLbl.TextXAlignment = Enum.TextXAlignment.Center
-    _errorLbl.TextWrapped = true
-    _errorLbl.TextTransparency = 1  -- oculto hasta que sea necesario
-    _errorLbl.ZIndex = 4
+    -- Barra de progreso (discreta, debajo del status)
+    local _barBg = Instance.new("Frame", _panel)
+    _barBg.Size = UDim2.new(1, -60, 0, 4)
+    _barBg.Position = UDim2.new(0, 30, 0, 216)
+    _barBg.BackgroundColor3 = Color3.fromRGB(50, 18, 18)
+    _barBg.BorderSizePixel = 0
+    _barBg.ZIndex = 3
+    Instance.new("UICorner", _barBg).CornerRadius = UDim.new(0, 2)
+
+    local _bar = Instance.new("Frame", _barBg)
+    _bar.Size = UDim2.new(0, 0, 1, 0)
+    _bar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    _bar.BorderSizePixel = 0
+    _bar.ZIndex = 4
+    Instance.new("UICorner", _bar).CornerRadius = UDim.new(0, 2)
 
     -- ================================================================
-    -- BOTONES INFERIORES: Copy Page / Discord / Security
+    -- FUNCION HELPER PARA CREAR BOTONES ESTILO IMAGEN DE REFERENCIA
     -- ================================================================
-    local _btnContainer = Instance.new("Frame", _phase2)
-    _btnContainer.Size = UDim2.new(1, -20, 0, 30)
-    _btnContainer.AnchorPoint = Vector2.new(0.5, 0)
-    _btnContainer.Position = UDim2.new(0.5, 0, 0, 326)
-    _btnContainer.BackgroundTransparency = 1
-    _btnContainer.ZIndex = 4
-
-    local function _makeSmallBtn(parent, text, col, idx, total)
-        local _gap = 6
-        local _w = (1 - (_gap * (total - 1) / parent.AbsoluteSize.X) ) / total
-        local _btn = Instance.new("TextButton", parent)
-        _btn.Size = UDim2.new(0, 0, 1, 0)  -- anchura real se fija con UIListLayout
-        _btn.BackgroundColor3 = col
-        _btn.BackgroundTransparency = 0.15
-        _btn.BorderSizePixel = 0
-        _btn.Text = text
-        _btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        _btn.Font = Enum.Font.GothamBold
-        _btn.TextSize = 10
-        _btn.AutoButtonColor = false
-        _btn.ZIndex = 5
-        local _c = Instance.new("UICorner", _btn); _c.CornerRadius = UDim.new(0, 6)
-        local _s = Instance.new("UIStroke", _btn)
-        _s.Color = col; _s.Thickness = 1; _s.Transparency = 0.5
-        -- Hover
-        _btn.MouseEnter:Connect(function()
-            TweenService:Create(_btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+    local function _makeKeyBtn(parent, posY, label, width, xOffset)
+        local btn = Instance.new("TextButton", parent)
+        btn.Size = UDim2.new(0, width or 130, 0, 44)
+        btn.Position = UDim2.new(0, xOffset or 14, 0, posY)
+        btn.BackgroundColor3 = Color3.fromRGB(140, 28, 28)
+        btn.BackgroundTransparency = 0
+        btn.BorderSizePixel = 0
+        btn.Text = label
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.AutoButtonColor = false
+        btn.ZIndex = 5
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        local bStroke = Instance.new("UIStroke", btn)
+        bStroke.Color = Color3.fromRGB(190, 45, 45)
+        bStroke.Thickness = 1.5
+        bStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(190, 40, 40)}):Play()
         end)
-        _btn.MouseLeave:Connect(function()
-            TweenService:Create(_btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play()
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(140, 28, 28)}):Play()
         end)
-        return _btn
+        return btn
     end
 
-    -- UIListLayout para alinear los 3 botones en fila
-    local _btnLayout = Instance.new("UIListLayout", _btnContainer)
-    _btnLayout.FillDirection = Enum.FillDirection.Horizontal
-    _btnLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    _btnLayout.Padding = UDim.new(0, 5)
-    _btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    _btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-
-    -- Boton 1: COPY PAGE
-    local _copyBtn = Instance.new("TextButton", _btnContainer)
-    _copyBtn.Size = UDim2.new(0, 98, 1, 0)
-    _copyBtn.LayoutOrder = 1
-    _copyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-    _copyBtn.BackgroundTransparency = 0.15
-    _copyBtn.BorderSizePixel = 0
-    _copyBtn.Text = "?? Copy Page"
-    _copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _copyBtn.Font = Enum.Font.GothamBold
-    _copyBtn.TextSize = 10
-    _copyBtn.AutoButtonColor = false
-    _copyBtn.ZIndex = 5
-    Instance.new("UICorner", _copyBtn).CornerRadius = UDim.new(0, 6)
-    local _copyStroke = Instance.new("UIStroke", _copyBtn)
-    _copyStroke.Color = Color3.fromRGB(220, 60, 60); _copyStroke.Thickness = 1; _copyStroke.Transparency = 0.5
-    _copyBtn.MouseEnter:Connect(function() TweenService:Create(_copyBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play() end)
-    _copyBtn.MouseLeave:Connect(function() TweenService:Create(_copyBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play() end)
-    _copyBtn.Activated:Connect(function()
-        local _keyLink
-        if _myBinId and _G._keyStartTime then
-            _keyLink = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId .. "&t=" .. tostring(_G._keyStartTime)
-        elseif _myBinId then
-            _keyLink = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId
+    -- ================================================================
+    -- BOTON "Llave Get" (abre pagina de obtencion de key)
+    -- ================================================================
+    local _LLAVE_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
+    local _llavebtn = _makeKeyBtn(_panel, 238, "Llave Get", 130, 14)
+    _llavebtn.Activated:Connect(function()
+        TweenService:Create(_llavebtn, TweenInfo.new(0.07), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
+        task.wait(0.12)
+        TweenService:Create(_llavebtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(140, 28, 28)}):Play()
+        local _tok = _myToken
+        local _link
+        if _G._zerqonBinId and _G._keyStartTime then
+            _link = _LLAVE_PAGE_URL .. "?token=" .. _tok .. "&bin=" .. _G._zerqonBinId .. "&t=" .. tostring(_G._keyStartTime)
+        elseif _G._zerqonBinId then
+            _link = _LLAVE_PAGE_URL .. "?token=" .. _tok .. "&bin=" .. _G._zerqonBinId
         else
-            _keyLink = _PAGE_URL .. "?token=" .. _myToken
+            _link = _LLAVE_PAGE_URL .. "?token=" .. _tok
         end
-        local _copied2 = false
-        if setclipboard then pcall(function() setclipboard(_keyLink); _copied2 = true end)
-        elseif syn and syn.set_clipboard then pcall(function() syn.set_clipboard(_keyLink); _copied2 = true end)
-        elseif Clipboard and Clipboard.set then pcall(function() Clipboard.set(_keyLink); _copied2 = true end) end
-        local _orig = _copyBtn.Text
-        _copyBtn.Text = _copied2 and "Copied!" or "Check F9"
-        _copyBtn.TextColor3 = _copied2 and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 200, 80)
-        print("[ZERQON KEY PAGE] " .. _keyLink)
-        task.delay(2.5, function()
-            if _copyBtn and _copyBtn.Parent then
-                _copyBtn.Text = _orig
-                _copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        local _opened = false
+        if not _opened then pcall(function() if openBrowser then openBrowser(_link); _opened = true end end) end
+        if not _opened then pcall(function() if syn and syn.open then syn.open(_link); _opened = true end end) end
+        if not _opened then pcall(function() if open_url then open_url(_link); _opened = true end end) end
+        if not _opened then pcall(function() if seturi then seturi(_link); _opened = true end end) end
+        if not _opened then pcall(function() if Exploit and Exploit.OpenUrl then Exploit.OpenUrl(_link); _opened = true end end) end
+        pcall(function() if setclipboard then setclipboard(_link) end end)
+        pcall(function() if syn and syn.set_clipboard then syn.set_clipboard(_link) end end)
+    end)
+
+    -- ================================================================
+    -- BOTON "Discord" (copia el link del discord)
+    -- ================================================================
+    local _DISCORD_LINK = "https://discord.gg/Prsa5w5VVA"
+    local _discordBtn = _makeKeyBtn(_panel, 238, "Discord", 130, 165)
+    _discordBtn.Activated:Connect(function()
+        TweenService:Create(_discordBtn, TweenInfo.new(0.07), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
+        task.wait(0.12)
+        TweenService:Create(_discordBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(140, 28, 28)}):Play()
+        local _copied = false
+        pcall(function() if setclipboard then setclipboard(_DISCORD_LINK); _copied = true end end)
+        pcall(function() if not _copied and syn and syn.set_clipboard then syn.set_clipboard(_DISCORD_LINK); _copied = true end end)
+        pcall(function() if not _copied and Clipboard and Clipboard.set then Clipboard.set(_DISCORD_LINK); _copied = true end end)
+        local _opened = false
+        if not _opened then pcall(function() if openBrowser then openBrowser(_DISCORD_LINK); _opened = true end end) end
+        if not _opened then pcall(function() if syn and syn.open then syn.open(_DISCORD_LINK); _opened = true end end) end
+        if not _opened then pcall(function() if open_url then open_url(_DISCORD_LINK); _opened = true end end) end
+        -- Feedback visual temporal
+        local _origText = _discordBtn.Text
+        _discordBtn.Text = _copied and "Copiado!" or "Abierto!"
+        task.delay(1.5, function()
+            if _discordBtn and _discordBtn.Parent then
+                _discordBtn.Text = _origText
             end
         end)
     end)
 
-    -- Boton 2: DISCORD
-    local _discordBtn = Instance.new("TextButton", _btnContainer)
-    _discordBtn.Size = UDim2.new(0, 98, 1, 0)
-    _discordBtn.LayoutOrder = 2
-    _discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    _discordBtn.BackgroundTransparency = 0.15
-    _discordBtn.BorderSizePixel = 0
-    _discordBtn.Text = "?? Discord"
-    _discordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _discordBtn.Font = Enum.Font.GothamBold
-    _discordBtn.TextSize = 10
-    _discordBtn.AutoButtonColor = false
-    _discordBtn.ZIndex = 5
-    Instance.new("UICorner", _discordBtn).CornerRadius = UDim.new(0, 6)
-    local _discStroke = Instance.new("UIStroke", _discordBtn)
-    _discStroke.Color = Color3.fromRGB(110, 120, 255); _discStroke.Thickness = 1; _discStroke.Transparency = 0.5
-    _discordBtn.MouseEnter:Connect(function() TweenService:Create(_discordBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play() end)
-    _discordBtn.MouseLeave:Connect(function() TweenService:Create(_discordBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play() end)
-    _discordBtn.Activated:Connect(function()
-        local _dLink = "https://discord.gg/Prsa5w5VVA"
-        local _opened3 = false
-        if protectedcall then pcall(function() if syn and syn.request then syn.request({Url="https://discord.gg/Prsa5w5VVA", Method="GET"}) end end) end
-        pcall(function()
-            if type(openurl) == "function" then openurl(_dLink); _opened3 = true
-            elseif syn and syn.open_url then syn.open_url(_dLink); _opened3 = true end
+    -- ================================================================
+    -- BOTON "Trust Statement" (ancho completo, abajo)
+    -- ================================================================
+    local _trustBtn = _makeKeyBtn(_panel, 296, "Trust Statement", 432, 14)
+    _trustBtn.Activated:Connect(function()
+        TweenService:Create(_trustBtn, TweenInfo.new(0.07), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
+        task.wait(0.12)
+        TweenService:Create(_trustBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(140, 28, 28)}):Play()
+
+        -- Crear popup de Trust Statement si no existe ya
+        if _lsGui:FindFirstChild("TrustPopup") then return end
+
+        local _tPopup = Instance.new("Frame", _lsGui)
+        _tPopup.Name = "TrustPopup"
+        _tPopup.Size = UDim2.new(0, 420, 0, 0)
+        _tPopup.Position = UDim2.new(0.5, -210, 0.5, -160)
+        _tPopup.BackgroundColor3 = Color3.fromRGB(14, 6, 6)
+        _tPopup.BackgroundTransparency = 0.05
+        _tPopup.BorderSizePixel = 0
+        _tPopup.ZIndex = 20
+        Instance.new("UICorner", _tPopup).CornerRadius = UDim.new(0, 10)
+        local _tStroke = Instance.new("UIStroke", _tPopup)
+        _tStroke.Color = Color3.fromRGB(190, 35, 35)
+        _tStroke.Thickness = 2
+        _tStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+        -- Header
+        local _tHeader = Instance.new("TextLabel", _tPopup)
+        _tHeader.Size = UDim2.new(1, -50, 0, 36)
+        _tHeader.Position = UDim2.new(0, 14, 0, 10)
+        _tHeader.BackgroundTransparency = 1
+        _tHeader.Text = "Trust Statement"
+        _tHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
+        _tHeader.Font = Enum.Font.GothamBold
+        _tHeader.TextSize = 17
+        _tHeader.TextXAlignment = Enum.TextXAlignment.Left
+        _tHeader.ZIndex = 21
+
+        -- Linea separadora
+        local _tLine = Instance.new("Frame", _tPopup)
+        _tLine.Size = UDim2.new(1, -28, 0, 1)
+        _tLine.Position = UDim2.new(0, 14, 0, 48)
+        _tLine.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+        _tLine.BorderSizePixel = 0
+        _tLine.ZIndex = 21
+
+        -- Texto del statement
+        local _tBody = Instance.new("TextLabel", _tPopup)
+        _tBody.Size = UDim2.new(1, -28, 0, 180)
+        _tBody.Position = UDim2.new(0, 14, 0, 58)
+        _tBody.BackgroundTransparency = 1
+        _tBody.Text = "Este script es seguro y no contiene malware.\n\n" ..
+            "[OK] No roba cuentas ni informacion personal.\n" ..
+            "[OK] No modifica archivos fuera de Roblox.\n" ..
+            "[OK] No envia datos a servidores externos.\n" ..
+            "[OK] Solo funciona dentro del juego de Roblox.\n\n" ..
+            "El sistema de key existe unicamente para\n" ..
+            "proteger el hub del uso no autorizado.\n\n" ..
+            "Usa el hub bajo tu propia responsabilidad."
+        _tBody.TextColor3 = Color3.fromRGB(210, 170, 170)
+        _tBody.Font = Enum.Font.Gotham
+        _tBody.TextSize = 13
+        _tBody.TextXAlignment = Enum.TextXAlignment.Left
+        _tBody.TextWrapped = true
+        _tBody.ZIndex = 21
+
+        -- Boton cerrar X
+        local _tClose = Instance.new("TextButton", _tPopup)
+        _tClose.Size = UDim2.new(0, 30, 0, 30)
+        _tClose.Position = UDim2.new(1, -38, 0, 8)
+        _tClose.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+        _tClose.BorderSizePixel = 0
+        _tClose.Text = "X"
+        _tClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+        _tClose.Font = Enum.Font.GothamBold
+        _tClose.TextSize = 13
+        _tClose.AutoButtonColor = false
+        _tClose.ZIndex = 22
+        Instance.new("UICorner", _tClose).CornerRadius = UDim.new(0, 6)
+        _tClose.Activated:Connect(function()
+            TweenService:Create(_tPopup, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 420, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.delay(0.3, function() pcall(function() _tPopup:Destroy() end) end)
         end)
-        local _copied3 = false
-        if not _opened3 then
-            if setclipboard then pcall(function() setclipboard(_dLink); _copied3 = true end)
-            elseif syn and syn.set_clipboard then pcall(function() syn.set_clipboard(_dLink); _copied3 = true end) end
-        end
-        local _orig3 = _discordBtn.Text
-        if _opened3 then _discordBtn.Text = "? Opened!"
-        elseif _copied3 then _discordBtn.Text = "? Copied!"
-        else _discordBtn.Text = "Check F9"; print("[ZERQON DISCORD] " .. _dLink) end
-        task.delay(2.5, function()
-            if _discordBtn and _discordBtn.Parent then _discordBtn.Text = _orig3 end
+        _tClose.MouseEnter:Connect(function()
+            TweenService:Create(_tClose, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(220, 50, 50)}):Play()
         end)
-    end)
-
-    -- Boton 3: SECURITY
-    local _secBtn = Instance.new("TextButton", _btnContainer)
-    _secBtn.Size = UDim2.new(0, 98, 1, 0)
-    _secBtn.LayoutOrder = 3
-    _secBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-    _secBtn.BackgroundTransparency = 0.15
-    _secBtn.BorderSizePixel = 0
-    _secBtn.Text = "?? Security"
-    _secBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _secBtn.Font = Enum.Font.GothamBold
-    _secBtn.TextSize = 10
-    _secBtn.AutoButtonColor = false
-    _secBtn.ZIndex = 5
-    Instance.new("UICorner", _secBtn).CornerRadius = UDim.new(0, 6)
-    local _secStroke = Instance.new("UIStroke", _secBtn)
-    _secStroke.Color = Color3.fromRGB(60, 200, 100); _secStroke.Thickness = 1; _secStroke.Transparency = 0.5
-    _secBtn.MouseEnter:Connect(function() TweenService:Create(_secBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play() end)
-    _secBtn.MouseLeave:Connect(function() TweenService:Create(_secBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play() end)
-
-    -- Popup de seguridad
-    local _secPopupOpen = false
-    _secBtn.Activated:Connect(function()
-        if _secPopupOpen then return end
-        _secPopupOpen = true
-        -- Crear popup flotante sobre el panel
-        local _popup = Instance.new("Frame", _lsGui)
-        _popup.Size = UDim2.new(0, 320, 0, 220)
-        _popup.AnchorPoint = Vector2.new(0.5, 0.5)
-        _popup.Position = UDim2.new(0.5, 0, 0.5, 0)
-        _popup.BackgroundColor3 = Color3.fromRGB(10, 22, 12)
-        _popup.BackgroundTransparency = 0
-        _popup.BorderSizePixel = 0
-        _popup.ZIndex = 20
-        Instance.new("UICorner", _popup).CornerRadius = UDim.new(0, 12)
-        local _popStroke = Instance.new("UIStroke", _popup)
-        _popStroke.Color = Color3.fromRGB(60, 200, 100); _popStroke.Thickness = 1.5; _popStroke.Transparency = 0.3
-
-        local _popTitle = Instance.new("TextLabel", _popup)
-        _popTitle.Size = UDim2.new(1, -16, 0, 28)
-        _popTitle.Position = UDim2.new(0, 8, 0, 8)
-        _popTitle.BackgroundTransparency = 1
-        _popTitle.Text = "?? Security Info"
-        _popTitle.TextColor3 = Color3.fromRGB(80, 220, 120)
-        _popTitle.Font = Enum.Font.GothamBold
-        _popTitle.TextSize = 15
-        _popTitle.TextXAlignment = Enum.TextXAlignment.Center
-        _popTitle.ZIndex = 21
-
-        local _popBody = Instance.new("TextLabel", _popup)
-        _popBody.Size = UDim2.new(1, -20, 0, 140)
-        _popBody.Position = UDim2.new(0, 10, 0, 40)
-        _popBody.BackgroundTransparency = 1
-        _popBody.Text =
-            "? This hub does NOT steal your data.\n" ..
-            "? Este hub NO roba tu informaci?n.\n\n" ..
-            "? No passwords, cookies or tokens\n    are collected at any time.\n" ..
-            "? No se recopilan contrase?as,\n    cookies ni tokens.\n\n" ..
-            "?? Only your Roblox UserId is used\n    to generate a session key.\n" ..
-            "?? Solo se usa tu UserId de Roblox\n    para generar la key de sesi?n."
-        _popBody.TextColor3 = Color3.fromRGB(200, 230, 210)
-        _popBody.Font = Enum.Font.Gotham
-        _popBody.TextSize = 11
-        _popBody.TextXAlignment = Enum.TextXAlignment.Left
-        _popBody.TextWrapped = true
-        _popBody.ZIndex = 21
-
-        local _popClose = Instance.new("TextButton", _popup)
-        _popClose.Size = UDim2.new(1, -20, 0, 26)
-        _popClose.Position = UDim2.new(0, 10, 1, -34)
-        _popClose.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
-        _popClose.BackgroundTransparency = 0.1
-        _popClose.BorderSizePixel = 0
-        _popClose.Text = "Close / Cerrar"
-        _popClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-        _popClose.Font = Enum.Font.GothamBold
-        _popClose.TextSize = 12
-        _popClose.ZIndex = 21
-        Instance.new("UICorner", _popClose).CornerRadius = UDim.new(0, 6)
-        _popClose.Activated:Connect(function()
-            TweenService:Create(_popup, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-                {BackgroundTransparency = 1}):Play()
-            TweenService:Create(_popTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-            TweenService:Create(_popBody,  TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-            TweenService:Create(_popClose, TweenInfo.new(0.2), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-            task.delay(0.25, function()
-                pcall(function() _popup:Destroy() end)
-                _secPopupOpen = false
-            end)
+        _tClose.MouseLeave:Connect(function()
+            TweenService:Create(_tClose, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(160, 30, 30)}):Play()
         end)
 
-        -- Animacion de entrada del popup
-        _popup.BackgroundTransparency = 1
-        _popTitle.TextTransparency = 1; _popBody.TextTransparency = 1; _popClose.TextTransparency = 1
-        _popup.Size = UDim2.new(0, 260, 0, 180)
-        TweenService:Create(_popup, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            {BackgroundTransparency = 0, Size = UDim2.new(0, 320, 0, 220)}):Play()
-        task.wait(0.15)
-        TweenService:Create(_popTitle, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-        TweenService:Create(_popBody,  TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-        TweenService:Create(_popClose, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+        -- Animacion entrada
+        TweenService:Create(_tPopup, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 420, 0, 260),
+            BackgroundTransparency = 0.05
+        }):Play()
     end)
 
     -- ================================================================
-    -- AGRANDAR el _bg para acomodar los botones y el boton manual
+    -- NOTA INFORMATIVA (debajo de los botones)
     -- ================================================================
-    _bg.Size = UDim2.new(0, 360, 0, 410)
-    _panel.Size = UDim2.new(0, 340, 0, 390)
+    local _infoLbl = Instance.new("TextLabel", _panel)
+    _infoLbl.Size = UDim2.new(1, -20, 0, 40)
+    _infoLbl.Position = UDim2.new(0, 10, 0, 355)
+    _infoLbl.BackgroundTransparency = 1
+    _infoLbl.Text = "Presiona 'Llave Get' para obtener tu key.\nEl hub se abre automaticamente al verificar."
+    _infoLbl.TextColor3 = Color3.fromRGB(140, 90, 90)
+    _infoLbl.Font = Enum.Font.Gotham
+    _infoLbl.TextSize = 11
+    _infoLbl.TextXAlignment = Enum.TextXAlignment.Center
+    _infoLbl.TextWrapped = true
+    _infoLbl.ZIndex = 3
 
-    -- Barra de progreso delgada en el fondo de la pantalla
-    local _barBg = Instance.new("Frame", _bg)
-    _barBg.Size = UDim2.new(1, 0, 0, 3)
-    _barBg.AnchorPoint = Vector2.new(0, 1)
-    _barBg.Position = UDim2.new(0, 0, 1, 0)
-    _barBg.BackgroundColor3 = Color3.fromRGB(30, 8, 8)
-    _barBg.BorderSizePixel = 0
-    _barBg.ZIndex = 5
-    local _bar = Instance.new("Frame", _barBg)
-    _bar.Size = UDim2.new(0, 0, 1, 0)
-    _bar.BackgroundColor3 = Color3.fromRGB(210, 40, 40)
-    _bar.BorderSizePixel = 0
-    _bar.ZIndex = 6
+    -- Variable dummy _hint para que la logica de polling no crashee al intentar actualizarla
+    local _hint = _infoLbl
 
-    -- dummy _hint y _pageBtn para compatibilidad con el sistema de polling
-    local _hint = _errorLbl
+    -- Variable dummy _pageBtn para compatibilidad con la logica de polling
     local _pageBtn = Instance.new("TextButton", _panel)
     _pageBtn.Size = UDim2.new(0, 1, 0, 1)
     _pageBtn.Position = UDim2.new(0, 0, 1, -1)
@@ -62580,84 +62389,27 @@ do
     _pageBtn.Visible = false
 
     -- ================================================================
-    -- LOOP DEL SPINNER (rota el arco)
+    -- ANIMACION DE ENTRADA DEL PANEL
     -- ================================================================
-    local _spinnerActive = true
+    _panel.Size = UDim2.new(0, 460, 0, 0)
+    _panel.BackgroundTransparency = 1
     task.spawn(function()
-        local _rot = 0
-        while _spinnerActive and _spinArc and _spinArc.Parent do
-            _rot = (_rot + 6) % 360
-            _spinArc.Rotation = _rot
-            task.wait(0.016)  -- ~60fps
-        end
+        task.wait(0.05)
+        TweenService:Create(_panel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 460, 0, 430),
+            BackgroundTransparency = 0.05
+        }):Play()
+        TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0.45}):Play()
     end)
 
-    -- ================================================================
-    -- ANIMACION FASE 1: avatar + nombre aparecen, luego desaparecen
-    -- ================================================================
+    -- Animacion borde pulsante rojo
     task.spawn(function()
-        -- Fondo aparece
-        _bg.BackgroundTransparency = 1
-        TweenService:Create(_bg, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {BackgroundTransparency = 0}):Play()
-        task.wait(0.3)
-
-        -- Avatar escala desde 0 y aparece
-        _avatarImg.Size = UDim2.new(0, 0, 0, 0)
-        _avatarImg.AnchorPoint = Vector2.new(0.5, 0.5)
-        _avatarImg.Position = UDim2.new(0.5, 0, 0.5, 0)
-        _avatarImg.ImageTransparency = 0
-        TweenService:Create(_avatarImg, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, 0, 1, 0),
-        }):Play()
-        task.wait(0.3)
-
-        -- Nombre y subtitulo aparecen con fade
-        TweenService:Create(_nameLbl, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {TextTransparency = 0}):Play()
-        task.wait(0.15)
-        TweenService:Create(_welcomeSub, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {TextTransparency = 0}):Play()
-
-        -- Borde pulsante del avatar durante la fase 1
-        task.spawn(function()
-            local _pulse = true
-            task.delay(2.2, function() _pulse = false end)
-            while _pulse and _avatarStroke and _avatarStroke.Parent do
-                TweenService:Create(_avatarStroke, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                    {Transparency = 0.6}):Play()
-                task.wait(0.7)
-                TweenService:Create(_avatarStroke, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                    {Transparency = 0}):Play()
-                task.wait(0.7)
-            end
-        end)
-
-        -- Mantener visible la fase 1 durante 2.2s
-        task.wait(2.2)
-
-        -- Fase 1 desaparece: avatar se achica, texto se va con fade
-        TweenService:Create(_nameLbl, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {TextTransparency = 1}):Play()
-        TweenService:Create(_welcomeSub, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {TextTransparency = 1}):Play()
-        TweenService:Create(_avatarImg, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0),
-        }):Play()
-        task.wait(0.4)
-
-        -- Fase 1 oculta, fase 2 aparece
-        _phase1.Visible = false
-        _phase2.Visible = true
-
-        -- Spinner y texto aparecen con fade in
-        _detectLbl.TextTransparency = 1
-        _status.TextTransparency = 1
-        TweenService:Create(_detectLbl, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {TextTransparency = 0}):Play()
-        task.wait(0.15)
-        TweenService:Create(_status, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {TextTransparency = 0}):Play()
+        while _panel and _panel.Parent do
+            TweenService:Create(_stroke, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.55}):Play()
+            task.wait(1.1)
+            TweenService:Create(_stroke, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0}):Play()
+            task.wait(1.1)
+        end
     end)
 
     -- ----------------------------------------------------------------
@@ -62670,67 +62422,36 @@ do
     -- Abrir hub cuando se detecta "verified"
     local function _openHub()
         _pollingActive = false
-        _spinnerActive = false
-        -- Actualizar textos a estado verificado
-        _detectLbl.Text = "Key detected!"
-        _detectLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
-        _status.Text = "Loading hub..."
-        _status.TextColor3 = Color3.fromRGB(80, 200, 100)
-        -- Ocultar mensaje de error si estaba visible
-        TweenService:Create(_errorLbl, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        _status.Text = "VERIFICADO! Abriendo hub..."
+        _status.TextColor3 = Color3.fromRGB(200, 80, 80)
         TweenService:Create(_bar, TweenInfo.new(0.4), {Size = UDim2.new(1, 0, 1, 0)}):Play()
         -- Sonido de exito al verificar la key
         pcall(function()
             local _successSound = Instance.new("Sound")
-            _successSound.SoundId = "rbxassetid://4590662766"
+            _successSound.SoundId = "rbxassetid://4590662766"  -- sonido de exito/succedido
             _successSound.Volume = 0.8
             _successSound.Parent = game:GetService("SoundService")
             _successSound:Play()
             game:GetService("Debris"):AddItem(_successSound, 5)
         end)
-        -- Animacion de salida: fade out general
+        -- Animacion de salida del panel (zoom out + fade) antes de abrir el hub
         task.spawn(function()
-            task.wait(0.6)
-            if _bg and _bg.Parent then
-                TweenService:Create(_bg, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            task.wait(0.1)
+            if _panel and _panel.Parent then
+                TweenService:Create(_panel, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0, 460, 0, 0),
+                    Position = UDim2.new(0.5, -230, 0.5, 215),
                     BackgroundTransparency = 1
                 }):Play()
+                TweenService:Create(_bg, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
             end
         end)
         -- Guardar timestamp de inicio de key (24h) para el timer en Settings
         -- AUTOSAVE: solo asignar si no hay uno ya valido (no resetear las 24h)
-        -- FIX SYNC: priorizar el t del JSONBin (guardado por la pagina web) sobre os.time()
-        -- Esto garantiza que el timer del hub sincroniza exactamente con la pagina.
+        -- FIX SYNC: usar os.time() (Unix seconds) para que coincida con Date.now()/1000
+        -- de la web. tick() es tiempo Roblox (desde 2006) y causa desfase en el timer.
         if not _G._keyStartTime then
-            -- Intentar leer el t real del JSONBin antes de usar os.time()
-            local _gotWebT = false
-            pcall(function()
-                if _myBinId then
-                    local _rdRes = _reqWithRetry(
-                        _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
-                        "GET",
-                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                    )
-                    if _rdRes then
-                        local _okRd, _dataRd = pcall(function() return _HttpService:JSONDecode(_rdRes) end)
-                        if _okRd and _dataRd and _dataRd.record and _dataRd.record.t then
-                            local _tRd = tonumber(_dataRd.record.t)
-                            if _tRd then
-                                local _tRdS = _tRd > 9999999999 and math.floor(_tRd / 1000) or _tRd
-                                local _ageRd = os.time() - _tRdS
-                                if _ageRd >= 0 and _ageRd < _KEY_DURATION then
-                                    _G._keyStartTime = _tRdS
-                                    _gotWebT = true
-                                    warn("[ZerqonHUB] _openHub: t leido de la pagina web = " .. tostring(_tRdS) .. "s")
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            if not _gotWebT then
-                _G._keyStartTime = os.time()
-            end
+            _G._keyStartTime = os.time()
         end
         -- AUTOSAVE: guardar key en archivo local para auto-ejecucion en proximas sesiones
         -- Formato: "token|binId|startTime"
@@ -62787,221 +62508,75 @@ do
 
     -- FIX: Polling ahora arranca automaticamente (no solo al presionar boton).
     -- Consulta el bin cada 2.5s. Si el bin aun no existe, lo espera tambien.
-    -- Tiempo limite para mostrar el mensaje de error (segundos de polling sin verificar)
-    local _NO_KEY_TIMEOUT = 18
-
-    -- Funcion de lectura y apertura de hub al detectar verified
-    local function _checkAndOpen()
-        if not _myBinId then
-            warn("[ZerqonHUB] checkAndOpen: NO binId todavia")
-            return false
-        end
-        -- Leer el bin completo para diagnostico
-        local _rawRes = _reqWithRetry(
-            _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
-            "GET",
-            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-        )
-        warn("[ZerqonHUB] BIN RAW: " .. tostring(_rawRes))
-        local _st = nil
-        if _rawRes then
-            local _okR, _dataR = pcall(function() return _HttpService:JSONDecode(_rawRes) end)
-            if _okR and _dataR and _dataR.record then
-                _st = _dataR.record.status
-                warn("[ZerqonHUB] BIN status=" .. tostring(_st) .. " token=" .. tostring(_dataR.record.token))
-            else
-                warn("[ZerqonHUB] BIN decode fail: " .. tostring(_okR))
-            end
-        end
-        if _st == "verified" then
-            pcall(function()
-                local _resT = _reqWithRetry(
-                    _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
-                    "GET",
-                    { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                )
-                if _resT then
-                    local _okT, _dataT = pcall(function() return _HttpService:JSONDecode(_resT) end)
-                    if _okT and _dataT and _dataT.record and _dataT.record.t then
-                        local _binTRaw = tonumber(_dataT.record.t)
-                        if _binTRaw then
-                            local _binT = _binTRaw > 9999999999 and math.floor(_binTRaw / 1000) or _binTRaw
-                            local _elapsed = os.time() - _binT
-                            if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                                _G._keyStartTime = _binT
-                                warn("[ZerqonHUB] AUTOSAVE: t restaurado = " .. tostring(_binT) .. "s (Unix)")
-                            end
-                        end
-                    end
-                end
-            end)
-            _openHub()
-            return true
-        end
-        return false
-    end
-
-    -- FIX PRINCIPAL: escritura directa del bin cuando el usuario confirma manualmente
-    -- Evita depender de que la pagina web actualice JSONBin (que puede fallar por CORS/timing)
-    local function _forceVerify()
-        if not _myBinId then
-            _myBinId = _ensureBin(_myToken); _G._zerqonBinId = _myBinId
-        end
-        if not _myBinId then
-            _status.Text = "No connection. Try again."
-            _status.TextColor3 = Color3.fromRGB(255, 80, 80)
-            return
-        end
-        _status.Text = "Verifying..."
-        _status.TextColor3 = Color3.fromRGB(160, 200, 255)
-
-        -- Primero intentar leer: si ya esta verified, abrir directo
-        if _checkAndOpen() then return end
-
-        -- No verificado todavia: leer primero el t existente del JSONBin (puesto por la pagina web)
-        -- Si la pagina ya guardo un t valido, conservarlo; si no, usar os.time() como fallback.
-        local _nowT = os.time()
-        pcall(function()
-            local _readRes = _reqWithRetry(
-                _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
-                "GET",
-                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-            )
-            if _readRes then
-                local _okRead, _dataRead = pcall(function() return _HttpService:JSONDecode(_readRes) end)
-                if _okRead and _dataRead and _dataRead.record and _dataRead.record.t then
-                    local _tRaw = tonumber(_dataRead.record.t)
-                    if _tRaw then
-                        local _tS = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
-                        local _age = os.time() - _tS
-                        if _age >= 0 and _age < _KEY_DURATION then
-                            _nowT = _tS
-                            warn("[ZerqonHUB] FORCE-VERIFY: usando t de la pagina web = " .. tostring(_nowT) .. "s")
-                        end
-                    end
-                end
-            end
-        end)
-        local _body = _HttpService:JSONEncode({ token = _myToken, status = "verified", t = _nowT })
-        warn("[ZerqonHUB] FORCE-VERIFY PUT -> binId=" .. _myBinId .. " body=" .. _body)
-        local _res = _reqWithRetry(
-            _JSONBIN_URL .. "/" .. _myBinId,
-            "PUT",
-            {
-                ["Content-Type"] = "application/json",
-                ["X-Master-Key"] = _JSONBIN_KEY,
-                ["X-Access-Key"] = _JSONBIN_KEY
-            },
-            _body
-        )
-        warn("[ZerqonHUB] FORCE-VERIFY PUT response: " .. tostring(_res))
-        if _res then
-            local _ok2, _data2 = pcall(function() return _HttpService:JSONDecode(_res) end)
-            if _ok2 and _data2 and (_data2.record or _data2.metadata) then
-                warn("[ZerqonHUB] FORCE-VERIFY: bin actualizado a verified. Abriendo hub...")
-                _G._keyStartTime = _nowT
-                _openHub()
-                return
-            end
-            warn("[ZerqonHUB] FORCE-VERIFY: respuesta inesperada del PUT")
-        else
-            warn("[ZerqonHUB] FORCE-VERIFY: PUT fallo, sin respuesta")
-        end
-        -- Si el PUT fallo, intentar leer de nuevo por si la web ya lo actualizo mientras tanto
-        if _checkAndOpen() then return end
-        _status.Text = "Still not verified. Try again."
-        _status.TextColor3 = Color3.fromRGB(255, 120, 80)
-    end
-
     local function _startPolling()
         if _pollingActive then return end
         _pollingActive = true
-        _status.Text = "Checking..."
-        _status.TextColor3 = Color3.fromRGB(160, 90, 90)
+        _status.Text = "Esperando verificacion..."
+        _status.TextColor3 = Color3.fromRGB(80, 130, 100)
 
         task.spawn(function()
             local _barAnim = 0
-            local _pollSecs = 0
-            local _errorShown = false
             while _pollingActive do
                 -- Animacion barra
                 _barAnim = (_barAnim + 0.07) % 1
-                TweenService:Create(_bar, TweenInfo.new(0.2), {Size = UDim2.new(_barAnim * 0.85, 0, 1, 0)}):Play()
+                TweenService:Create(_bar, TweenInfo.new(0.2), {Size = UDim2.new(_barAnim * 0.9, 0, 1, 0)}):Play()
 
-                -- Dots animados en el status
+                -- Dots animados
                 _dots = (_dots + 1) % 4
-                _status.Text = "Detecting key" .. string.rep(".", _dots)
+                _status.Text = "Esperando verificacion" .. string.rep(".", _dots)
 
-                -- Mostrar boton de verificacion manual si lleva tiempo sin detectar
-                _pollSecs = _pollSecs + _POLL_INTERVAL
-                if _pollSecs >= _NO_KEY_TIMEOUT and not _errorShown then
-                    _errorShown = true
-                    TweenService:Create(_errorLbl, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                        {TextTransparency = 0}):Play()
-                    -- Mostrar boton manual si existe
-                    if _manualBtn and _manualBtn.Parent then
-                        _manualBtn.Visible = true
-                        TweenService:Create(_manualBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-                            {BackgroundTransparency = 0.1}):Play()
-                    end
-                end
-
-                -- Si aun no tenemos binId, intentar obtenerlo
+                -- FIX: Si aun no tenemos el binId, intentar obtenerlo
                 if not _myBinId then
                     _myBinId = _findBin(_myToken); _G._zerqonBinId = _myBinId
                     if not _myBinId then
                         task.wait(_POLL_INTERVAL)
-                        continue
+                        continue -- bin aun no fue creado por la web, seguir esperando
                     end
                 end
 
                 -- Consultar estado
-                if _checkAndOpen() then return end
+                local _st = _getStatus(_myBinId)
+                warn("[ZerqonHUB] Poll status: " .. tostring(_st))
+                if _st == "verified" then
+                    -- AUTOSAVE: leer el 't' original del bin para no resetear las 24h
+                    pcall(function()
+                        local _resT = _reqWithRetry(
+                            _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
+                            "GET",
+                            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                        )
+                        if _resT then
+                            local _okT, _dataT = pcall(function() return _HttpService:JSONDecode(_resT) end)
+                            if _okT and _dataT and _dataT.record and _dataT.record.t then
+                                local _binTRaw = tonumber(_dataT.record.t)
+                                if _binTRaw then
+                                    -- FIX ms->s: la pagina HTML guarda 't' con Date.now() (milisegundos),
+                                    -- pero tick() trabaja en SEGUNDOS. Si el valor tiene mas de 10 digitos
+                                    -- es milisegundos -> dividir por 1000.
+                                    local _binT = _binTRaw
+                                    if _binTRaw > 9999999999 then
+                                        _binT = math.floor(_binTRaw / 1000)
+                                    end
+                                    -- FIX SYNC: os.time() para comparar con timestamps Unix
+                                    local _elapsed = os.time() - _binT
+                                    if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                                        _G._keyStartTime = _binT
+                                        warn("[ZerqonHUB] AUTOSAVE: t restaurado = " .. tostring(_binT) .. "s (Unix)")
+                                    else
+                                        warn("[ZerqonHUB] AUTOSAVE: t invalido o expirado (elapsed=" .. tostring(_elapsed) .. "s)")
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    _openHub()
+                    return
+                end
 
                 task.wait(_POLL_INTERVAL)
             end
         end)
     end
-
-    -- Boton "I verified / Ya verifique" - aparece tras el timeout, fuerza la apertura
-    local _manualBtn = Instance.new("TextButton", _phase2)
-    _manualBtn.Size = UDim2.new(1, -40, 0, 28)
-    _manualBtn.AnchorPoint = Vector2.new(0.5, 0)
-    _manualBtn.Position = UDim2.new(0.5, 0, 0, 252)
-    _manualBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 80)
-    _manualBtn.BackgroundTransparency = 1
-    _manualBtn.BorderSizePixel = 0
-    _manualBtn.Text = "I already verified / Ya verifique"
-    _manualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _manualBtn.Font = Enum.Font.GothamBold
-    _manualBtn.TextSize = 12
-    _manualBtn.AutoButtonColor = false
-    _manualBtn.ZIndex = 5
-    _manualBtn.Visible = false
-    Instance.new("UICorner", _manualBtn).CornerRadius = UDim.new(0, 7)
-    local _manualStroke = Instance.new("UIStroke", _manualBtn)
-    _manualStroke.Color = Color3.fromRGB(255, 100, 130)
-    _manualStroke.Thickness = 1.2
-    _manualStroke.Transparency = 0.3
-    _manualBtn.MouseEnter:Connect(function()
-        TweenService:Create(_manualBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
-    end)
-    _manualBtn.MouseLeave:Connect(function()
-        TweenService:Create(_manualBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.1}):Play()
-    end)
-    _manualBtn.Activated:Connect(function()
-        _manualBtn.Text = "Checking..."
-        _manualBtn.Active = false
-        task.spawn(function()
-            _forceVerify()
-            task.delay(3, function()
-                if _manualBtn and _manualBtn.Parent then
-                    _manualBtn.Text = "I already verified / Ya verifique"
-                    _manualBtn.Active = true
-                end
-            end)
-        end)
-    end)
 
     -- FIX: Al presionar el boton copiar: crear el bin primero, luego copiar el link,
     -- luego iniciar el polling. Antes el bin podia no existir cuando la web verificaba.
@@ -63013,8 +62588,8 @@ do
     local function _doOpenVerification()
         _pageBtn.Active = false
         _pageBtn.Text = "ABRIENDO..."
-        _status.Text = "Registering..."
-        _status.TextColor3 = Color3.fromRGB(160, 90, 90)
+        _status.Text = "Registrando en servidor..."
+        _status.TextColor3 = Color3.fromRGB(80, 130, 100)
 
         task.spawn(function()
             -- 1. Asegurar que el bin existe ANTES de abrir la pagina
@@ -63023,10 +62598,8 @@ do
             end
 
             if not _myBinId then
-                _status.Text = "Network error. Try again."
+                _status.Text = "Error de red. Presiona el boton para reintentar."
                 _status.TextColor3 = Color3.fromRGB(255, 68, 85)
-                TweenService:Create(_errorLbl, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {TextTransparency = 0}):Play()
                 _pageBtn.Text = "REINTENTAR"
                 _pageBtn.Active = true
                 return
@@ -63044,7 +62617,7 @@ do
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId .. "&t=" .. tostring(_G._keyStartTime)
             elseif _myBinId then
                 -- Bin existente pero sin timestamp local conocido: no pasar &t=
-                -- La web leer? el timestamp de JSONBin y de localStorage.
+                -- La web leerá el timestamp de JSONBin y de localStorage.
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId
             else
                 -- Bin nuevo: pasar timestamp actual como inicio de la key
@@ -63101,22 +62674,20 @@ do
 
             -- 6. Actualizar UI segun resultado
             if _opened then
-                _status.Text = "Browser opened. Complete the steps."
-                _status.TextColor3 = Color3.fromRGB(100, 200, 120)
-                _hint.Text = "Please copy the key link\nand paste it in your browser"
-                _hint.TextTransparency = 0
+                _pageBtn.Text = "NAVEGADOR ABIERTO ?"
+                _status.Text = "Completa los pasos en el navegador. El hub arranca solo."
+                _status.TextColor3 = Color3.fromRGB(57, 255, 154)
+                _hint.Text = "Ya abrimos el verificador.\nCompleta los 3 pasos y el hub se abre automaticamente."
             elseif _copied then
-                _status.Text = "Link copied!"
-                _status.TextColor3 = Color3.fromRGB(100, 180, 255)
-                _hint.Text = "Please copy the key link\nand paste it in your browser"
-                TweenService:Create(_hint, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {TextTransparency = 0}):Play()
+                _pageBtn.Text = "LINK COPIADO - Pega en tu navegador"
+                _status.Text = "Link copiado al portapapeles. Pegalo en tu navegador."
+                _status.TextColor3 = Color3.fromRGB(100, 200, 255)
+                _hint.Text = "Pega el link en tu navegador.\nCompleta los pasos y el hub se abre solo."
             else
-                _status.Text = "Check console (F9) for the key link."
+                _pageBtn.Text = "LINK EN CONSOLA (F9)"
+                _status.Text = "Copia el link de la consola (F9) y pegalo en el navegador."
                 _status.TextColor3 = Color3.fromRGB(255, 200, 80)
-                _hint.Text = "Please copy the key link\nand paste it in your browser"
-                TweenService:Create(_hint, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {TextTransparency = 0}):Play()
+                _hint.Text = "Abre la consola (F9), copia el link\ny pegalo en tu navegador para verificar."
             end
 
             -- Restaurar boton despues de 5 segundos para permitir reintentos
@@ -63137,127 +62708,44 @@ do
         _doOpenVerification()
     end)
 
-    -- ================================================================
-    -- AUTO-VERIFY v4: el script verifica por si mismo sin depender de la pagina web
-    -- 1. Si ya hay bin verified -> abrir hub directo
-    -- 2. Si no -> crear bin, hacer PUT verified, guardar key, abrir hub
-    -- La pagina web es opcional (para celular donde no hay navegador)
-    -- ================================================================
+    -- AUTO-EXEC: verificar inmediatamente si el bin ya esta en "verified"
+    -- (caso: el usuario ya completo la verificacion en la web y la pagina
+    -- actualizo el bin automaticamente al detectar la key valida).
+    -- Si ya esta verificado, abrir el hub sin mostrar ningun mensaje al usuario.
+    -- AUTO-OPEN: al mismo tiempo, abrir la pagina de verificacion automaticamente
+    -- para que el usuario no tenga que presionar ningun boton.
     task.spawn(function()
-        _status.Text = "Connecting..."
-        _status.TextColor3 = Color3.fromRGB(160, 90, 90)
+        _status.Text = "Verificando key..."
+        _status.TextColor3 = Color3.fromRGB(100, 200, 255)
 
-        warn("[ZerqonHUB] TOKEN: " .. tostring(_myToken))
-
-        -- PASO 1: buscar bin existente
+        -- Intentar encontrar el bin existente del token
         local _existingBin = _findBin(_myToken)
-        warn("[ZerqonHUB] Bin encontrado: " .. tostring(_existingBin))
-
         if _existingBin then
             _myBinId = _existingBin; _G._zerqonBinId = _myBinId
-            -- PASO 2a: leer el bin completo
-            local _rawFull = _reqWithRetry(
-                _JSONBIN_URL .. "/" .. _existingBin .. "/latest",
-                "GET",
-                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-            )
-            warn("[ZerqonHUB] Bin raw: " .. tostring(_rawFull))
-            if _rawFull then
-                local _okF, _dataF = pcall(function() return _HttpService:JSONDecode(_rawFull) end)
-                if _okF and _dataF and _dataF.record then
-                    local _st = _dataF.record.status
-                    local _tRaw = tonumber(_dataF.record.t)
-                    warn("[ZerqonHUB] status=" .. tostring(_st) .. " t=" .. tostring(_tRaw))
-
-                    if _st == "verified" and _tRaw then
-                        local _tS = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
-                        local _el = os.time() - _tS
-                        if _el >= 0 and _el < _KEY_DURATION then
-                            -- Key vigente: abrir directo
-                            warn("[ZerqonHUB] Key verificada y vigente. Abriendo hub...")
-                            _G._keyStartTime = _tS
-                            _openHub()
-                            return
-                        else
-                            warn("[ZerqonHUB] Key expirada (" .. tostring(_el) .. "s). Renovando...")
-                        end
-                    end
-                end
-            end
-        end
-
-        -- PASO 3: crear bin si no existe
-        _status.Text = "Registering..."
-        if not _myBinId then
-            _myBinId = _ensureBin(_myToken); _G._zerqonBinId = _myBinId
-            warn("[ZerqonHUB] Bin creado: " .. tostring(_myBinId))
-        end
-
-        if not _myBinId then
-            warn("[ZerqonHUB] Sin conexion a JSONBin. Mostrando pantalla manual.")
-            _status.Text = "No connection. Press verify."
-            _status.TextColor3 = Color3.fromRGB(220, 80, 80)
-            -- Mostrar boton manual de inmediato si no hay red
-            if _manualBtn and _manualBtn.Parent then
-                _manualBtn.Visible = true
-                _manualBtn.BackgroundTransparency = 0.1
-            end
-            TweenService:Create(_errorLbl, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
-            return
-        end
-
-        -- PASO 4: escribir "verified" directamente desde el script
-        -- FIX: leer el t del JSONBin (puesto por la pagina web) antes de hacer PUT.
-        -- Asi el timer del hub usa el tiempo de inicio real de la key, no os.time() del script.
-        _status.Text = "Verifying key..."
-        _status.TextColor3 = Color3.fromRGB(120, 160, 255)
-        local _nowT = os.time()
-        pcall(function()
-            local _preRead = _reqWithRetry(
-                _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
-                "GET",
-                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-            )
-            if _preRead then
-                local _okPR, _dataPR = pcall(function() return _HttpService:JSONDecode(_preRead) end)
-                if _okPR and _dataPR and _dataPR.record and _dataPR.record.t then
-                    local _tRawPR = tonumber(_dataPR.record.t)
-                    if _tRawPR then
-                        local _tSPR = _tRawPR > 9999999999 and math.floor(_tRawPR / 1000) or _tRawPR
-                        local _agePR = os.time() - _tSPR
-                        if _agePR >= 0 and _agePR < _KEY_DURATION then
-                            _nowT = _tSPR
-                            warn("[ZerqonHUB] PASO4: usando t de la pagina web = " .. tostring(_nowT) .. "s")
-                        end
-                    end
-                end
-            end
-        end)
-        local _putBody = _HttpService:JSONEncode({ token = _myToken, status = "verified", t = _nowT })
-        warn("[ZerqonHUB] PUT verified -> bin=" .. _myBinId)
-        local _putRes = _reqWithRetry(
-            _JSONBIN_URL .. "/" .. _myBinId,
-            "PUT",
-            {
-                ["Content-Type"] = "application/json",
-                ["X-Master-Key"] = _JSONBIN_KEY,
-                ["X-Access-Key"] = _JSONBIN_KEY
-            },
-            _putBody
-        )
-        warn("[ZerqonHUB] PUT response: " .. tostring(_putRes))
-
-        if _putRes then
-            local _okP, _dataP = pcall(function() return _HttpService:JSONDecode(_putRes) end)
-            if _okP and _dataP and (_dataP.record or _dataP.metadata) then
-                warn("[ZerqonHUB] Verificado OK. Guardando y abriendo hub...")
-                _G._keyStartTime = _nowT
-                -- Guardar en archivo local para la proxima sesion
+            local _immediateStatus = _getStatus(_existingBin)
+            warn("[ZerqonHUB] CHECK INMEDIATO: status = " .. tostring(_immediateStatus))
+            if _immediateStatus == "verified" then
+                -- KEY YA VERIFICADA: abrir hub directamente sin esperar
+                warn("[ZerqonHUB] AUTO-EXEC: Key ya verificada en JSONBin. Abriendo hub...")
+                -- Leer timestamp original del bin para no resetear las 24h
                 pcall(function()
-                    if writefile then
-                        local _uid2 = tostring(_lp and _lp.UserId or "0")
-                        writefile("zerqon_key_" .. _uid2 .. ".txt",
-                            _myToken .. "|" .. _myBinId .. "|" .. tostring(_nowT))
+                    local _resT = _req(
+                        _JSONBIN_URL .. "/" .. _existingBin .. "/latest",
+                        "GET",
+                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                    )
+                    if _resT then
+                        local _okT, _dataT = pcall(function() return _HttpService:JSONDecode(_resT) end)
+                        if _okT and _dataT and _dataT.record and _dataT.record.t then
+                            local _binTRaw = tonumber(_dataT.record.t)
+                            if _binTRaw then
+                                local _binT = _binTRaw > 9999999999 and math.floor(_binTRaw / 1000) or _binTRaw
+                                local _elapsed = os.time() - _binT
+                                if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                                    _G._keyStartTime = _binT
+                                end
+                            end
+                        end
                     end
                 end)
                 _openHub()
@@ -63265,20 +62753,24 @@ do
             end
         end
 
-        -- PASO 5 (fallback): el PUT fallo, intentar leer de nuevo por si la pagina lo actualizo
-        warn("[ZerqonHUB] PUT fallo. Verificando si la pagina ya actualizo el bin...")
-        if _checkAndOpen() then return end
-
-        -- Ultimo recurso: mostrar boton manual y seguir haciendo polling
-        warn("[ZerqonHUB] Iniciando polling + mostrando boton manual...")
-        _status.Text = "Waiting for verification..."
-        _status.TextColor3 = Color3.fromRGB(200, 140, 60)
-        if _manualBtn and _manualBtn.Parent then
-            _manualBtn.Visible = true
-            _manualBtn.BackgroundTransparency = 0.1
+        -- No habia bin o no estaba verificado: registrar, abrir pagina automaticamente y hacer polling
+        _status.Text = "Registrando token..."
+        if not _myBinId then
+            _myBinId = _ensureBin(_myToken); _G._zerqonBinId = _myBinId
         end
-        TweenService:Create(_errorLbl, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
-        _startPolling()
+        if _myBinId then
+            warn("[ZerqonHUB] Bin registrado: " .. _myBinId)
+            -- AUTO-OPEN: abrir la pagina de verificacion automaticamente sin que el usuario haga nada
+            task.delay(0.5, function()
+                if _lsGui and _lsGui.Parent then
+                    _doOpenVerification()
+                end
+            end)
+        else
+            warn("[ZerqonHUB] No se pudo registrar el bin. Se reintentara al presionar el boton.")
+            _status.Text = "Presiona el boton para continuar."
+            _status.TextColor3 = Color3.fromRGB(140, 180, 155)
+        end
     end)
 
     warn("[ZerqonHUB] Auto-key system v3.2 activo (auto-open). Token: " .. _myToken)
