@@ -948,7 +948,11 @@ local function _loadConfig()
             _G._hubSettings = _G._hubSettings or {}
             local field = k:sub(6)
             -- NUNCA restaurar hubLayoutMode: siempre forzar Sidebar izquierda (modo 1)
-            if field ~= "hubLayoutMode" then
+            -- FIX v24 MOBILE: NUNCA restaurar crosshairHidden/hudHidden/chatHidden del disco.
+            -- Si quedaron en true (usuario activo el toggle antes), al re-ejecutar el hub
+            -- ocultaban el HUD nativo de Roblox sin que el usuario lo pidiera.
+            local _blockHSFields = { hubLayoutMode=true, crosshairHidden=true, hudHidden=true, chatHidden=true }
+            if not _blockHSFields[field] then
                 _G._hubSettings[field] = v
             end
         elseif k == "__hubScale" or k == "__hubOpacity" then
@@ -1025,6 +1029,13 @@ local _neverRestoreToggles = {
     -- Cham Dead Only: sub-toggles no se auto-restauran (el principal Cham Dead Only si lo hace)
     ["Tracer Dead Only"] = true,
     ["Skeleton Dead Only"] = true,
+    -- FIX v24 MOBILE: estos toggles NUNCA se auto-restauran al re-ejecutar el hub.
+    -- "Ocultar Crosshair Roblox" antes llamaba SetCoreGuiEnabled(All,false) al restaurarse
+    -- automaticamente y hacia desaparecer TODO el HUD nativo en mobile.
+    -- El usuario los puede activar manualmente en Settings cuando quiera.
+    ["Ocultar Crosshair Roblox"]      = true,
+    ["Ocultar HUD (Backpack/Health)"]  = true,
+    ["Ocultar Chat"]                   = true,
 }
 
 -- =======================================================================
@@ -42442,17 +42453,6 @@ function CreateExclusiveTab()
         -- pero NO tocar Enum.CoreGuiType.All ni .Backpack ni .Health aqui.
         pcall(function()
             game:GetService("UserInputService").MouseIconEnabled = not on
-        end)
-        -- Metodo alternativo via StarterGui SetCore (oculta solo el crosshair propio del juego)
-        pcall(function()
-            local sg = game:GetService("StarterGui")
-            -- Solo ocultar el SelfView (camara del jugador) y no el resto del CoreGui
-            -- En MM2 no hay crosshair nativo separado; el MouseIconEnabled es suficiente
-            if on then
-                pcall(function() sg:SetCore("TopbarEnabled", false) end)
-            else
-                pcall(function() sg:SetCore("TopbarEnabled", true) end)
-            end
         end)
         -- Restaurar SIEMPRE Backpack/Health/Chat para que el HUD del juego nunca desaparezca
         pcall(function()
