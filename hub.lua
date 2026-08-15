@@ -57202,17 +57202,19 @@ _getTargetScale = function()
         local _uis = game:GetService("UserInputService")
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
+    -- DEBUG: imprimir valores reales para diagnosticar
+    warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
     if _isMobileNow then
-        -- Frame base real: 820x460. Calcular escala para que entre con margen de 12px por lado.
         local _availW = _vpNow.X - 24
         local _availH = _vpNow.Y - 24
         local _scaleByW = _availW / 820
         local _scaleByH = _availH / 460
         local _autoScale = math.min(_scaleByW, _scaleByH)
-        -- Clamp: minimo 0.35 para legibilidad, maximo 0.70 para que no quede gigante
-        return math.clamp(_autoScale, 0.35, 0.70)
+        local _final = math.clamp(_autoScale, 0.35, 0.70)
+        warn("[ZerqonHUB SCALE DEBUG] mobile -> scaleW=" .. tostring(_scaleByW) .. " scaleH=" .. tostring(_scaleByH) .. " final=" .. tostring(_final))
+        return _final
     else
-        -- PC: siempre 70%
+        warn("[ZerqonHUB SCALE DEBUG] PC branch -> returning 0.70")
         return 0.70
     end
 end
