@@ -102,12 +102,21 @@ do
 
     -- Leer el archivo ANTES de decidir si borrar
     local _keyStillValid = false
+    local _expectedToken = "ZQT" .. _uid  -- formato nuevo: sin seed de dia
     pcall(function()
         if not readfile then return end
         local _data = readfile(_savePath)
         if not _data or _data == "" then return end
         local _tok, _bid, _startStr = _data:match("^([^|]+)|([^|]+)|(%d+)$")
         if not (_tok and _startStr) then return end
+        -- VALIDAR formato del token: si no coincide con el formato nuevo, descartar
+        -- Esto limpia automaticamente tokens viejos con formato ZQT{uid}S{seed}
+        if _tok ~= _expectedToken then
+            warn("[ZerqonHUB] Token guardado desactualizado (" .. tostring(_tok) .. "). Limpiando para usar token nuevo.")
+            pcall(function() if delfile   then delfile(_savePath)       end end)
+            pcall(function() if writefile then writefile(_savePath, "") end end)
+            return
+        end
         local _startT = tonumber(_startStr)
         if not _startT then return end
         -- Normalizar ms -> s
@@ -118,7 +127,7 @@ do
             _G._zerqonToken       = _tok
             _G._keyStartTime      = _startT
             _G._zerqonBinId       = _bid
-            _G._zerqonSessionSeed = _tok:match("S(.+)$") or tostring(math.floor(os.time() / 86400))
+            _G._zerqonSessionSeed = _uid
             _keyStillValid = true
             warn("[ZerqonHUB] Key valida encontrada en archivo (" .. math.floor((_KEY_DUR - _elapsed) / 3600) .. "h restantes). Reutilizando...")
         end
@@ -21980,15 +21989,13 @@ function CreateMainTab()
         local KEY_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
-        -- Reutilizar el mismo token que el key system (formato S), o generarlo si aun no existe
+        -- TOKEN FIJO: solo por uid, sin seed de dia. Evita que distintos dispositivos
+        -- generen tokens distintos y se pisen mutuamente en JSONBin.
         local function _zqGetToken()
             if _G._zerqonToken then return _G._zerqonToken end
             local lp  = game:GetService("Players").LocalPlayer
             local uid = tostring(lp and lp.UserId or "0")
-            if not _G._zerqonSessionSeed then
-                _G._zerqonSessionSeed = tostring(math.floor(os.time() / 86400))
-            end
-            _G._zerqonToken = "ZQT" .. uid .. "S" .. _G._zerqonSessionSeed
+            _G._zerqonToken = "ZQT" .. uid
             return _G._zerqonToken
         end
 
@@ -40712,6 +40719,16 @@ function CreateExclusiveTab()
             leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
             leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
             leftColumn.CanvasPosition = Vector2.new(0, 0)
+            -- FIX SCROLL SETTINGS: el wrapper NO debe recortar su contenido,
+            -- de lo contrario el ScrollingFrame queda bloqueado visualmente
+            local _wrapper = leftColumn.Parent
+            if _wrapper and _wrapper.Name == "TwoColumnWrapper" then
+                _wrapper.ClipsDescendants = false
+            end
+            -- FIX MOBILE: propagar TouchPan directamente al leftColumn
+            -- para que el scroll funcione en dispositivos tactiles
+            leftColumn.ScrollingDirection = Enum.ScrollingDirection.Y
+            leftColumn.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
         end)
     end
 
@@ -41664,8 +41681,28 @@ function CreateExclusiveTab()
                 pcall(function()
                     leftColumn.ScrollingEnabled = true
                     leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                    leftColumn.CanvasPosition = Vector2.new(0, 0)
                 end)
             end
+            -- FIX ADICIONAL: esperar un frame mas para que el tween de layout
+            -- termine de ajustar contentContainer antes de forzar el scroll
+            task.delay(0.35, function()
+                if leftColumn and leftColumn.Parent then
+                    pcall(function()
+                        leftColumn.ScrollingEnabled = true
+                        leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                        leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
+                        leftColumn.CanvasPosition = Vector2.new(0, 0)
+                        -- Forzar wrapper a llenar contentContainer completo para que
+                        -- el ScrollingFrame tenga espacio correcto para scrollear
+                        local _wrapper = leftColumn.Parent
+                        if _wrapper and _wrapper.Name == "TwoColumnWrapper" then
+                            _wrapper.Size = UDim2.new(1, 0, 1, 0)
+                            _wrapper.ClipsDescendants = false
+                        end
+                    end)
+                end
+            end)
         end)
     end
 
@@ -58563,6 +58600,24 @@ particles = {}
                         local rc = wrapper:FindFirstChild("RightColumn")
                         if lc then lc.Visible = false; lc.Visible = true end
                         if rc then rc.Visible = false; rc.Visible = true end
+                        -- FIX SETTINGS SCROLL: re-habilitar scroll del leftColumn
+                        -- cada vez que se muestra el tab de Settings (idx 5)
+                        if idx == 5 and lc then
+                            pcall(function()
+                                lc.ScrollingEnabled = true
+                                lc.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                                lc.CanvasSize = UDim2.new(0, 0, 0, 0)
+                                wrapper.ClipsDescendants = false
+                            end)
+                            task.delay(0.35, function()
+                                if lc and lc.Parent then
+                                    pcall(function()
+                                        lc.ScrollingEnabled = true
+                                        lc.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                                    end)
+                                end
+                            end)
+                        end
                     end
                 end)
             end
@@ -61736,6 +61791,23 @@ do
     local _lp          = _Players.LocalPlayer
     local _KEY_DURATION = 24 * 3600  -- 24 horas en segundos
 
+    -- HTTP request universal (soporte para todos los executors) - definida aqui para uso en _tryAutoExec
+    local function _httpReqEarly(url, method, headers, body)
+        local opts = { Url = url, Method = method or "GET", Headers = headers or {}, Body = body or "" }
+        local ok, res
+        ok, res = pcall(function() if request then return request(opts) end end)
+        if ok and res and res.Body then return res.Body end
+        ok, res = pcall(function() if syn and syn.request then return syn.request(opts) end end)
+        if ok and res and res.Body then return res.Body end
+        ok, res = pcall(function() if http and http.request then return http.request(opts) end end)
+        if ok and res and res.Body then return res.Body end
+        if (method or "GET") == "GET" then
+            ok, res = pcall(function() return game:HttpGet(url, true) end)
+            if ok and res then return res end
+        end
+        return nil
+    end
+
     -- AUTOSAVE: intentar leer key guardada en archivo local o JSONBin.
     -- Si existe y no expiro, abrir el hub directamente sin pantalla de verificacion.
     local function _tryAutoExec()
@@ -61744,24 +61816,68 @@ do
         -- -- METODO 0: key ya restaurada por el bloque de limpieza (lo mas rapido) --
         -- El bloque LIMPIEZA DE KEY al inicio ya leyo el archivo y restauro
         -- _G._zerqonToken y _G._keyStartTime si la key era valida.
-        -- Si esos globals existen y son validos, abrir el hub directamente.
-        if _G._zerqonToken and _G._keyStartTime then
-            local _elapsed0 = os.time() - _G._keyStartTime
-            if _elapsed0 >= 0 and _elapsed0 < _KEY_DURATION then
-                warn("[ZerqonHUB] METODO 0: Key en memoria valida (" ..
-                    math.floor((_KEY_DURATION - _elapsed0) / 3600) .. "h restantes). Abriendo hub sin verificacion...")
-                task.spawn(function()
-                    task.wait(0.5)
-                    pcall(function() abrirHub() end)
-                end)
-                return true
-            else
-                -- Expiro: limpiar para que no interfiera con el resto del flujo
-                _G._zerqonToken       = nil
-                _G._keyStartTime      = nil
-                _G._zerqonBinId       = nil
-                _G._zerqonSessionSeed = nil
+        -- FIX: verifica contra JSONBin para obtener el t real de la pagina web,
+        -- evitando que el hub use cualquier timestamp local incorrecto.
+        if _G._zerqonToken and _G._keyStartTime and _G._zerqonBinId then
+            -- Leer JSONBin para obtener el t oficial de la pagina
+            local _binResM0 = nil
+            pcall(function()
+                _binResM0 = _httpReqEarly(
+                    _JSONBIN_URL .. "/" .. _G._zerqonBinId .. "/latest",
+                    "GET",
+                    { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                )
+            end)
+            local _startT0 = _G._keyStartTime
+            local _m0Skip = false
+            if _binResM0 then
+                local _okM0, _dataM0 = pcall(function() return _HttpService:JSONDecode(_binResM0) end)
+                if _okM0 and _dataM0 and _dataM0.record then
+                    local _stM0 = _dataM0.record.status
+                    local _tRawM0 = tonumber(_dataM0.record.t)
+                    if _stM0 == "verified" and _tRawM0 then
+                        local _tSM0 = _tRawM0 > 9999999999 and math.floor(_tRawM0 / 1000) or _tRawM0
+                        local _elM0 = os.time() - _tSM0
+                        if _elM0 >= 0 and _elM0 < _KEY_DURATION then
+                            -- Usar el t del bin (el real de la pagina)
+                            _startT0 = _tSM0
+                            _G._keyStartTime = _tSM0
+                        else
+                            -- Key expirada en JSONBin
+                            _G._zerqonToken = nil; _G._keyStartTime = nil
+                            _G._zerqonBinId = nil; _G._zerqonSessionSeed = nil
+                            warn("[ZerqonHUB] METODO 0: Key expirada en JSONBin. Se requiere nueva verificacion.")
+                            _m0Skip = true
+                        end
+                    elseif _stM0 ~= "verified" then
+                        -- No verificada: no abrir
+                        _G._zerqonToken = nil; _G._keyStartTime = nil
+                        _G._zerqonBinId = nil; _G._zerqonSessionSeed = nil
+                        warn("[ZerqonHUB] METODO 0: bin no verificado. Se requiere verificacion.")
+                        _m0Skip = true
+                    end
+                end
             end
+            if not _m0Skip then
+                local _elapsed0 = os.time() - _startT0
+                if _elapsed0 >= 0 and _elapsed0 < _KEY_DURATION then
+                    warn("[ZerqonHUB] METODO 0: Key en memoria valida (" ..
+                        math.floor((_KEY_DURATION - _elapsed0) / 3600) .. "h restantes). Abriendo hub sin verificacion...")
+                    task.spawn(function()
+                        task.wait(0.5)
+                        pcall(function() abrirHub() end)
+                    end)
+                    return true
+                else
+                    _G._zerqonToken       = nil
+                    _G._keyStartTime      = nil
+                    _G._zerqonBinId       = nil
+                    _G._zerqonSessionSeed = nil
+                end
+            end
+        elseif _G._zerqonToken and _G._keyStartTime then
+            -- Hay token pero sin binId: limpiar para forzar verificacion limpia
+            _G._zerqonToken = nil; _G._keyStartTime = nil; _G._zerqonSessionSeed = nil
         end
 
         -- -- METODO 1: archivo local (readfile/writefile) ------------------
@@ -61775,21 +61891,59 @@ do
                     local _startTRaw = tonumber(_startStr)
                     if _startTRaw then
                         local _startT = _startTRaw > 9999999999 and math.floor(_startTRaw / 1000) or _startTRaw
-                        local _elapsed = os.time() - _startT
-                        if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                            _G._zerqonToken       = _tok
-                            _G._keyStartTime      = _startT
-                            _G._zerqonSessionSeed = _tok:match("S(.+)$") or tostring(math.floor(os.time() / 86400))
-                            warn("[ZerqonHUB] AUTOSAVE (archivo): Key valida (" .. math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub...")
-                            task.spawn(function()
-                                task.wait(0.5)
-                                pcall(function() abrirHub() end)
-                            end)
-                            return true
-                        else
-                            pcall(function() delfile(_savePath) end)
-                            pcall(function() writefile(_savePath, "") end)
-                            warn("[ZerqonHUB] Key expirada en archivo. Se requiere nueva verificacion.")
+                        local _m1Valid = true
+                        -- FIX: verificar contra JSONBin para obtener el t real de la pagina
+                        local _binResM1 = _httpReqEarly(
+                            _JSONBIN_URL .. "/" .. _bid .. "/latest",
+                            "GET",
+                            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                        )
+                        if _binResM1 then
+                            local _okM1, _dataM1 = pcall(function() return _HttpService:JSONDecode(_binResM1) end)
+                            if _okM1 and _dataM1 and _dataM1.record then
+                                local _stM1 = _dataM1.record.status
+                                local _tRawM1 = tonumber(_dataM1.record.t)
+                                if _stM1 == "verified" and _tRawM1 then
+                                    local _tSM1 = _tRawM1 > 9999999999 and math.floor(_tRawM1 / 1000) or _tRawM1
+                                    local _elM1 = os.time() - _tSM1
+                                    if _elM1 >= 0 and _elM1 < _KEY_DURATION then
+                                        -- Usar el t real del bin (puede diferir del archivo)
+                                        _startT = _tSM1
+                                    else
+                                        pcall(function() delfile(_savePath) end)
+                                        pcall(function() writefile(_savePath, "") end)
+                                        warn("[ZerqonHUB] Key expirada en JSONBin. Se requiere nueva verificacion.")
+                                        _m1Valid = false
+                                    end
+                                else
+                                    -- bin no verified: limpiar y pedir nueva verificacion
+                                    pcall(function() delfile(_savePath) end)
+                                    pcall(function() writefile(_savePath, "") end)
+                                    warn("[ZerqonHUB] Bin no verificado en JSONBin. Se requiere verificacion.")
+                                    _m1Valid = false
+                                end
+                            end
+                        end
+                        if _m1Valid then
+                            local _elapsed = os.time() - _startT
+                            if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                                _G._zerqonToken       = _tok
+                                _G._keyStartTime      = _startT
+                                _G._zerqonBinId       = _bid
+                                _G._zerqonSessionSeed = tostring(_lp and _lp.UserId or "0")
+                                -- Actualizar el archivo con el t correcto del bin
+                                pcall(function() writefile(_savePath, _tok .. "|" .. _bid .. "|" .. tostring(_startT)) end)
+                                warn("[ZerqonHUB] AUTOSAVE (archivo): Key valida (" .. math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub...")
+                                task.spawn(function()
+                                    task.wait(0.5)
+                                    pcall(function() abrirHub() end)
+                                end)
+                                return true
+                            else
+                                pcall(function() delfile(_savePath) end)
+                                pcall(function() writefile(_savePath, "") end)
+                                warn("[ZerqonHUB] Key expirada en archivo. Se requiere nueva verificacion.")
+                            end
                         end
                     end
                 end
@@ -61818,66 +61972,53 @@ do
 
         warn("[ZerqonHUB] AUTO-CHECK JSONBin: buscando key activa para uid=" .. uid)
 
-        -- Genera los posibles tokens del usuario para los ultimos 2 dias (por si
-        -- el dia cambio justo entre sesiones pero la key de 24h sigue siendo valida)
-        local _nowSeed = math.floor(os.time() / 86400)
-        local _seedsToCheck = {}
-        for _si = 0, 1 do
-            table.insert(_seedsToCheck, tostring(_nowSeed - _si))
-        end
-
-        for _, _seed in ipairs(_seedsToCheck) do
-            local _candidateTok = "ZQT" .. uid .. "S" .. _seed
-            local _binRes = _httpReq(
-                _JSONBIN_URL .. "?x-bin-name=" .. _candidateTok,
-                "GET",
-                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-            )
-            if _binRes then
-                local _okB, _dataB = pcall(function() return _HttpService:JSONDecode(_binRes) end)
-                if _okB and _dataB and _dataB.metadata and _dataB.metadata.id then
-                    local _binId = _dataB.metadata.id
-                    -- Leer estado actual del bin
-                    local _latestRes = _httpReq(
-                        _JSONBIN_URL .. "/" .. _binId .. "/latest",
-                        "GET",
-                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
-                    )
-                    if _latestRes then
-                        local _okL, _dataL = pcall(function() return _HttpService:JSONDecode(_latestRes) end)
-                        if _okL and _dataL and _dataL.record then
-                            local _rec = _dataL.record
-                            if _rec.status == "verified" and _rec.t then
-                                local _tRaw = tonumber(_rec.t)
-                                if _tRaw then
-                                    local _startT = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
-                                    local _elapsed = os.time() - _startT
-                                    if _elapsed >= 0 and _elapsed < _KEY_DURATION then
-                                        -- KEY VALIDA EN JSONBIN: auto-exec sin navegador
-                                        _G._zerqonToken       = _candidateTok
-                                        _G._keyStartTime      = _startT
-                                        _G._zerqonSessionSeed = _seed
-                                        warn("[ZerqonHUB] AUTO-CHECK JSONBin: Key verificada encontrada (" ..
-                                            math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub SIN verificacion...")
-                                        -- Guardar en archivo para la proxima sesion (si hay readfile/writefile)
-                                        if _canFile then
-                                            local _savePath2 = "zerqon_key_" .. uid .. ".txt"
-                                            pcall(function()
-                                                writefile(_savePath2, _candidateTok .. "|" .. _binId .. "|" .. tostring(_startT))
-                                            end)
-                                        end
-                                        task.spawn(function()
-                                            task.wait(0.5)
-                                            pcall(function() abrirHub() end)
+        -- TOKEN FIJO: un solo bin por uid, sin seeds de dia.
+        -- Asi PC y celu siempre leen el mismo bin y ven el mismo tiempo restante.
+        local _candidateTok = "ZQT" .. uid
+        local _binRes = _httpReq(
+            _JSONBIN_URL .. "?x-bin-name=" .. _candidateTok,
+            "GET",
+            { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+        )
+        if _binRes then
+            local _okB, _dataB = pcall(function() return _HttpService:JSONDecode(_binRes) end)
+            if _okB and _dataB and _dataB.metadata and _dataB.metadata.id then
+                local _binId = _dataB.metadata.id
+                local _latestRes = _httpReq(
+                    _JSONBIN_URL .. "/" .. _binId .. "/latest",
+                    "GET",
+                    { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                )
+                if _latestRes then
+                    local _okL, _dataL = pcall(function() return _HttpService:JSONDecode(_latestRes) end)
+                    if _okL and _dataL and _dataL.record then
+                        local _rec = _dataL.record
+                        if _rec.status == "verified" and _rec.t then
+                            local _tRaw = tonumber(_rec.t)
+                            if _tRaw then
+                                local _startT = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
+                                local _elapsed = os.time() - _startT
+                                if _elapsed >= 0 and _elapsed < _KEY_DURATION then
+                                    _G._zerqonToken  = _candidateTok
+                                    _G._keyStartTime = _startT
+                                    _G._zerqonBinId  = _binId
+                                    warn("[ZerqonHUB] AUTO-CHECK JSONBin: Key verificada encontrada (" ..
+                                        math.floor((_KEY_DURATION - _elapsed) / 3600) .. "h restantes). Abriendo hub SIN verificacion...")
+                                    if _canFile then
+                                        local _savePath2 = "zerqon_key_" .. uid .. ".txt"
+                                        pcall(function()
+                                            writefile(_savePath2, _candidateTok .. "|" .. _binId .. "|" .. tostring(_startT))
                                         end)
-                                        return true
                                     end
+                                    task.spawn(function()
+                                        task.wait(0.5)
+                                        pcall(function() abrirHub() end)
+                                    end)
+                                    return true
                                 end
                             end
                         end
                     end
-                    -- Bin encontrado pero no verified o expirado: no seguir buscando
-                    break
                 end
             end
         end
@@ -61897,16 +62038,10 @@ do
     local function _getToken()
         if _G._zerqonToken then return _G._zerqonToken end
         local uid = tostring(_lp and _lp.UserId or "0")
-        -- Incluimos la hora de inicio de sesion (tick al primer uso) para que
-        -- cada sesion de juego tenga su propio token unico, pero no cambie
-        -- mientras el jugador sigue en la misma sesion.
-        if not _G._zerqonSessionSeed then
-            -- Token estable por DIA (86400s). Antes era por hora y causaba que al
-            -- re-ejecutar el script o volver al juego el token cambiara -> bin distinto
-            -- -> la web no encontraba la key guardada y la "reiniciaba" desde cero.
-            _G._zerqonSessionSeed = tostring(math.floor(os.time() / 86400))
-        end
-        _G._zerqonToken = "ZQT" .. uid .. "S" .. _G._zerqonSessionSeed
+        -- TOKEN FIJO por uid: sin seed de dia para que PC y celu usen siempre
+        -- el mismo bin en JSONBin. La duracion se controla por el campo 't' del bin.
+        _G._zerqonToken = "ZQT" .. uid
+        _G._zerqonSessionSeed = uid  -- mantener por compatibilidad con codigo que lo lea
         return _G._zerqonToken
     end
 
@@ -62612,10 +62747,38 @@ do
         end)
         -- Guardar timestamp de inicio de key (24h) para el timer en Settings
         -- AUTOSAVE: solo asignar si no hay uno ya valido (no resetear las 24h)
-        -- FIX SYNC: usar os.time() (Unix seconds) para que coincida con Date.now()/1000
-        -- de la web. tick() es tiempo Roblox (desde 2006) y causa desfase en el timer.
+        -- FIX SYNC: priorizar el t del JSONBin (guardado por la pagina web) sobre os.time()
+        -- Esto garantiza que el timer del hub sincroniza exactamente con la pagina.
         if not _G._keyStartTime then
-            _G._keyStartTime = os.time()
+            -- Intentar leer el t real del JSONBin antes de usar os.time()
+            local _gotWebT = false
+            pcall(function()
+                if _myBinId then
+                    local _rdRes = _reqWithRetry(
+                        _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
+                        "GET",
+                        { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+                    )
+                    if _rdRes then
+                        local _okRd, _dataRd = pcall(function() return _HttpService:JSONDecode(_rdRes) end)
+                        if _okRd and _dataRd and _dataRd.record and _dataRd.record.t then
+                            local _tRd = tonumber(_dataRd.record.t)
+                            if _tRd then
+                                local _tRdS = _tRd > 9999999999 and math.floor(_tRd / 1000) or _tRd
+                                local _ageRd = os.time() - _tRdS
+                                if _ageRd >= 0 and _ageRd < _KEY_DURATION then
+                                    _G._keyStartTime = _tRdS
+                                    _gotWebT = true
+                                    warn("[ZerqonHUB] _openHub: t leido de la pagina web = " .. tostring(_tRdS) .. "s")
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            if not _gotWebT then
+                _G._keyStartTime = os.time()
+            end
         end
         -- AUTOSAVE: guardar key en archivo local para auto-ejecucion en proximas sesiones
         -- Formato: "token|binId|startTime"
@@ -62743,8 +62906,30 @@ do
         -- Primero intentar leer: si ya esta verified, abrir directo
         if _checkAndOpen() then return end
 
-        -- No verificado todavia: escribir verified directamente desde el script
+        -- No verificado todavia: leer primero el t existente del JSONBin (puesto por la pagina web)
+        -- Si la pagina ya guardo un t valido, conservarlo; si no, usar os.time() como fallback.
         local _nowT = os.time()
+        pcall(function()
+            local _readRes = _reqWithRetry(
+                _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
+                "GET",
+                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+            )
+            if _readRes then
+                local _okRead, _dataRead = pcall(function() return _HttpService:JSONDecode(_readRes) end)
+                if _okRead and _dataRead and _dataRead.record and _dataRead.record.t then
+                    local _tRaw = tonumber(_dataRead.record.t)
+                    if _tRaw then
+                        local _tS = _tRaw > 9999999999 and math.floor(_tRaw / 1000) or _tRaw
+                        local _age = os.time() - _tS
+                        if _age >= 0 and _age < _KEY_DURATION then
+                            _nowT = _tS
+                            warn("[ZerqonHUB] FORCE-VERIFY: usando t de la pagina web = " .. tostring(_nowT) .. "s")
+                        end
+                    end
+                end
+            end
+        end)
         local _body = _HttpService:JSONEncode({ token = _myToken, status = "verified", t = _nowT })
         warn("[ZerqonHUB] FORCE-VERIFY PUT -> binId=" .. _myBinId .. " body=" .. _body)
         local _res = _reqWithRetry(
@@ -63070,9 +63255,32 @@ do
         end
 
         -- PASO 4: escribir "verified" directamente desde el script
+        -- FIX: leer el t del JSONBin (puesto por la pagina web) antes de hacer PUT.
+        -- Asi el timer del hub usa el tiempo de inicio real de la key, no os.time() del script.
         _status.Text = "Verifying key..."
         _status.TextColor3 = Color3.fromRGB(120, 160, 255)
         local _nowT = os.time()
+        pcall(function()
+            local _preRead = _reqWithRetry(
+                _JSONBIN_URL .. "/" .. _myBinId .. "/latest",
+                "GET",
+                { ["X-Master-Key"] = _JSONBIN_KEY, ["X-Access-Key"] = _JSONBIN_KEY }
+            )
+            if _preRead then
+                local _okPR, _dataPR = pcall(function() return _HttpService:JSONDecode(_preRead) end)
+                if _okPR and _dataPR and _dataPR.record and _dataPR.record.t then
+                    local _tRawPR = tonumber(_dataPR.record.t)
+                    if _tRawPR then
+                        local _tSPR = _tRawPR > 9999999999 and math.floor(_tRawPR / 1000) or _tRawPR
+                        local _agePR = os.time() - _tSPR
+                        if _agePR >= 0 and _agePR < _KEY_DURATION then
+                            _nowT = _tSPR
+                            warn("[ZerqonHUB] PASO4: usando t de la pagina web = " .. tostring(_nowT) .. "s")
+                        end
+                    end
+                end
+            end
+        end)
         local _putBody = _HttpService:JSONEncode({ token = _myToken, status = "verified", t = _nowT })
         warn("[ZerqonHUB] PUT verified -> bin=" .. _myBinId)
         local _putRes = _reqWithRetry(
