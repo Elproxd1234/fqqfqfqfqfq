@@ -3151,6 +3151,8 @@ function _resetHist(userId)
         pingEMA       = 80,   -- EMA del lag del jugador en ms (estimado)
         pingJitter    = 0,    -- varianza reciente del lag
         pingHistory   = {},   -- ultimas N estimaciones para tendencia
+        pingHistoryIdx = 0,   -- OPT: ring buffer idx para pingHistory (O(1) insert, reemplaza table.remove(ph,1))
+        pingHistoryCount = 0, -- OPT: cuantos slots validos en pingHistory ring buffer
         lastSeenT     = 0,    -- tick() de la ultima posicion recibida
         lastSeenPos   = nil,  -- ultima posicion guardada
         receiveDeltas = {},   -- ring buffer de intervalos (~ lag del target)
@@ -3332,9 +3334,12 @@ _G._histUpdaterConn = RunService.Heartbeat:Connect(function()
                     local _jRaw = math.abs(_delta - _h.pingEMA)
                     _h.pingJitter = _h.pingJitter * 0.75 + _jRaw * 0.25
                     -- Guardar en pingHistory para tendencia
+                    -- OPT: ring buffer O(1) -- reemplaza table.insert + table.remove(ph,1) que era O(n)
                     local _ph = _h.pingHistory
-                    table.insert(_ph, _h.pingEMA)
-                    if #_ph > 20 then table.remove(_ph, 1) end
+                    local _MAX_PH = 20
+                    _h.pingHistoryIdx = (_h.pingHistoryIdx % _MAX_PH) + 1
+                    _ph[_h.pingHistoryIdx] = _h.pingEMA
+                    if _h.pingHistoryCount < _MAX_PH then _h.pingHistoryCount = _h.pingHistoryCount + 1 end
                     _h.lastSeenT = _now
                     _h.lastSeenPos = hrp.Position
                 end
@@ -3425,15 +3430,17 @@ function getTargetPingFor(userId)
     local pingMs  = h.pingEMA   or 80
     local jitter  = h.pingJitter or 0
     local ph      = h.pingHistory or {}
+    -- OPT: usar pingHistoryCount del ring buffer en vez de #ph (O(1) vs O(n))
+    local phCount = h.pingHistoryCount or #ph
     -- Tendencia: comparar mitad reciente vs mitad antigua del historial
     local trend = 0
-    if #ph >= 6 then
-        local half = math.floor(#ph / 2)
+    if phCount >= 6 then
+        local half = math.floor(phCount / 2)
         local oldSum, newSum = 0, 0
-        for i = 1, half do oldSum = oldSum + ph[i] end
-        for i = half+1, #ph do newSum = newSum + ph[i] end
+        for i = 1, half do oldSum = oldSum + (ph[i] or 0) end
+        for i = half+1, phCount do newSum = newSum + (ph[i] or 0) end
         local oldAvg = oldSum / half
-        local newAvg = newSum / (#ph - half)
+        local newAvg = newSum / (phCount - half)
         trend = newAvg - oldAvg  -- positivo = ping subiendo, negativo = bajando
     end
     return pingMs, jitter, trend
@@ -3537,12 +3544,16 @@ local function _getPosHistVel(uid, fallbackVel)
     return hv
 end
 
+-- OPT: params cacheado fuera de _isGrounded para evitar crear RaycastParams.new() cada llamada
+-- (se re-usa cambiando solo FilterDescendantsInstances)
+local _isGroundedParams = RaycastParams.new()
+_isGroundedParams.FilterType = Enum.RaycastFilterType.Exclude
+local _isGroundedDown = Vector3.new(0, -4.5, 0)  -- OPT: constante pre-construida
 function _isGrounded(hrp)
     if not hrp then return true end
-    local rp = RaycastParams.new()
-    rp.FilterType = Enum.RaycastFilterType.Exclude
-    rp.FilterDescendantsInstances = { hrp.Parent }
-    return workspace:Raycast(hrp.Position, Vector3.new(0, -4.5, 0), rp) ~= nil
+    -- OPT: re-usar _isGroundedParams (evita RaycastParams.new() en cada llamada a 60Hz)
+    _isGroundedParams.FilterDescendantsInstances = { hrp.Parent }
+    return workspace:Raycast(hrp.Position, _isGroundedDown, _isGroundedParams) ~= nil
 end
 
 function _clampVel(vel)
@@ -3946,23 +3957,32 @@ function startAutoReload()
 
     local _hbTautoReload = 0
     local _arTick=0
+    local _arGunCache = nil   -- OPT: cache local de gun para auto-reload (~10Hz)
+    local _arGunCacheTs = 0
     CombatState.autoReloadConnection = RunService.Heartbeat:Connect(function()
         _arTick=_arTick+1; if _arTick<6 then return end; _arTick=0  -- OPT: ~10Hz para auto-reload
         _hbTautoReload=_hbTautoReload+1; if _hbTautoReload<3 then return end; _hbTautoReload=0
         if not C.autoReload then return end
         if _G._visualRoundOver then return end  -- OPT: pausar al fin de ronda
+        -- OPT: cachear gun cada 0.3s -- evita GetChildren() en cada Heartbeat (10Hz)
         -- FIX: buscar gun por _GUN_NAMES igual que autoShoot (no solo literal "Gun")
-        local gun = nil
-        if LocalPlayer.Character then
-            for _, t in ipairs(LocalPlayer.Character:GetChildren()) do
-                if t:IsA("Tool") then
-                    local n = t.Name:lower()
-                    if (_GUN_NAMES and _GUN_NAMES[t.Name]) or n:find("gun") or n:find("sheriff") or n:find("revolver") then
-                        gun = t; break
+        local _now = os.clock()
+        if not _arGunCache or not _arGunCache.Parent or (_now - _arGunCacheTs) > 0.3 then
+            local gun = nil
+            if LocalPlayer.Character then
+                for _, t in ipairs(LocalPlayer.Character:GetChildren()) do
+                    if t:IsA("Tool") then
+                        local n = t.Name:lower()
+                        if (_GUN_NAMES and _GUN_NAMES[t.Name]) or n:find("gun") or n:find("sheriff") or n:find("revolver") then
+                            gun = t; break
+                        end
                     end
                 end
             end
+            _arGunCache = gun
+            _arGunCacheTs = _now
         end
+        local gun = _arGunCache
         if not gun then return end
         local ammo = gun:FindFirstChild("Ammo")
         if ammo and ammo.Value <= 0 then
@@ -7366,7 +7386,8 @@ function _startFlingPosTracking()
         -- No guardar mientras hay un fling activo, mientras volvemos, ni si la velocidad es alta
         -- (podriamos estar siendo arrastrados por el fling justo antes de que _flingActive sea true)
         if _flingActive or _flingReturning then return end
-        local char = game:GetService("Players").LocalPlayer.Character
+        -- OPT: usar LocalPlayer en vez de game:GetService("Players").LocalPlayer (lookup innecesario en loop)
+        local char = LocalPlayer and LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
         local vel = hrp.AssemblyLinearVelocity.Magnitude
@@ -10746,12 +10767,36 @@ end
 
 function ToggleXray(enabled)
     Settings.xray.enabled = enabled
+    -- OPT: preconstruir set de Characters una sola vez antes de escanear workspace.
+    -- Asi _isAnyPlayerPartRT hace una lookup O(1) en vez de iterar jugadores por cada ancestro.
+    local _charSet = {}
+    local function _buildCharSet()
+        for k in pairs(_charSet) do _charSet[k] = nil end  -- limpiar sin crear tabla nueva
+        if _G._playerIndex then
+            for p in pairs(_G._playerIndex) do
+                if p.Character then _charSet[p.Character] = true end
+            end
+        else
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Character then _charSet[p.Character] = true end
+            end
+        end
+    end
+    _buildCharSet()
     -- Helper: devuelve true si 'part' es descendiente de cualquier personaje de jugador
+    -- OPT: usa _G._playerIndex (O(1) por jugador) en vez de iterar GetPlayers() en cada llamada
     local function _isAnyPlayerPartRT(part)
         local par = part.Parent
         while par and par ~= workspace do
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character and p.Character == par then return true end
+            if _charSet[par] then return true end
+            if _G._playerIndex then
+                for p in pairs(_G._playerIndex) do
+                    if p.Character and p.Character == par then return true end
+                end
+            else
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p.Character and p.Character == par then return true end
+                end
             end
             par = par.Parent
         end
@@ -10904,7 +10949,7 @@ function CreateESP(player)
             return
         end
 
-        local color = Color3.fromRGB(255, 255, 255)
+        local color = _CHAM_COLOR_DEFAULT  -- OPT: constante pre-cacheada
         local shouldShow = false
 
         if Settings.esp.enabled.Everyone then
@@ -11012,6 +11057,13 @@ function CreateESP(player)
     end)
 end
 
+-- OPT: colores de rol pre-cacheados -- evita Color3.fromRGB() en cada ciclo de updateChams/updateESP
+local _CHAM_COLOR_MURDERER  = Color3.fromRGB(255,   0,  40)
+local _CHAM_COLOR_SHERIFF   = Color3.fromRGB(  0, 140, 255)
+local _CHAM_COLOR_HERO      = Color3.fromRGB(255, 210,   0)
+local _CHAM_COLOR_INNOCENT  = Color3.fromRGB(  0, 255, 160)
+local _CHAM_COLOR_DEFAULT   = Color3.fromRGB(255, 255, 255)
+
 function CreateChams(player)
     if player == LocalPlayer then return end
 
@@ -11036,7 +11088,7 @@ function CreateChams(player)
             return
         end
 
-        local color = Color3.fromRGB(255, 255, 255)
+        local color = _CHAM_COLOR_DEFAULT
         local shouldShow = false
 
         -- Muertos: solo mostrar si DeadOnly esta activo
@@ -11056,10 +11108,11 @@ function CreateChams(player)
         elseif _roleCache.sheriff  == player then role = "Sheriff"
         elseif _roleCache.hero     == player then role = "Hero"
         end
-        if     role == "Murderer"  then color = Color3.fromRGB(255,   0,  40)
-        elseif role == "Sheriff"   then color = Color3.fromRGB(  0, 140, 255)
-        elseif role == "Hero"      then color = Color3.fromRGB(255, 210,   0)
-        else                            color = Color3.fromRGB(  0, 255, 160)  -- Innocent
+        -- OPT: usar constantes pre-cacheadas en vez de Color3.fromRGB() en cada ciclo
+        if     role == "Murderer"  then color = _CHAM_COLOR_MURDERER
+        elseif role == "Sheriff"   then color = _CHAM_COLOR_SHERIFF
+        elseif role == "Hero"      then color = _CHAM_COLOR_HERO
+        else                            color = _CHAM_COLOR_INNOCENT  -- Innocent
         end
 
         -- FIX CHAM FANTASMA: CreateChams usaba Settings.cham.enabled (sistema viejo)
@@ -11425,6 +11478,7 @@ function ApplyAllESPToPlayer(player)
 end
 
 _notifQueue = {}
+_notifQueueHead = 1  -- OPT: head pointer para dequeue O(1) sin table.remove(queue,1)
 _notifRunning = false
 _notifOffset = 0  -- offset Y acumulado para stack
 
@@ -11442,14 +11496,23 @@ function _processNotifQueue()
     _notifRunning = true
     task.spawn(function()
         -- Descartar exceso: mantener solo las mas recientes
-        while #_notifQueue > _NOTIF_MAX_QUEUE do
-            table.remove(_notifQueue, 1)
+        -- OPT: avanzar head en vez de table.remove(queue,1) que era O(n)
+        local _qLen = #_notifQueue - _notifQueueHead + 1
+        while _qLen > _NOTIF_MAX_QUEUE do
+            _notifQueue[_notifQueueHead] = nil  -- liberar slot para GC
+            _notifQueueHead = _notifQueueHead + 1
+            _qLen = _qLen - 1
         end
-        while #_notifQueue > 0 do
-            local item = table.remove(_notifQueue, 1)
-            pcall(item)
+        while _notifQueueHead <= #_notifQueue do
+            local item = _notifQueue[_notifQueueHead]
+            _notifQueue[_notifQueueHead] = nil  -- liberar para GC
+            _notifQueueHead = _notifQueueHead + 1
+            if item then pcall(item) end
             task.wait(0.18)  -- gap minimo entre notifs para evitar superposicion visual
         end
+        -- Resetear cabeza cuando la cola queda vacia (evita que el indice crezca indefinidamente)
+        _notifQueue = {}
+        _notifQueueHead = 1
         _notifRunning = false
     end)
 end
