@@ -40743,26 +40743,17 @@ function CreateExclusiveTab()
     local HS = _G._hubSettings
     local function _hs() return _G._hubSettings end
 
-    -- FIX ESCALA: guardar y bloquear el UIScale actual para que abrir Settings
-    -- NO cambie el ancho/tama?o del hub. El valor correcto ya fue calculado
-    -- por _getTargetScale() al iniciar; aqui solo lo protegemos.
-    local _frozenScale = nil
-    pcall(function()
-        local _sc = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
-        if _sc then
-            _frozenScale = _sc.Scale
-        end
-    end)
-    -- Restaurar la escala congelada al final del frame (evita que algun hijo la altere)
+    -- FIX ESCALA: usar siempre _getTargetScale() como fuente de verdad,
+    -- NO el Scale actual del frame (que puede estar en modo fullscreen o animandose).
+    local _frozenScale = (_getTargetScale and _getTargetScale()) or 0.70
+    -- Restaurar la escala correcta al final del frame (evita que algun hijo la altere)
     task.defer(function()
-        if _frozenScale then
-            pcall(function()
-                local _sc = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
-                if _sc and math.abs(_sc.Scale - _frozenScale) > 0.001 then
-                    _sc.Scale = _frozenScale
-                end
-            end)
-        end
+        pcall(function()
+            local _sc = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
+            if _sc and not _G._settingsFullscreenActive and math.abs(_sc.Scale - _frozenScale) > 0.001 then
+                _sc.Scale = _frozenScale
+            end
+        end)
     end)
 
     -- SETTINGS
@@ -43247,7 +43238,8 @@ function CreateExclusiveTab()
         local function _exitFullscreen()
             if not _G._settingsFullscreenActive then return end
             _G._settingsFullscreenActive = false
-            local _restoreScale = _origScale or (_getTargetScale and _getTargetScale() or 0.70)
+            -- FIX: siempre usar _getTargetScale() para que refleje hubScale actual del slider
+            local _restoreScale = (_getTargetScale and _getTargetScale()) or _origScale or 0.70
             pcall(function()
                 local _sc = mainFrame:FindFirstChildOfClass("UIScale")
                 if _sc then
@@ -57183,7 +57175,7 @@ uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() d
 -- Celular: calcula la escala para que 750px quepan en el ancho
 --          disponible con un margen de 4px a cada lado (ancho ligeramente mayor).
 --          Luego aplica hubScale (default 130%) sobre esa escala base.
--- PC:      usa el slider hubScale (70-130%, default 130%).
+-- PC:      usa el slider hubScale (70-130%, default 70%).
 -- ================================================================
 _getTargetScale = function()
     -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
@@ -57211,8 +57203,8 @@ _getTargetScale = function()
         if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
             return _savedScale / 100
         end
-        -- Fallback: escala base 85% si no hay valor guardado
-        return 0.85
+        -- Fallback: escala base 70% si no hay valor guardado
+        return 0.70
     end
 end
 do
