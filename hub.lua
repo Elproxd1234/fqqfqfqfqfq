@@ -57196,8 +57196,6 @@ uiScale.Scale = 0  -- se corrige inmediatamente en el bloque _getTargetScale() d
 -- PC:      usa el slider hubScale (70-130%, default 70%).
 -- ================================================================
 _getTargetScale = function()
-    -- FIX MOBILE: en celular calcular escala para que 750px entren en pantalla
-    -- PC: usar hubScale guardado (slider 70-130%) para preservar tama?o al reabrir
     local _vpNow = workspace.CurrentCamera.ViewportSize
     local _isMobileNow = false
     pcall(function()
@@ -57205,23 +57203,16 @@ _getTargetScale = function()
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
     if _isMobileNow then
-        -- Calcular escala para que el hub de 750px quepa con margen de 8px a cada lado
-        local _availW = _vpNow.X - 16
-        local _availH = _vpNow.Y - 16
-        local _scaleByW = _availW / 750
-        local _scaleByH = _availH / 420
-        -- Usar la escala mas pequena para que entre en ambas dimensiones
+        -- Frame base real: 820x460. Calcular escala para que entre con margen de 12px por lado.
+        local _availW = _vpNow.X - 24
+        local _availH = _vpNow.Y - 24
+        local _scaleByW = _availW / 820
+        local _scaleByH = _availH / 460
         local _autoScale = math.min(_scaleByW, _scaleByH)
-        -- Clamp: minimo 0.45 para que sea legible, maximo 0.95
-        return math.clamp(_autoScale, 0.45, 0.95)
+        -- Clamp: minimo 0.35 para legibilidad, maximo 0.70 para que no quede gigante
+        return math.clamp(_autoScale, 0.35, 0.70)
     else
-        -- FIX TAMA?O REOPEN: usar hubScale guardado para que al cerrar y abrir
-        -- el hub mantenga el tama?o que el usuario habia configurado con el slider.
-        local _savedScale = _G._hubSettings and _G._hubSettings.hubScale
-        if _savedScale and _savedScale >= 70 and _savedScale <= 130 then
-            return _savedScale / 100
-        end
-        -- Fallback: escala base 70% si no hay valor guardado
+        -- PC: siempre 70%
         return 0.70
     end
 end
