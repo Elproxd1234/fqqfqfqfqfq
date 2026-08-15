@@ -902,8 +902,10 @@ local function _saveConfig()
         for _, k in ipairs(_hsPersistKeys) do
             if hs[k] ~= nil then toSave["__hs_" .. k] = hs[k] end
         end
+        -- Forzar hubScale = 70 siempre en el guardado
+        toSave["__hs_hubScale"] = 70
         -- Compatibilidad con saves anteriores (claves sin prefijo __hs_)
-        if hs.hubScale   then toSave["__hubScale"]   = hs.hubScale   end
+        toSave["__hubScale"] = 70
         if hs.hubOpacity then toSave["__hubOpacity"] = hs.hubOpacity end
     end
     -- FIX FONDOS: guardar ?ndice de fondo activo y tema previo para restaurarlos al reabrir
@@ -1163,6 +1165,9 @@ if not _G._hubSettings then
 end
 _loadConfig()
 
+-- FIX SCALE: forzar hubScale = 70 siempre, ignorar lo que haya en el archivo guardado
+_G._hubSettings = _G._hubSettings or {}
+_G._hubSettings.hubScale = 70
 
 -- Forzar a false TODOS los toggles de _neverRestoreToggles
 -- (_saveConfig los excluye igual, as? que escribir aqu? no los persiste en disco)
@@ -43261,8 +43266,21 @@ function CreateExclusiveTab()
         -- Hookear SetActiveTab para salir de fullscreen al cambiar de tab
         local _prevSetActiveTab = SetActiveTab
         SetActiveTab = function(idx)
-            if idx ~= 5 and _G._settingsFullscreenActive then
-                _exitFullscreen()
+            if idx ~= 5 then
+                -- Salir de fullscreen si estaba activo
+                if _G._settingsFullscreenActive then
+                    _exitFullscreen()
+                end
+                -- FIX BUG PESTAÑA GIGANTE: forzar scale correcto siempre al cambiar de tab
+                task.defer(function()
+                    local _sc = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
+                    if _sc then
+                        local _correct = _getTargetScale and _getTargetScale() or 0.70
+                        if math.abs(_sc.Scale - _correct) > 0.01 then
+                            _sc.Scale = _correct
+                        end
+                    end
+                end)
             elseif idx == 5 then
                 task.defer(_enterFullscreen)
             end
