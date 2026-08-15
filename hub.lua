@@ -57268,13 +57268,27 @@ function abrirHub()
     hubGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     hubGui.DisplayOrder = 999
     hubGui.Enabled = true
-    hubGui.IgnoreGuiInset = true
-    -- FIX EXECUTOR: usar gethui() es el mtodo ms compatible
+    -- FIX v25 MOBILE: NO usar IgnoreGuiInset en mobile.
+    -- En executors moviles (Delta, Arceus X, Fluxus), IgnoreGuiInset=true sobre
+    -- un ScreenGui en gethui()/CoreGui desplaza o tapa los controles tactiles
+    -- nativos de Roblox (joystick, boton de salto, inventario, tienda).
+    local _isMobileHub = false
+    pcall(function()
+        local _uis = game:GetService("UserInputService")
+        _isMobileHub = _uis.TouchEnabled and not _uis.KeyboardEnabled
+    end)
+    hubGui.IgnoreGuiInset = not _isMobileHub  -- false en mobile, true en PC
+    -- FIX v25 MOBILE: en mobile usar SIEMPRE PlayerGui, nunca gethui()/CoreGui.
+    -- gethui() en executors moviles puede devolver el CoreGui real de Roblox,
+    -- y parentear el hub ahi oculta los controles tactiles del juego.
     local _guiParent = playerGui
-    if gethui then
-        _guiParent = gethui()
-    else
-        pcall(function() _guiParent = game:GetService("CoreGui") end)
+    if not _isMobileHub then
+        -- Solo en PC intentar gethui() o CoreGui
+        if gethui then
+            _guiParent = gethui()
+        else
+            pcall(function() _guiParent = game:GetService("CoreGui") end)
+        end
     end
     pcall(function() hubGui.Parent = _guiParent end)
     if not hubGui.Parent then hubGui.Parent = playerGui end
@@ -62439,13 +62453,27 @@ do
     _lsGui.ResetOnSpawn = false
     _lsGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     _lsGui.DisplayOrder = 9999
-    _lsGui.IgnoreGuiInset = true
-
-    local _lsParent = _lp:WaitForChild("PlayerGui")
+    -- FIX v25: IgnoreGuiInset=false en mobile para no tapar controles tactiles
+    local _ksIsMobile = false
     pcall(function()
-        if gethui then _lsParent = gethui()
-        else _lsParent = game:GetService("CoreGui") end
+        local _u = game:GetService("UserInputService")
+        _ksIsMobile = _u.TouchEnabled and not _u.KeyboardEnabled
     end)
+    _lsGui.IgnoreGuiInset = not _ksIsMobile
+
+    -- FIX v25 MOBILE: key screen siempre en PlayerGui en mobile
+    local _lsParent = _lp:WaitForChild("PlayerGui")
+    local _lsIsMobile = false
+    pcall(function()
+        local _uis = game:GetService("UserInputService")
+        _lsIsMobile = _uis.TouchEnabled and not _uis.KeyboardEnabled
+    end)
+    if not _lsIsMobile then
+        pcall(function()
+            if gethui then _lsParent = gethui()
+            else _lsParent = game:GetService("CoreGui") end
+        end)
+    end
     pcall(function() _lsGui.Parent = _lsParent end)
     if not _lsGui.Parent then _lsGui.Parent = _lp.PlayerGui end
 
