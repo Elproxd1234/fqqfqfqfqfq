@@ -40082,6 +40082,8 @@ function CreatePremiumTab()
             -- para capturar cualquier Tool que aparezca (gun en char o en workspace).
             local function _scTryApplyGun()
                 if not _skinState.enabled then return end
+                -- FIX: no aplicar si el modo actual es knife (evita que skin de knife se aplique a la gun)
+                if _skinState.mode ~= "gun" then return end
                 task.wait(0.15)
                 -- FIX MOBILE: buscar tambien en workspace[playerName] ademas de char/backpack
                 local gun = _findGun and _findGun()
@@ -40098,7 +40100,9 @@ function CreatePremiumTab()
                     pcall(function() _skinState._charPickupConn:Disconnect() end)
                 end
                 _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
+                    -- FIX: solo disparar _scTryApplyGun si el tool recien agregado es una gun
+                    -- (evita que al agarrar el knife se aplique la skin sobre la gun con modo knife activo)
+                    if child:IsA("Tool") and _scEsGun(child) then
                         task.spawn(_scTryApplyGun)
                     end
                 end)
