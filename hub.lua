@@ -21986,7 +21986,7 @@ function CreateMainTab()
         -- Antes este boton usaba "_zqGetToken()" con formato "ZQT{uid}D{day}", un
         -- token DIFERENTE -> la web hacia auto-sync al bin equivocado y el hub nunca
         -- detectaba la verificacion. Ahora usamos SIEMPRE el mismo token del key system.
-        local KEY_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
+        local KEY_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
         -- TOKEN FIJO: solo por uid, sin seed de dia. Evita que distintos dispositivos
@@ -40526,7 +40526,7 @@ function CreatePremiumTab()
     -- -- FIN SKIN CHANGER ------------------------------------------
 
     -- --------------------------------------------------------------------
-    -- ?? COLD KATANA — KILL SOUND
+    -- ?? COLD KATANA ? KILL SOUND
     -- Reemplaza el sonido Slash del knife por un sonido custom cuando
     -- la skin activa es Cold Katana y el jugador mata a alguien.
     -- --------------------------------------------------------------------
@@ -40605,7 +40605,7 @@ function CreatePremiumTab()
             end)
         end
 
-        -- También hookear el Sound Slash del knife directamente
+        -- Tambi?n hookear el Sound Slash del knife directamente
         -- (reemplaza el sonido de slash cuando Cold Katana esta activa)
         local function _hookSlashSound(enable)
             if _coldSlashConn then
@@ -40633,7 +40633,7 @@ function CreatePremiumTab()
                 end)
             end
 
-            -- Aplicar al knife actual si ya está equipado
+            -- Aplicar al knife actual si ya est? equipado
             local char = LocalPlayer.Character
             if char then
                 for _, obj in ipairs(char:GetChildren()) do
@@ -61965,7 +61965,7 @@ end -- cierra abrirHub
 do
     local _JSONBIN_KEY = "$2a$10$EHI.Kqyc.ImU6uGP9ByCk.kn5kgRzLyV4wyFwUyaRiRQaOP6Skcfa"
     local _JSONBIN_URL = "https://api.jsonbin.io/v3/b"
-    local _PAGE_URL    = "https://glistening-cuchufli-5a09b1.netlify.app/"
+    local _PAGE_URL    = "https://glowing-sundae-a5a567.netlify.app/"
     local _HttpService = game:GetService("HttpService")
     local _Players     = game:GetService("Players")
     local _lp          = _Players.LocalPlayer
