@@ -31865,6 +31865,8 @@ function CreateWorldUI_Emotes()
     _tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     _tabLayout.Padding        = UDim.new(0, 4)
 
+
+
     -- Grid de botones de animacion
     local _gridFrame = Instance.new("Frame", _animContainer)
     _gridFrame.Name              = "AnimGrid"
@@ -31873,16 +31875,21 @@ function CreateWorldUI_Emotes()
     _gridFrame.BackgroundTransparency = 1
     _gridFrame.BorderSizePixel   = 0
     local _gridLayout = Instance.new("UIGridLayout", _gridFrame)
-    _gridLayout.CellSize          = UDim2.new(0.5, -3, 0, 26)
-    _gridLayout.CellPadding       = UDim2.new(0, 4, 0, 4)
+    _gridLayout.CellSize          = UDim2.new(0.5, -5, 0, 46)
+    _gridLayout.CellPadding       = UDim2.new(0, 5, 0, 5)
     _gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     _gridLayout.SortOrder         = Enum.SortOrder.LayoutOrder
+    local _gridPad = Instance.new("UIPadding", _gridFrame)
+    _gridPad.PaddingLeft = UDim.new(0, 2); _gridPad.PaddingRight = UDim.new(0, 2)
+    _gridPad.PaddingTop = UDim.new(0, 4); _gridPad.PaddingBottom = UDim.new(0, 4)
 
     local _currentCatIdx = 1
     local _tabBtns = {}
+    local _activeAnimBtn = nil  -- boton actualmente seleccionado
 
     local function _showCategory(catIdx)
         _currentCatIdx = catIdx
+        _activeAnimBtn = nil
         -- Limpiar grid
         for _, c in ipairs(_gridFrame:GetChildren()) do
             if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
@@ -31891,44 +31898,105 @@ function CreateWorldUI_Emotes()
         -- Resaltar tab activo
         for ti, tb in ipairs(_tabBtns) do
             if ti == catIdx then
-                tb.BackgroundTransparency = 0.1
+                tb.BackgroundTransparency = 0.05
                 tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+                TweenService:Create(tb, TweenInfo.new(0.15), {BackgroundTransparency = 0.05, TextColor3 = Color3.fromRGB(255,255,255)}):Play()
             else
-                tb.BackgroundTransparency = 0.7
-                tb.TextColor3 = Color3.fromRGB(180, 180, 180)
+                TweenService:Create(tb, TweenInfo.new(0.15), {BackgroundTransparency = 0.72, TextColor3 = Color3.fromRGB(160, 160, 160)}):Play()
             end
         end
+
+        -- Colores base derivados del color de la categoria
+        local r, g, b = cat.color.R, cat.color.G, cat.color.B
+        local darkBg  = Color3.new(r*0.08 + 0.04, g*0.08 + 0.02, b*0.12 + 0.06)
+        local hoverBg = Color3.new(r*0.18 + 0.06, g*0.12 + 0.03, b*0.22 + 0.08)
+        local activeBg= Color3.new(r*0.30 + 0.06, g*0.18 + 0.04, b*0.35 + 0.10)
+
         -- Crear botones de anims
         for order, anim in ipairs(cat.anims) do
             local captured = anim
-            local btn = Instance.new("TextButton", _gridFrame)
+            -- Contenedor del boton
+            local btnWrap = Instance.new("Frame", _gridFrame)
+            btnWrap.Name              = "AnimBtnWrap_" .. anim.name
+            btnWrap.LayoutOrder       = order
+            btnWrap.BackgroundColor3  = darkBg
+            btnWrap.BackgroundTransparency = 0.15
+            btnWrap.BorderSizePixel   = 0
+            Instance.new("UICorner", btnWrap).CornerRadius = UDim.new(0, 8)
+
+            -- Stroke de borde con color de categoria
+            local btnStroke = Instance.new("UIStroke", btnWrap)
+            btnStroke.Color = cat.color; btnStroke.Thickness = 1.2; btnStroke.Transparency = 0.5
+            btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            -- Franja de color superior (acento visual)
+            local topBar = Instance.new("Frame", btnWrap)
+            topBar.Name = "TopBar"
+            topBar.Size = UDim2.new(1, 0, 0, 3)
+            topBar.Position = UDim2.new(0, 0, 0, 0)
+            topBar.BackgroundColor3 = cat.color
+            topBar.BackgroundTransparency = 0.3
+            topBar.BorderSizePixel = 0
+            local topBarCorner = Instance.new("UICorner", topBar)
+            topBarCorner.CornerRadius = UDim.new(0, 8)
+
+            -- Boton invisible encima (captura clicks)
+            local btn = Instance.new("TextButton", btnWrap)
             btn.Name                   = "AnimBtn_" .. anim.name
-            btn.LayoutOrder            = order
-            btn.BackgroundColor3       = Color3.fromRGB(20, 10, 45)
-            btn.BackgroundTransparency = 0.3
+            btn.Size                   = UDim2.new(1, 0, 1, 0)
+            btn.BackgroundTransparency = 1
             btn.BorderSizePixel        = 0
-            btn.Text                   = anim.name
-            btn.TextColor3             = cat.color
-            btn.TextSize               = 11
-            btn.Font                   = Enum.Font.Montserrat
+            btn.Text                   = ""
             btn.AutoButtonColor        = false
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-            local btnStroke = Instance.new("UIStroke", btn)
-            btnStroke.Color = cat.color; btnStroke.Thickness = 1; btnStroke.Transparency = 0.55
+            btn.ZIndex                 = 5
+
+            -- Texto del nombre (ocupa todo el ancho)
+            local nameLabel = Instance.new("TextLabel", btnWrap)
+            nameLabel.Name = "AnimName"
+            nameLabel.Size = UDim2.new(1, -8, 1, 0)
+            nameLabel.Position = UDim2.new(0, 4, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = anim.name
+            nameLabel.TextSize = 12
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+            nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+            nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+            nameLabel.ZIndex = 4
+
+            -- Hover
             btn.MouseEnter:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundTransparency = 0.05, TextColor3 = Color3.fromRGB(255,255,255)}):Play()
-                TweenService:Create(btnStroke, TweenInfo.new(0.12), {Transparency = 0.1}):Play()
+                TweenService:Create(btnWrap, TweenInfo.new(0.13), {BackgroundColor3 = hoverBg, BackgroundTransparency = 0.05}):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.13), {Transparency = 0.1, Thickness = 1.8}):Play()
+                TweenService:Create(nameLabel, TweenInfo.new(0.13), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
             end)
             btn.MouseLeave:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundTransparency = 0.3, TextColor3 = cat.color}):Play()
-                TweenService:Create(btnStroke, TweenInfo.new(0.12), {Transparency = 0.55}):Play()
+                if _activeAnimBtn ~= btnWrap then
+                    TweenService:Create(btnWrap, TweenInfo.new(0.13), {BackgroundColor3 = darkBg, BackgroundTransparency = 0.15}):Play()
+                    TweenService:Create(btnStroke, TweenInfo.new(0.13), {Transparency = 0.5, Thickness = 1.2}):Play()
+                    TweenService:Create(nameLabel, TweenInfo.new(0.13), {TextColor3 = Color3.fromRGB(210,210,230)}):Play()
+                end
             end)
+
+            -- Click: marcar como activo + aplicar
             btn.Activated:Connect(function()
+                -- Desmarcar anterior
+                if _activeAnimBtn and _activeAnimBtn ~= btnWrap and _activeAnimBtn.Parent then
+                    TweenService:Create(_activeAnimBtn, TweenInfo.new(0.15), {BackgroundColor3 = darkBg, BackgroundTransparency = 0.15}):Play()
+                    local prevStroke = _activeAnimBtn:FindFirstChildOfClass("UIStroke")
+                    if prevStroke then TweenService:Create(prevStroke, TweenInfo.new(0.15), {Transparency = 0.5, Thickness = 1.2}):Play() end
+                    local prevName = _activeAnimBtn:FindFirstChild("AnimName")
+                    if prevName then TweenService:Create(prevName, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(210,210,230)}):Play() end
+                end
+                -- Marcar este como activo
+                _activeAnimBtn = btnWrap
+                TweenService:Create(btnWrap, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                    {BackgroundColor3 = activeBg, BackgroundTransparency = 0}):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.1), {Transparency = 0, Thickness = 2.0}):Play()
+                TweenService:Create(nameLabel, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+                -- Aplicar animacion
                 _applyAnimation(captured)
-                TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(60, 20, 100)}):Play()
-                task.delay(0.25, function()
-                    pcall(function() TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(20, 10, 45)}):Play() end)
-                end)
             end)
         end
     end
@@ -34751,56 +34819,126 @@ function CreateWorldUI_Performance()
     local sec = CreateSection(rightColumn, "", "! PERFORMANCE", ThemeColors.Aurora3)
     _currentMainSectionFrame = sec
 
-    -- FPS BOOST
-    -- FIX: _shouldSkip original no detectaba characters (son Model con nombre del player,
-    -- no "Knife"/"Gun"). Se construye un set de characters/backpacks antes del loop
-    -- para skip O(1). Se agregan keywords funcionales de MM2 a la lista de exclusion.
-    _makeTPButton("FPS Boost", function()
-        local n = 0
-        local _skipModels = {}
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr.Character then _skipModels[plr.Character] = true end
-            local bp = plr:FindFirstChildOfClass("Backpack")
-            if bp then _skipModels[bp] = true end
-        end
-        local _skipKw = {
-            "knife","gun","ladder","stair","step","handle",
-            "weapon","tool","ramp","gundrop","knifemodel",
-            "spawn","spawnlocation","coin","bomb","sheriff",
-            "murderer","trigger","zone","detector","sensor",
-            "victory","round","event","checkpoint"
-        }
-        local function _shouldSkip(p)
-            local par = p.Parent
-            while par and par ~= workspace do
-                if _skipModels[par] then return true end
-                if par:IsA("Tool") then return true end
-                local pnl = par.Name:lower()
-                for _, kw in ipairs(_skipKw) do
-                    if pnl:find(kw) then return true end
-                end
-                par = par.Parent
+    -- ================================================================
+    -- FPS BOOST (TOGGLE PERSISTENTE - MEJORADO)
+    -- Aplica optimizaciones al mapa al activar y restaura al desactivar.
+    -- Ahora como toggle para que se re-aplique en cada respawn/ronda.
+    -- ================================================================
+    _G._fpsBState = _G._fpsBState or { enabled = false, conn = nil, origMat = {}, origRef = {}, origShadow = {} }
+    local _fbs = _G._fpsBState
+
+    local _fpsBSkipModels = {}
+    local _fpsBSkipKw = {
+        "knife","gun","ladder","stair","step","handle",
+        "weapon","tool","ramp","gundrop","knifemodel",
+        "spawn","spawnlocation","coin","bomb","sheriff",
+        "murderer","trigger","zone","detector","sensor",
+        "victory","round","event","checkpoint"
+    }
+    local function _fpsBShouldSkip(p)
+        local par = p.Parent
+        while par and par ~= workspace do
+            if _fpsBSkipModels[par] then return true end
+            if par:IsA("Tool") then return true end
+            local pnl = par.Name:lower()
+            for _, kw in ipairs(_fpsBSkipKw) do
+                if pnl:find(kw) then return true end
             end
-            return false
+            par = par.Parent
         end
+        return false
+    end
+
+    local function _applyFpsBoost()
+        -- Reconstruir skip list de personajes
+        _fpsBSkipModels = {}
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then _fpsBSkipModels[plr.Character] = true end
+            local bp = plr:FindFirstChildOfClass("Backpack")
+            if bp then _fpsBSkipModels[bp] = true end
+        end
+        local n = 0
         for _, p in ipairs(workspace:GetDescendants()) do
-            if (p:IsA("BasePart") or p:IsA("MeshPart")) and not _shouldSkip(p) then
+            if (p:IsA("BasePart") or p:IsA("MeshPart")) and not _fpsBShouldSkip(p) then
                 pcall(function()
-                    p.Material = Enum.Material.SmoothPlastic
+                    -- Guardar originales solo la primera vez
+                    if not _fbs.origMat[p] then
+                        _fbs.origMat[p]    = p.Material
+                        _fbs.origRef[p]    = p.Reflectance
+                        _fbs.origShadow[p] = p.CastShadow
+                    end
+                    p.Material    = Enum.Material.SmoothPlastic
                     p.Reflectance = 0
-                    p.CastShadow = false
+                    p.CastShadow  = false
                 end)
                 n = n + 1
             end
         end
+        -- Calidad de render minima
         pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
-        CreateCustomNotification("FPS BOOST", "Graficos plastilina -- " .. n .. " partes", 3)
+        -- Desactivar sombras globales
+        pcall(function() game:GetService("Lighting").GlobalShadows = false end)
+        -- Apagar particulas del workspace
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                pcall(function() obj.Enabled = false end)
+            end
+        end
+        return n
+    end
+
+    local function _restoreFpsBoost()
+        for p, mat in pairs(_fbs.origMat) do
+            pcall(function()
+                if p and p.Parent then
+                    p.Material    = mat
+                    p.Reflectance = _fbs.origRef[p] or 0
+                    p.CastShadow  = _fbs.origShadow[p] ~= nil and _fbs.origShadow[p] or true
+                end
+            end)
+        end
+        _fbs.origMat = {}; _fbs.origRef = {}; _fbs.origShadow = {}
+        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+        pcall(function() game:GetService("Lighting").GlobalShadows = true end)
+    end
+
+    CreateAuroraToggle(sec, "FPS Boost (Toggle)", function(on)
+        _fbs.enabled = on
+        if _fbs.conn then pcall(function() _fbs.conn:Disconnect() end); _fbs.conn = nil end
+        if on then
+            local n = _applyFpsBoost()
+            -- Re-aplicar cuando se agregen nuevas partes (nueva ronda/mapa)
+            _fbs.conn = workspace.DescendantAdded:Connect(function(obj)
+                if not _fbs.enabled then return end
+                if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and not _fpsBShouldSkip(obj) then
+                    pcall(function()
+                        if not _fbs.origMat[obj] then
+                            _fbs.origMat[obj]    = obj.Material
+                            _fbs.origRef[obj]    = obj.Reflectance
+                            _fbs.origShadow[obj] = obj.CastShadow
+                        end
+                        obj.Material    = Enum.Material.SmoothPlastic
+                        obj.Reflectance = 0
+                        obj.CastShadow  = false
+                    end)
+                end
+            end)
+            CreateCustomNotification("FPS BOOST", "ON — " .. n .. " partes optimizadas", 3)
+        else
+            _restoreFpsBoost()
+            CreateCustomNotification("FPS BOOST", "OFF — graficos restaurados", 2)
+        end
+    end, _fbs.enabled)
+
+    -- Boton one-shot (para aplicar rapido sin toggle)
+    _makeTPButton("FPS Boost (One-Shot)", function()
+        local n = _applyFpsBoost()
+        CreateCustomNotification("FPS BOOST", "Aplicado — " .. n .. " partes", 3)
     end, sec)
 
-    -- LESS LAG
-    -- FIX 1: NO deshabilitar SelectionBox ni Beam: el hub los usa para Box ESP y
-    --         otros sistemas visuales propios. Solo particulas/humo/fuego/chispas/trail.
-    -- FIX 2: workspace.StreamingEnabled no se puede cambiar desde el cliente; eliminado.
+    -- ================================================================
+    -- LESS LAG (sin cambios funcionales, preservado)
+    -- ================================================================
     _makeTPButton("Less Lag", function()
         local n = 0
         for _, obj in ipairs(workspace:GetDescendants()) do
@@ -34816,7 +34954,7 @@ function CreateWorldUI_Performance()
     -- NO SHADOWS (seguro, sin cambios)
     CreateAuroraToggle(rightColumn, "No Shadows", function(on)
         pcall(function()
-            Lighting.GlobalShadows = not on
+            game:GetService("Lighting").GlobalShadows = not on
             for _, p in ipairs(workspace:GetDescendants()) do
                 if p:IsA("BasePart") or p:IsA("MeshPart") then
                     pcall(function() p.CastShadow = not on end)
@@ -34826,46 +34964,372 @@ function CreateWorldUI_Performance()
         CreateCustomNotification("NO SHADOWS", on and "Sombras OFF" or "Sombras ON", 2)
     end, false)
 
-    -- REMOVE BARRIERS
-    -- FIX: el codigo anterior marcaba como barrera CUALQUIER parte con
-    -- Transparency >= 0.9 + CanCollide=true, lo que incluye triggers de fin
-    -- de ronda, zonas de spawn, detectores de victoria y otros objetos
-    -- funcionales de MM2 que son invisibles con colision de forma intencional.
-    -- La nueva logica: SOLO elimina CanCollide si el nombre tiene keyword de
-    -- barrera Y NO tiene keyword funcional. Nunca toca Transparency.
-    _makeTPButton("Remove Barriers", function()
+    -- ================================================================
+    -- REMOVE BARRIERS (TOGGLE PERSISTENTE - MEJORADO)
+    -- Detecta barreras por: nombre con keyword, transparencia alta + colision,
+    -- y partes invisibles sin nombre funcional. Persiste entre rondas.
+    -- ================================================================
+    _G._removeBarrState = _G._removeBarrState or { enabled = false, conn = nil, restored = {} }
+    local _rbs = _G._removeBarrState
+
+    -- Keywords que indican claramente que es una barrera invisible del mapa
+    local _barrierKw = {
+        "barrier","invis","invisible","bound","limit",
+        "border","fence","clip","hitbox","noclip","nobuild"
+    }
+    -- Keywords que indican que es geometria funcional del mapa: NUNCA tocar
+    local _safeKw = {
+        "spawn","spawnlocation","coin","bomb","sheriff","murderer",
+        "trigger","zone","detector","sensor","victory","round",
+        "event","checkpoint","gun","knife","platform","floor",
+        "ceiling","roof","door","ground","map","base","terrain",
+        "stud","tile","grass","wood","stone","road","path","sand",
+        "wall","block","collide","part","union","mesh","wedge",
+        "ramp","step","stair","rail","pillar","column","beam"
+    }
+
+    local function _isBarrierPart(obj)
+        if not (obj:IsA("BasePart") or obj:IsA("MeshPart")) then return false end
+        if not obj.CanCollide then return false end
+        local name = obj.Name:lower()
+
+        -- Nunca tocar objetos con nombre funcional/geometria del mapa
+        for _, kw in ipairs(_safeKw) do
+            if name:find(kw) then return false end
+        end
+
+        -- Solo detectar como barrera si el NOMBRE lo indica explicitamente
+        -- No usar transparencia: demasiado agresivo, rompe suelos/paredes/escaleras
+        for _, kw in ipairs(_barrierKw) do
+            if name:find(kw) then return true end
+        end
+
+        -- Parte completamente sin nombre ("Part", "BasePart") con transparencia = 1
+        -- y sin padre reconocible: unico caso heuristico permitido
+        if (name == "part" or name == "basepart" or name == "meshpart" or name == "unionoperation") then
+            if obj.Transparency == 1 and obj.CanCollide then
+                -- Verificar que no sea personaje ni tool
+                local par = obj.Parent
+                local isFunctional = false
+                while par and par ~= workspace do
+                    if par:IsA("Tool") or par:IsA("Hat") or par:IsA("Accessory")
+                    or par:IsA("Model") then
+                        isFunctional = true; break
+                    end
+                    par = par.Parent
+                end
+                if not isFunctional then return true end
+            end
+        end
+
+        return false
+    end
+
+    local function _applyRemoveBarriers()
         local removed = 0
-        local _barrierKw = {
-            "barrier","invis","invisible","bound","limit",
-            "border","fence","collide"
-        }
-        -- Objetos funcionales de MM2: NUNCA tocar aunque tengan keyword de barrera
-        local _safeKw = {
-            "spawn","spawnlocation","coin","bomb","sheriff","murderer",
-            "trigger","zone","detector","sensor","victory","round",
-            "event","checkpoint","gun","knife","platform","floor",
-            "ceiling","roof","door","ground","map","wall","block"
-        }
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and obj.CanCollide then
-                local name = obj.Name:lower()
-                local hasBarrierKw = false
-                for _, kw in ipairs(_barrierKw) do
-                    if name:find(kw) then hasBarrierKw = true; break end
-                end
-                if not hasBarrierKw then continue end
-                local isSafe = false
-                for _, kw in ipairs(_safeKw) do
-                    if name:find(kw) then isSafe = true; break end
-                end
-                if isSafe then continue end
-                -- Solo desactivar colision, nunca tocar Transparency
-                pcall(function() obj.CanCollide = false end)
+            if _isBarrierPart(obj) then
+                pcall(function()
+                    if not _rbs.restored[obj] then
+                        _rbs.restored[obj] = obj.CanCollide
+                    end
+                    obj.CanCollide = false
+                end)
                 removed = removed + 1
             end
         end
-        CreateCustomNotification("REMOVE BARRIERS", removed .. " barriers eliminados (solo por nombre)", 3)
+        return removed
+    end
+
+    local function _restoreBarriers()
+        for obj, orig in pairs(_rbs.restored) do
+            if obj and obj.Parent then
+                pcall(function() obj.CanCollide = orig end)
+            end
+        end
+        _rbs.restored = {}
+    end
+
+    CreateAuroraToggle(sec, "Remove Barriers (Toggle)", function(on)
+        _rbs.enabled = on
+        if _rbs.conn then pcall(function() _rbs.conn:Disconnect() end); _rbs.conn = nil end
+        if on then
+            local removed = _applyRemoveBarriers()
+            -- Re-aplicar en partes nuevas (nueva ronda/mapa)
+            _rbs.conn = workspace.DescendantAdded:Connect(function(obj)
+                if not _rbs.enabled then return end
+                task.defer(function()
+                    if _isBarrierPart(obj) then
+                        pcall(function()
+                            _rbs.restored[obj] = obj.CanCollide
+                            obj.CanCollide = false
+                        end)
+                    end
+                end)
+            end)
+            CreateCustomNotification("REMOVE BARRIERS", "ON — " .. removed .. " barreras eliminadas", 3)
+        else
+            _restoreBarriers()
+            CreateCustomNotification("REMOVE BARRIERS", "OFF — colisiones restauradas", 2)
+        end
+    end, _rbs.enabled)
+
+    -- Boton one-shot original (preservado)
+    _makeTPButton("Remove Barriers (One-Shot)", function()
+        local removed = _applyRemoveBarriers()
+        CreateCustomNotification("REMOVE BARRIERS", removed .. " barriers eliminados", 3)
     end, sec)
+
+    -- ================================================================
+    -- GRAFICOS CARTON MEJORADOS (VISUAL ENHANCEMENT)
+    -- Mejora la apariencia de los graficos de carton (SmoothPlastic)
+    -- agregando colores ligeramente saturados, iluminacion limpia y
+    -- efectos de post-procesado sutiles. SIN remover texturas.
+    -- ================================================================
+    _G._cartoonEnhState = _G._cartoonEnhState or {
+        enabled      = false,
+        conn         = nil,
+        origColors   = {},
+        origSmooth   = {},
+        origSpecular = {},
+        origBright   = nil,
+        origClock    = nil,
+        origFog      = nil,
+        origBloom    = nil,
+        bloomInst    = nil,
+        corrInst     = nil,
+    }
+    local _ces = _G._cartoonEnhState
+
+    -- Paleta de ajuste sutil de color: levemente mas saturada sin cambiar el tono
+    local function _enhanceColor(c3)
+        local h, s, v = Color3.toHSV(c3)
+        -- Aumentar saturacion ligeramente (+15%), clampeado para no exagerar
+        s = math.clamp(s * 1.15, 0, 1)
+        -- Aumentar brillo muy poco (+5%) para que las partes oscuras no se vean apagadas
+        v = math.clamp(v * 1.05, 0, 1)
+        return Color3.fromHSV(h, s, v)
+    end
+
+    local function _cartoonEnhSkip(obj)
+        local par = obj.Parent
+        while par and par ~= workspace do
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == par then return true end
+            end
+            if par:IsA("Tool") or par:IsA("Hat") or par:IsA("Accessory") then return true end
+            par = par.Parent
+        end
+        return false
+    end
+
+    local function _applyCartoonEnh()
+        local L = game:GetService("Lighting")
+        -- Guardar originales de lighting
+        if not _ces.origBright then _ces.origBright = L.Brightness end
+        if not _ces.origClock  then _ces.origClock  = L.ClockTime  end
+        if not _ces.origFog    then _ces.origFog    = L.FogEnd      end
+
+        -- Lighting limpio: mediodía suave, sin niebla cercana
+        pcall(function()
+            L.Brightness  = math.min(L.Brightness + 0.5, 4)
+            L.ClockTime   = 14   -- mediodía (luz limpia y directa)
+            L.FogEnd      = math.max(L.FogEnd, 100000)
+        end)
+
+        -- Agregar Bloom sutil si no existe
+        if not _ces.bloomInst or not _ces.bloomInst.Parent then
+            local existBloom = L:FindFirstChildOfClass("BloomEffect")
+            if not existBloom then
+                local bloom = Instance.new("BloomEffect", L)
+                bloom.Intensity  = 0.4   -- sutil, no exagerado
+                bloom.Size       = 16
+                bloom.Threshold  = 0.9
+                bloom.Enabled    = true
+                _ces.bloomInst   = bloom
+            else
+                -- Guardar estado y ajustar el existente
+                _ces.origBloom = { existBloom.Intensity, existBloom.Size, existBloom.Threshold, existBloom.Enabled }
+                existBloom.Intensity = 0.4
+                existBloom.Size      = 16
+                existBloom.Threshold = 0.9
+                existBloom.Enabled   = true
+                _ces.bloomInst = existBloom
+            end
+        end
+
+        -- ColorCorrection sutil para look mas vibrante
+        if not _ces.corrInst or not _ces.corrInst.Parent then
+            local existCorr = L:FindFirstChildOfClass("ColorCorrectionEffect")
+            if not existCorr then
+                local corr = Instance.new("ColorCorrectionEffect", L)
+                corr.Saturation = 0.12   -- +12% saturacion global
+                corr.Brightness = 0.02   -- poquito mas de brillo
+                corr.Contrast   = 0.08   -- contraste ligeramente mayor
+                corr.Enabled    = true
+                _ces.corrInst   = corr
+            else
+                _ces.corrInst = existCorr
+            end
+        end
+
+        -- Mejorar partes de tipo carton (SmoothPlastic / Neon existente)
+        -- Solo ajustar color; NO cambiar Material ni remover texturas
+        local n = 0
+        for _, p in ipairs(workspace:GetDescendants()) do
+            if (p:IsA("BasePart") or p:IsA("MeshPart")) and not _cartoonEnhSkip(p) then
+                if p.Material == Enum.Material.SmoothPlastic
+                or p.Material == Enum.Material.Plastic
+                or p.Material == Enum.Material.Neon then
+                    pcall(function()
+                        if not _ces.origColors[p] then
+                            _ces.origColors[p]   = p.Color
+                            _ces.origSmooth[p]   = p.Material
+                            _ces.origSpecular[p] = p.Reflectance
+                        end
+                        -- Mejorar color saturandolo levemente
+                        p.Color       = _enhanceColor(p.Color)
+                        -- Reducir reflejos plasticos que hacen que el carton se vea "barato"
+                        p.Reflectance = math.max(p.Reflectance - 0.02, 0)
+                        -- Asegurar material SmoothPlastic para sombras limpias
+                        p.Material    = Enum.Material.SmoothPlastic
+                    end)
+                    n = n + 1
+                end
+            end
+        end
+        return n
+    end
+
+    local function _restoreCartoonEnh()
+        local L = game:GetService("Lighting")
+        -- Restaurar lighting
+        pcall(function()
+            if _ces.origBright then L.Brightness = _ces.origBright end
+            if _ces.origClock  then L.ClockTime  = _ces.origClock  end
+            if _ces.origFog    then L.FogEnd      = _ces.origFog    end
+        end)
+        _ces.origBright = nil; _ces.origClock = nil; _ces.origFog = nil
+        -- Remover bloom y colorCorrection creados por nosotros
+        if _ces.bloomInst and _ces.bloomInst.Parent then
+            if _ces.origBloom then
+                -- Era existente: restaurar valores
+                pcall(function()
+                    _ces.bloomInst.Intensity  = _ces.origBloom[1]
+                    _ces.bloomInst.Size       = _ces.origBloom[2]
+                    _ces.bloomInst.Threshold  = _ces.origBloom[3]
+                    _ces.bloomInst.Enabled    = _ces.origBloom[4]
+                end)
+                _ces.origBloom = nil
+            else
+                -- Lo creamos nosotros: destruirlo
+                pcall(function() _ces.bloomInst:Destroy() end)
+            end
+            _ces.bloomInst = nil
+        end
+        if _ces.corrInst and _ces.corrInst.Parent then
+            pcall(function() _ces.corrInst:Destroy() end)
+            _ces.corrInst = nil
+        end
+        -- Restaurar colores originales de partes
+        for p, origColor in pairs(_ces.origColors) do
+            if p and p.Parent then
+                pcall(function()
+                    p.Color       = origColor
+                    p.Material    = _ces.origSmooth[p]   or Enum.Material.SmoothPlastic
+                    p.Reflectance = _ces.origSpecular[p] or 0
+                end)
+            end
+        end
+        _ces.origColors = {}; _ces.origSmooth = {}; _ces.origSpecular = {}
+    end
+
+    CreateAuroraToggle(sec, "Cartoon Visual Enhance", function(on)
+        _ces.enabled = on
+        if _ces.conn then pcall(function() _ces.conn:Disconnect() end); _ces.conn = nil end
+        if on then
+            local n = _applyCartoonEnh()
+            -- Re-aplicar en partes nuevas que aparezcan (nueva ronda)
+            _ces.conn = workspace.DescendantAdded:Connect(function(obj)
+                if not _ces.enabled then return end
+                task.defer(function()
+                    if (obj:IsA("BasePart") or obj:IsA("MeshPart")) and not _cartoonEnhSkip(obj) then
+                        if obj.Material == Enum.Material.SmoothPlastic
+                        or obj.Material == Enum.Material.Plastic
+                        or obj.Material == Enum.Material.Neon then
+                            pcall(function()
+                                if not _ces.origColors[obj] then
+                                    _ces.origColors[obj]   = obj.Color
+                                    _ces.origSmooth[obj]   = obj.Material
+                                    _ces.origSpecular[obj] = obj.Reflectance
+                                end
+                                obj.Color       = _enhanceColor(obj.Color)
+                                obj.Reflectance = math.max(obj.Reflectance - 0.02, 0)
+                                obj.Material    = Enum.Material.SmoothPlastic
+                            end)
+                        end
+                    end
+                end)
+            end)
+            CreateCustomNotification("CARTOON ENH", "ON — " .. n .. " partes mejoradas visualmente", 3)
+        else
+            _restoreCartoonEnh()
+            CreateCustomNotification("CARTOON ENH", "OFF — apariencia original restaurada", 2)
+        end
+    end, _ces.enabled)
+
+    -- ================================================================
+    -- ANIMACIONES MEJORADAS: velocidad y fluidez de animaciones propias
+    -- Ajusta el PlaybackSpeed del Animator del personaje local para que
+    -- las animaciones se vean mas fluidas (sin tocar animaciones de NPCs).
+    -- ================================================================
+    _G._animEnhState = _G._animEnhState or { enabled = false, conn = nil, speed = 1.15 }
+    local _aes = _G._animEnhState
+
+    local function _applyAnimEnh(speed)
+        local myChar = LocalPlayer and LocalPlayer.Character
+        if not myChar then return end
+        local hum = myChar:FindFirstChildOfClass("Humanoid")
+        local animr = hum and hum:FindFirstChildOfClass("Animator")
+        if animr then
+            for _, track in ipairs(animr:GetPlayingAnimationTracks()) do
+                -- Solo acelerar animaciones de movimiento/idle (no de muerte ni especiales)
+                local name = track.Name and track.Name:lower() or ""
+                if not name:find("death") and not name:find("emote") and not name:find("throw") then
+                    pcall(function() track:AdjustSpeed(speed) end)
+                end
+            end
+        end
+    end
+
+    local function _restoreAnimEnh()
+        local myChar = LocalPlayer and LocalPlayer.Character
+        if not myChar then return end
+        local hum = myChar:FindFirstChildOfClass("Humanoid")
+        local animr = hum and hum:FindFirstChildOfClass("Animator")
+        if animr then
+            for _, track in ipairs(animr:GetPlayingAnimationTracks()) do
+                pcall(function() track:AdjustSpeed(1) end)
+            end
+        end
+    end
+
+    CreateAuroraToggle(sec, "Smooth Animations (+15%)", function(on)
+        _aes.enabled = on
+        if _aes.conn then pcall(function() _aes.conn:Disconnect() end); _aes.conn = nil end
+        if on then
+            _applyAnimEnh(1.15)
+            -- Re-aplicar cuando el personaje reaparezca
+            _aes.conn = LocalPlayer.CharacterAdded:Connect(function()
+                task.wait(1)
+                if _aes.enabled then _applyAnimEnh(1.15) end
+            end)
+            CreateCustomNotification("ANIM ENH", "Animaciones mas fluidas ON (+15% velocidad)", 2)
+        else
+            _restoreAnimEnh()
+            CreateCustomNotification("ANIM ENH", "Animaciones restauradas a velocidad normal", 2)
+        end
+    end, _aes.enabled)
 end
 
 
