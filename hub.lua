@@ -12371,9 +12371,9 @@ function _makeTwoColumns()
     lCol.ScrollBarImageColor3 = ThemeColors.Primary
     lCol.CanvasSize = UDim2.new(0,0,0,0)
     lCol.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    -- FIX MOBILE v4: scroll m?s suave en touch (WhenScrollable evita el bounce en PC)
-    lCol.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+    lCol.ElasticBehavior = Enum.ElasticBehavior.Always
     lCol.ScrollingDirection = Enum.ScrollingDirection.Y
+    lCol.ScrollingEnabled = true
 
     local rCol
     if _useDoubleCol then
@@ -40714,6 +40714,8 @@ function CreateExclusiveTab()
     if leftColumn then
         pcall(function()
             leftColumn.ScrollingEnabled = true
+            leftColumn.ScrollingDirection = Enum.ScrollingDirection.Y
+            leftColumn.ElasticBehavior = Enum.ElasticBehavior.Always
             leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
             leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
             leftColumn.CanvasPosition = Vector2.new(0, 0)
@@ -43212,14 +43214,20 @@ function CreateExclusiveTab()
             if _sc then _origScale = _sc.Scale end
         end)
 
+        local _isMobileSettings = false
+        pcall(function()
+            local _uis = game:GetService("UserInputService")
+            _isMobileSettings = _uis.TouchEnabled and not _uis.KeyboardEnabled
+        end)
+
         local function _enterFullscreen()
+            -- En mobile NO hacer fullscreen: ya ocupa la pantalla y el scroll se rompe
+            if _isMobileSettings then return end
             _vp = workspace.CurrentCamera.ViewportSize
-            -- Guardar estado actual antes de expandir
             pcall(function()
                 local _sc = mainFrame:FindFirstChildOfClass("UIScale")
                 if _sc then _origScale = _sc.Scale end
             end)
-            -- Escalar el hub a pantalla completa usando UIScale
             local _fsScaleX = _vp.X / 820
             local _fsScaleY = _vp.Y / 460
             local _fsScale  = math.min(_fsScaleX, _fsScaleY)
@@ -43236,14 +43244,13 @@ function CreateExclusiveTab()
                     ):Play()
                 end
             end)
-            -- Actualizar el guardian para que no revierta el cambio de escala
             _G._settingsFullscreenActive = true
         end
 
         local function _exitFullscreen()
+            if _isMobileSettings then return end
             if not _G._settingsFullscreenActive then return end
             _G._settingsFullscreenActive = false
-            -- FIX: siempre usar _getTargetScale() para que refleje hubScale actual del slider
             local _restoreScale = (_getTargetScale and _getTargetScale()) or _origScale or 0.70
             pcall(function()
                 local _sc = mainFrame:FindFirstChildOfClass("UIScale")
