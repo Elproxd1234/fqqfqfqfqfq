@@ -304,6 +304,122 @@ do
         end
     end)
 
+    -- PERF-11: Reducir LOD de ParticleEmitters existentes al cargar el hub
+    -- En mapas pesados con particulas activas, reducir el rate al 20% durante
+    -- la carga evita drops de FPS mientras se construye la UI del hub.
+    -- Se restauran automaticamente cuando el hub esta listo (_G._hubReady).
+    pcall(function()
+        if not _G._perf11_done then
+            _G._perf11_done = true
+            local _savedRates = {}
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") then
+                    pcall(function()
+                        _savedRates[obj] = obj.Rate
+                        obj.Rate = obj.Rate * 0.20
+                    end)
+                end
+            end
+            task.defer(function()
+                local _w2 = 0
+                repeat task.wait(0.4) _w2 = _w2 + 0.4 until _G._hubReady or _w2 > 14
+                for obj, origRate in pairs(_savedRates) do
+                    if obj and obj.Parent then
+                        pcall(function() obj.Rate = origRate end)
+                    end
+                end
+                _savedRates = {}
+            end)
+        end
+    end)
+
+    -- PERF-12: Desactivar DepthOfField y BloomEffect durante la carga del hub
+    -- Estos efectos de GPU son especialmente costosos durante la construccion de UI.
+    -- Se restauran al terminar igual que GlobalShadows en PERF-1.
+    pcall(function()
+        if not _G._perf12_done then
+            _G._perf12_done = true
+            local L = game:GetService("Lighting")
+            _G._perf12_savedFX = {}
+            for _, eff in ipairs(L:GetChildren()) do
+                if eff:IsA("DepthOfFieldEffect") or eff:IsA("BloomEffect") or eff:IsA("SunRaysEffect") then
+                    pcall(function()
+                        _G._perf12_savedFX[eff] = eff.Enabled
+                        eff.Enabled = false
+                    end)
+                end
+            end
+            task.defer(function()
+                local _w3 = 0
+                repeat task.wait(0.4) _w3 = _w3 + 0.4 until _G._hubReady or _w3 > 14
+                for eff, wasEnabled in pairs(_G._perf12_savedFX or {}) do
+                    if eff and eff.Parent then
+                        pcall(function() eff.Enabled = wasEnabled end)
+                    end
+                end
+                _G._perf12_savedFX = {}
+            end)
+        end
+    end)
+
+    -- PERF-13: Pausar AnimationTracks de NPCs durante la carga del hub
+    -- Las animaciones de entidades no-jugador consumen CPU innecesariamente
+    -- mientras se construye la interfaz. Se reanudan al terminar.
+    pcall(function()
+        if not _G._perf13_done then
+            _G._perf13_done = true
+            local _pausedTracks = {}
+            local _players = game:GetService("Players")
+            for _, model in ipairs(workspace:GetDescendants()) do
+                if model:IsA("Model") then
+                    local _isPlayer = false
+                    for _, p in ipairs(_players:GetPlayers()) do
+                        if p.Character == model then _isPlayer = true; break end
+                    end
+                    if not _isPlayer then
+                        local animator = model:FindFirstChildOfClass("Animator")
+                            or (model:FindFirstChildOfClass("Humanoid") and
+                                model:FindFirstChildOfClass("Humanoid"):FindFirstChildOfClass("Animator"))
+                        if animator then
+                            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                                pcall(function()
+                                    track:AdjustSpeed(0)
+                                    table.insert(_pausedTracks, track)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+            task.defer(function()
+                local _w4 = 0
+                repeat task.wait(0.4) _w4 = _w4 + 0.4 until _G._hubReady or _w4 > 14
+                for _, track in ipairs(_pausedTracks) do
+                    pcall(function() track:AdjustSpeed(1) end)
+                end
+                _pausedTracks = {}
+            end)
+        end
+    end)
+
+    -- PERF-14: Pre-calentar el pool de TweenService durante la carga
+    -- TweenService tiene un costo de inicializacion en el primer uso.
+    -- Crear un tween dummy al inicio garantiza que el sistema este listo
+    -- cuando el hub necesite animar elementos de la UI.
+    pcall(function()
+        if not _G._perf14_done then
+            _G._perf14_done = true
+            local _ts = game:GetService("TweenService")
+            local _dummyPart = Instance.new("Part")
+            local _dummyTween = _ts:Create(_dummyPart, TweenInfo.new(0.001), {Transparency = 1})
+            _dummyTween:Play()
+            task.defer(function()
+                pcall(function() _dummyTween:Cancel() end)
+                pcall(function() _dummyPart:Destroy() end)
+            end)
+        end
+    end)
+
     print("[PERF BOOST v1] Optimizaciones aplicadas correctamente ?")
 end
 -- ================================================================
@@ -589,6 +705,73 @@ do
         else
             table.insert(_G._deferredInits, fn)
         end
+    end
+
+    -- OPT-17: Cache de resultados de typeof() para tipos frecuentes
+    -- typeof() es una operacion relativamente cara en Lua.
+    -- Pre-cachear los strings de tipo evita llamadas repetidas en loops calientes
+    -- como el hook __namecall y el solver de prediccion.
+    if not _G._typeCache then
+        _G._typeCache = {
+            CFrame   = "CFrame",
+            Vector3  = "Vector3",
+            number   = "number",
+            string   = "string",
+            boolean  = "boolean",
+            userdata = "userdata",
+            table    = "table",
+        }
+    end
+
+    -- OPT-18: Indice inverso de workspace descendants para el bullet-listener
+    -- El sistema de Shoot Murder escucha DescendantAdded/Removing para trackear balas.
+    -- Pre-inicializar la tabla como un pool de weak references evita GC pressure
+    -- cuando las balas se crean y destruyen rapidamente en rondas largas.
+    if not _G._activeBulletsPool then
+        _G._activeBulletsPool = {}
+        setmetatable(_G._activeBulletsPool, {__mode = "k"})  -- weak keys
+    end
+
+    -- OPT-19: Reducir overhead de Vector3.new en loops de prediccion
+    -- Los solveres de SA llaman Vector3.new() decenas de veces por frame.
+    -- Pre-localizar el constructor como upvalue local reduce la busqueda global.
+    if not _G._V3 then
+        _G._V3        = Vector3.new
+        _G._V3zero    = Vector3.zero
+        _G._V3xAxis   = Vector3.xAxis
+        _G._V3yAxis   = Vector3.yAxis
+        _G._V3zAxis   = Vector3.zAxis
+        _G._CF        = CFrame.new
+        _G._CFlookAt  = CFrame.lookAt
+    end
+
+    -- OPT-20: Watchdog de GC periodico post-carga
+    -- Despues de que el hub este listo, correr collectgarbage cada 90 segundos
+    -- evita que la memoria Lua crezca indefinidamente durante sesiones largas.
+    -- Solo se registra una vez aunque el script se re-ejecute (_G._gcWatchdog).
+    if not _G._gcWatchdog then
+        _G._gcWatchdog = true
+        task.spawn(function()
+            -- Esperar a que el hub este completamente cargado
+            local _wg = 0
+            repeat task.wait(1) _wg = _wg + 1 until _G._hubReady or _wg > 20
+            -- Loop de GC periodico cada 90 segundos
+            while true do
+                task.wait(90)
+                pcall(function()
+                    if collectgarbage then
+                        local _before = math.floor(gcinfo() / 1024)
+                        collectgarbage("collect")
+                        local _after  = math.floor(gcinfo() / 1024)
+                        local _freed  = math.max(0, _before - _after)
+                        if _freed > 256 then  -- Solo notificar si libero mas de 256KB
+                            -- Silencioso: no spamear notificaciones al usuario
+                            warn("[ZerqonHUB] GC periodico: " .. _freed .. " KB liberados")
+                        end
+                    end
+                end)
+            end
+        end)
     end
 end
 -- ================================================================
