@@ -948,11 +948,7 @@ local function _loadConfig()
             _G._hubSettings = _G._hubSettings or {}
             local field = k:sub(6)
             -- NUNCA restaurar hubLayoutMode: siempre forzar Sidebar izquierda (modo 1)
-            -- FIX v24 MOBILE: NUNCA restaurar crosshairHidden/hudHidden/chatHidden del disco.
-            -- Si quedaron en true (usuario activo el toggle antes), al re-ejecutar el hub
-            -- ocultaban el HUD nativo de Roblox sin que el usuario lo pidiera.
-            local _blockHSFields = { hubLayoutMode=true, crosshairHidden=true, hudHidden=true, chatHidden=true }
-            if not _blockHSFields[field] then
+            if field ~= "hubLayoutMode" then
                 _G._hubSettings[field] = v
             end
         elseif k == "__hubScale" or k == "__hubOpacity" then
@@ -1029,13 +1025,6 @@ local _neverRestoreToggles = {
     -- Cham Dead Only: sub-toggles no se auto-restauran (el principal Cham Dead Only si lo hace)
     ["Tracer Dead Only"] = true,
     ["Skeleton Dead Only"] = true,
-    -- FIX v24 MOBILE: estos toggles NUNCA se auto-restauran al re-ejecutar el hub.
-    -- "Ocultar Crosshair Roblox" antes llamaba SetCoreGuiEnabled(All,false) al restaurarse
-    -- automaticamente y hacia desaparecer TODO el HUD nativo en mobile.
-    -- El usuario los puede activar manualmente en Settings cuando quiera.
-    ["Ocultar Crosshair Roblox"]      = true,
-    ["Ocultar HUD (Backpack/Health)"]  = true,
-    ["Ocultar Chat"]                   = true,
 }
 
 -- =======================================================================
@@ -3162,8 +3151,6 @@ function _resetHist(userId)
         pingEMA       = 80,   -- EMA del lag del jugador en ms (estimado)
         pingJitter    = 0,    -- varianza reciente del lag
         pingHistory   = {},   -- ultimas N estimaciones para tendencia
-        pingHistoryIdx = 0,   -- OPT: ring buffer idx para pingHistory (O(1) insert, reemplaza table.remove(ph,1))
-        pingHistoryCount = 0, -- OPT: cuantos slots validos en pingHistory ring buffer
         lastSeenT     = 0,    -- tick() de la ultima posicion recibida
         lastSeenPos   = nil,  -- ultima posicion guardada
         receiveDeltas = {},   -- ring buffer de intervalos (~ lag del target)
@@ -3345,12 +3332,9 @@ _G._histUpdaterConn = RunService.Heartbeat:Connect(function()
                     local _jRaw = math.abs(_delta - _h.pingEMA)
                     _h.pingJitter = _h.pingJitter * 0.75 + _jRaw * 0.25
                     -- Guardar en pingHistory para tendencia
-                    -- OPT: ring buffer O(1) -- reemplaza table.insert + table.remove(ph,1) que era O(n)
                     local _ph = _h.pingHistory
-                    local _MAX_PH = 20
-                    _h.pingHistoryIdx = (_h.pingHistoryIdx % _MAX_PH) + 1
-                    _ph[_h.pingHistoryIdx] = _h.pingEMA
-                    if _h.pingHistoryCount < _MAX_PH then _h.pingHistoryCount = _h.pingHistoryCount + 1 end
+                    table.insert(_ph, _h.pingEMA)
+                    if #_ph > 20 then table.remove(_ph, 1) end
                     _h.lastSeenT = _now
                     _h.lastSeenPos = hrp.Position
                 end
@@ -3441,17 +3425,15 @@ function getTargetPingFor(userId)
     local pingMs  = h.pingEMA   or 80
     local jitter  = h.pingJitter or 0
     local ph      = h.pingHistory or {}
-    -- OPT: usar pingHistoryCount del ring buffer en vez de #ph (O(1) vs O(n))
-    local phCount = h.pingHistoryCount or #ph
     -- Tendencia: comparar mitad reciente vs mitad antigua del historial
     local trend = 0
-    if phCount >= 6 then
-        local half = math.floor(phCount / 2)
+    if #ph >= 6 then
+        local half = math.floor(#ph / 2)
         local oldSum, newSum = 0, 0
-        for i = 1, half do oldSum = oldSum + (ph[i] or 0) end
-        for i = half+1, phCount do newSum = newSum + (ph[i] or 0) end
+        for i = 1, half do oldSum = oldSum + ph[i] end
+        for i = half+1, #ph do newSum = newSum + ph[i] end
         local oldAvg = oldSum / half
-        local newAvg = newSum / (phCount - half)
+        local newAvg = newSum / (#ph - half)
         trend = newAvg - oldAvg  -- positivo = ping subiendo, negativo = bajando
     end
     return pingMs, jitter, trend
@@ -3555,16 +3537,12 @@ local function _getPosHistVel(uid, fallbackVel)
     return hv
 end
 
--- OPT: params cacheado fuera de _isGrounded para evitar crear RaycastParams.new() cada llamada
--- (se re-usa cambiando solo FilterDescendantsInstances)
-local _isGroundedParams = RaycastParams.new()
-_isGroundedParams.FilterType = Enum.RaycastFilterType.Exclude
-local _isGroundedDown = Vector3.new(0, -4.5, 0)  -- OPT: constante pre-construida
 function _isGrounded(hrp)
     if not hrp then return true end
-    -- OPT: re-usar _isGroundedParams (evita RaycastParams.new() en cada llamada a 60Hz)
-    _isGroundedParams.FilterDescendantsInstances = { hrp.Parent }
-    return workspace:Raycast(hrp.Position, _isGroundedDown, _isGroundedParams) ~= nil
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = { hrp.Parent }
+    return workspace:Raycast(hrp.Position, Vector3.new(0, -4.5, 0), rp) ~= nil
 end
 
 function _clampVel(vel)
@@ -3968,32 +3946,23 @@ function startAutoReload()
 
     local _hbTautoReload = 0
     local _arTick=0
-    local _arGunCache = nil   -- OPT: cache local de gun para auto-reload (~10Hz)
-    local _arGunCacheTs = 0
     CombatState.autoReloadConnection = RunService.Heartbeat:Connect(function()
         _arTick=_arTick+1; if _arTick<6 then return end; _arTick=0  -- OPT: ~10Hz para auto-reload
         _hbTautoReload=_hbTautoReload+1; if _hbTautoReload<3 then return end; _hbTautoReload=0
         if not C.autoReload then return end
         if _G._visualRoundOver then return end  -- OPT: pausar al fin de ronda
-        -- OPT: cachear gun cada 0.3s -- evita GetChildren() en cada Heartbeat (10Hz)
         -- FIX: buscar gun por _GUN_NAMES igual que autoShoot (no solo literal "Gun")
-        local _now = os.clock()
-        if not _arGunCache or not _arGunCache.Parent or (_now - _arGunCacheTs) > 0.3 then
-            local gun = nil
-            if LocalPlayer.Character then
-                for _, t in ipairs(LocalPlayer.Character:GetChildren()) do
-                    if t:IsA("Tool") then
-                        local n = t.Name:lower()
-                        if (_GUN_NAMES and _GUN_NAMES[t.Name]) or n:find("gun") or n:find("sheriff") or n:find("revolver") then
-                            gun = t; break
-                        end
+        local gun = nil
+        if LocalPlayer.Character then
+            for _, t in ipairs(LocalPlayer.Character:GetChildren()) do
+                if t:IsA("Tool") then
+                    local n = t.Name:lower()
+                    if (_GUN_NAMES and _GUN_NAMES[t.Name]) or n:find("gun") or n:find("sheriff") or n:find("revolver") then
+                        gun = t; break
                     end
                 end
             end
-            _arGunCache = gun
-            _arGunCacheTs = _now
         end
-        local gun = _arGunCache
         if not gun then return end
         local ammo = gun:FindFirstChild("Ammo")
         if ammo and ammo.Value <= 0 then
@@ -7397,8 +7366,7 @@ function _startFlingPosTracking()
         -- No guardar mientras hay un fling activo, mientras volvemos, ni si la velocidad es alta
         -- (podriamos estar siendo arrastrados por el fling justo antes de que _flingActive sea true)
         if _flingActive or _flingReturning then return end
-        -- OPT: usar LocalPlayer en vez de game:GetService("Players").LocalPlayer (lookup innecesario en loop)
-        local char = LocalPlayer and LocalPlayer.Character
+        local char = game:GetService("Players").LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
         local vel = hrp.AssemblyLinearVelocity.Magnitude
@@ -10778,36 +10746,12 @@ end
 
 function ToggleXray(enabled)
     Settings.xray.enabled = enabled
-    -- OPT: preconstruir set de Characters una sola vez antes de escanear workspace.
-    -- Asi _isAnyPlayerPartRT hace una lookup O(1) en vez de iterar jugadores por cada ancestro.
-    local _charSet = {}
-    local function _buildCharSet()
-        for k in pairs(_charSet) do _charSet[k] = nil end  -- limpiar sin crear tabla nueva
-        if _G._playerIndex then
-            for p in pairs(_G._playerIndex) do
-                if p.Character then _charSet[p.Character] = true end
-            end
-        else
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character then _charSet[p.Character] = true end
-            end
-        end
-    end
-    _buildCharSet()
     -- Helper: devuelve true si 'part' es descendiente de cualquier personaje de jugador
-    -- OPT: usa _G._playerIndex (O(1) por jugador) en vez de iterar GetPlayers() en cada llamada
     local function _isAnyPlayerPartRT(part)
         local par = part.Parent
         while par and par ~= workspace do
-            if _charSet[par] then return true end
-            if _G._playerIndex then
-                for p in pairs(_G._playerIndex) do
-                    if p.Character and p.Character == par then return true end
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p.Character and p.Character == par then return true end
-                end
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Character and p.Character == par then return true end
             end
             par = par.Parent
         end
@@ -10960,7 +10904,7 @@ function CreateESP(player)
             return
         end
 
-        local color = _CHAM_COLOR_DEFAULT  -- OPT: constante pre-cacheada
+        local color = Color3.fromRGB(255, 255, 255)
         local shouldShow = false
 
         if Settings.esp.enabled.Everyone then
@@ -11068,13 +11012,6 @@ function CreateESP(player)
     end)
 end
 
--- OPT: colores de rol pre-cacheados -- evita Color3.fromRGB() en cada ciclo de updateChams/updateESP
-local _CHAM_COLOR_MURDERER  = Color3.fromRGB(255,   0,  40)
-local _CHAM_COLOR_SHERIFF   = Color3.fromRGB(  0, 140, 255)
-local _CHAM_COLOR_HERO      = Color3.fromRGB(255, 210,   0)
-local _CHAM_COLOR_INNOCENT  = Color3.fromRGB(  0, 255, 160)
-local _CHAM_COLOR_DEFAULT   = Color3.fromRGB(255, 255, 255)
-
 function CreateChams(player)
     if player == LocalPlayer then return end
 
@@ -11099,7 +11036,7 @@ function CreateChams(player)
             return
         end
 
-        local color = _CHAM_COLOR_DEFAULT
+        local color = Color3.fromRGB(255, 255, 255)
         local shouldShow = false
 
         -- Muertos: solo mostrar si DeadOnly esta activo
@@ -11119,11 +11056,10 @@ function CreateChams(player)
         elseif _roleCache.sheriff  == player then role = "Sheriff"
         elseif _roleCache.hero     == player then role = "Hero"
         end
-        -- OPT: usar constantes pre-cacheadas en vez de Color3.fromRGB() en cada ciclo
-        if     role == "Murderer"  then color = _CHAM_COLOR_MURDERER
-        elseif role == "Sheriff"   then color = _CHAM_COLOR_SHERIFF
-        elseif role == "Hero"      then color = _CHAM_COLOR_HERO
-        else                            color = _CHAM_COLOR_INNOCENT  -- Innocent
+        if     role == "Murderer"  then color = Color3.fromRGB(255,   0,  40)
+        elseif role == "Sheriff"   then color = Color3.fromRGB(  0, 140, 255)
+        elseif role == "Hero"      then color = Color3.fromRGB(255, 210,   0)
+        else                            color = Color3.fromRGB(  0, 255, 160)  -- Innocent
         end
 
         -- FIX CHAM FANTASMA: CreateChams usaba Settings.cham.enabled (sistema viejo)
@@ -11489,7 +11425,6 @@ function ApplyAllESPToPlayer(player)
 end
 
 _notifQueue = {}
-_notifQueueHead = 1  -- OPT: head pointer para dequeue O(1) sin table.remove(queue,1)
 _notifRunning = false
 _notifOffset = 0  -- offset Y acumulado para stack
 
@@ -11507,23 +11442,14 @@ function _processNotifQueue()
     _notifRunning = true
     task.spawn(function()
         -- Descartar exceso: mantener solo las mas recientes
-        -- OPT: avanzar head en vez de table.remove(queue,1) que era O(n)
-        local _qLen = #_notifQueue - _notifQueueHead + 1
-        while _qLen > _NOTIF_MAX_QUEUE do
-            _notifQueue[_notifQueueHead] = nil  -- liberar slot para GC
-            _notifQueueHead = _notifQueueHead + 1
-            _qLen = _qLen - 1
+        while #_notifQueue > _NOTIF_MAX_QUEUE do
+            table.remove(_notifQueue, 1)
         end
-        while _notifQueueHead <= #_notifQueue do
-            local item = _notifQueue[_notifQueueHead]
-            _notifQueue[_notifQueueHead] = nil  -- liberar para GC
-            _notifQueueHead = _notifQueueHead + 1
-            if item then pcall(item) end
+        while #_notifQueue > 0 do
+            local item = table.remove(_notifQueue, 1)
+            pcall(item)
             task.wait(0.18)  -- gap minimo entre notifs para evitar superposicion visual
         end
-        -- Resetear cabeza cuando la cola queda vacia (evita que el indice crezca indefinidamente)
-        _notifQueue = {}
-        _notifQueueHead = 1
         _notifRunning = false
     end)
 end
@@ -22060,7 +21986,7 @@ function CreateMainTab()
         -- Antes este boton usaba "_zqGetToken()" con formato "ZQT{uid}D{day}", un
         -- token DIFERENTE -> la web hacia auto-sync al bin equivocado y el hub nunca
         -- detectaba la verificacion. Ahora usamos SIEMPRE el mismo token del key system.
-        local KEY_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
+        local KEY_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
         -- TOKEN FIJO: solo por uid, sin seed de dia. Evita que distintos dispositivos
@@ -40156,8 +40082,6 @@ function CreatePremiumTab()
             -- para capturar cualquier Tool que aparezca (gun en char o en workspace).
             local function _scTryApplyGun()
                 if not _skinState.enabled then return end
-                -- FIX: no aplicar si el modo actual es knife (evita que skin de knife se aplique a la gun)
-                if _skinState.mode ~= "gun" then return end
                 task.wait(0.15)
                 -- FIX MOBILE: buscar tambien en workspace[playerName] ademas de char/backpack
                 local gun = _findGun and _findGun()
@@ -40174,9 +40098,7 @@ function CreatePremiumTab()
                     pcall(function() _skinState._charPickupConn:Disconnect() end)
                 end
                 _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
-                    -- FIX: solo disparar _scTryApplyGun si el tool recien agregado es una gun
-                    -- (evita que al agarrar el knife se aplique la skin sobre la gun con modo knife activo)
-                    if child:IsA("Tool") and _scEsGun(child) then
+                    if child:IsA("Tool") then
                         task.spawn(_scTryApplyGun)
                     end
                 end)
@@ -40603,186 +40525,6 @@ function CreatePremiumTab()
         end  -- cierra do skin changer
     -- -- FIN SKIN CHANGER ------------------------------------------
 
-    -- --------------------------------------------------------------------
-    -- ?? COLD KATANA ? KILL SOUND
-    -- Reemplaza el sonido Slash del knife por un sonido custom cuando
-    -- la skin activa es Cold Katana y el jugador mata a alguien.
-    -- --------------------------------------------------------------------
-    do
-        local _COLD_KILL_SOUND_ID = "rbxassetid://5985793946"
-        local _coldKillConn       = nil  -- listener de KnifeKill
-        local _coldSlashConn      = nil  -- listener de Slash sound
-
-        -- Crear el Sound object una sola vez en SoundService
-        local _coldSnd = nil
-        local function _getColdSnd()
-            if _coldSnd and _coldSnd.Parent then return _coldSnd end
-            local ss = game:GetService("SoundService")
-            -- Reutilizar si ya existe (re-build del tab)
-            local existing = ss:FindFirstChild("ZerqonColdKatanaKillSnd")
-            if existing then _coldSnd = existing; return _coldSnd end
-            local s = Instance.new("Sound", ss)
-            s.Name       = "ZerqonColdKatanaKillSnd"
-            s.SoundId    = _COLD_KILL_SOUND_ID
-            s.Volume     = 1
-            s.RollOffMaxDistance = 0
-            s.RollOffMinDistance = 0
-            _coldSnd = s
-            return s
-        end
-
-        -- Reproduce el kill sound si la skin activa es Cold Katana
-        local function _playColdKillSound()
-            -- Solo sonar si la skin activa ES Cold Katana
-            local skinName = ""
-            pcall(function()
-                local list = _SC_KNIFE_SKINS
-                local skin = list and list[_skinState.skinIdx]
-                skinName = skin and skin.name or ""
-            end)
-            if skinName ~= "Cold Katana" then return end
-            pcall(function()
-                local snd = _getColdSnd()
-                if snd.IsPlaying then snd:Stop() end
-                snd:Play()
-            end)
-        end
-
-        -- Hookear el Remote KnifeKill (MM2) para detectar kills del jugador
-        local function _hookColdKillRemote()
-            if _coldKillConn then
-                pcall(function() _coldKillConn:Disconnect() end)
-                _coldKillConn = nil
-            end
-            task.spawn(function()
-                local ok, remote = pcall(function()
-                    return game:GetService("ReplicatedStorage")
-                        :WaitForChild("Remotes", 10)
-                        :WaitForChild("Gameplay", 10)
-                        :WaitForChild("KnifeKill", 10)
-                end)
-                if not ok or not remote then return end
-                local signal = nil
-                if remote:IsA("RemoteEvent") then
-                    signal = remote.OnClientEvent
-                elseif remote:IsA("BindableEvent") then
-                    signal = remote.Event
-                end
-                if not signal then return end
-                -- KnifeKill se dispara cuando CUALQUIER jugador mata con knife.
-                -- Filtramos: si el killer no aparece como argumento, asumimos que
-                -- es nuestro kill (MM2 manda killedPlayer al cliente del killer).
-                _coldKillConn = signal:Connect(function(killedPlayer)
-                    -- Si el killed es un Player, significa que nuestro cliente recibio
-                    -- la notificacion -> somos el killer
-                    if killedPlayer and typeof(killedPlayer) == "Instance"
-                       and killedPlayer:IsA("Player") then
-                        _playColdKillSound()
-                    end
-                end)
-            end)
-        end
-
-        -- Tambi?n hookear el Sound Slash del knife directamente
-        -- (reemplaza el sonido de slash cuando Cold Katana esta activa)
-        local function _hookSlashSound(enable)
-            if _coldSlashConn then
-                pcall(function() _coldSlashConn:Disconnect() end)
-                _coldSlashConn = nil
-            end
-            if not enable then return end
-            -- Escuchar cuando el knife es equipado para hookear su Slash sound
-            local function _patchSlash(knife)
-                if not knife or not knife:IsA("Tool") then return end
-                local handle = knife:FindFirstChild("Handle")
-                if not handle then return end
-                local slash = handle:FindFirstChild("Slash")
-                if not slash or not slash:IsA("Sound") then return end
-                -- Verificar que la skin activa sea Cold Katana
-                local skinName = ""
-                pcall(function()
-                    local skin = _SC_KNIFE_SKINS and _SC_KNIFE_SKINS[_skinState.skinIdx]
-                    skinName = skin and skin.name or ""
-                end)
-                if skinName ~= "Cold Katana" then return end
-                -- Reemplazar el SoundId del Slash por el custom
-                pcall(function()
-                    slash.SoundId = _COLD_KILL_SOUND_ID
-                end)
-            end
-
-            -- Aplicar al knife actual si ya est? equipado
-            local char = LocalPlayer.Character
-            if char then
-                for _, obj in ipairs(char:GetChildren()) do
-                    if obj:IsA("Tool") then _patchSlash(obj) end
-                end
-            end
-
-            -- Escuchar nuevos tools equipados
-            _coldSlashConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-                newChar.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
-                        task.wait(0.1)
-                        _patchSlash(child)
-                    end
-                end)
-            end)
-        end
-
-        -- Limpiar al re-construir el tab
-        if _G._coldKatanaKillConn then
-            pcall(function() _G._coldKatanaKillConn:Disconnect() end)
-            _G._coldKatanaKillConn = nil
-        end
-        if _G._coldKatanaSlashConn then
-            pcall(function() _G._coldKatanaSlashConn:Disconnect() end)
-            _G._coldKatanaSlashConn = nil
-        end
-
-        local _coldEnabled = _G._coldKatanaSoundEnabled or false
-
-        local coldCard = CreateVisualCard(leftColumn, "??", "COLD KATANA", ThemeColors.Aurora2)
-
-        CreateAuroraToggle(coldCard, "Kill Sound (Cold Katana)", function(on)
-            _coldEnabled = on
-            _G._coldKatanaSoundEnabled = on
-            if on then
-                _hookColdKillRemote()
-                _hookSlashSound(true)
-                -- Guardar referencias globales para limpiar al re-build
-                _G._coldKatanaKillConn   = _coldKillConn
-                _G._coldKatanaSlashConn  = _coldSlashConn
-                CreateCustomNotification("?? COLD KATANA", "Kill sound activado", 2)
-            else
-                pcall(function() if _coldKillConn  then _coldKillConn:Disconnect()  end end)
-                pcall(function() if _coldSlashConn then _coldSlashConn:Disconnect() end end)
-                _coldKillConn  = nil
-                _coldSlashConn = nil
-                _G._coldKatanaKillConn  = nil
-                _G._coldKatanaSlashConn = nil
-                -- Restaurar el SoundId original del Slash
-                pcall(function()
-                    local char = LocalPlayer.Character
-                    if not char then return end
-                    for _, tool in ipairs(char:GetChildren()) do
-                        if tool:IsA("Tool") then
-                            local handle = tool:FindFirstChild("Handle")
-                            if handle then
-                                local slash = handle:FindFirstChild("Slash")
-                                if slash and slash:IsA("Sound") then
-                                    slash.SoundId = "rbxassetid://12222216"
-                                end
-                            end
-                        end
-                    end
-                end)
-                CreateCustomNotification("?? COLD KATANA", "Kill sound desactivado", 2)
-            end
-        end, _coldEnabled)
-    end
-    -- -- FIN COLD KATANA KILL SOUND ---------------------------------
-
 
     -- --------------------------------------------------------------------
     -- ?? CUSTOM MIRAS (CROSSHAIRS) - PREMIUM
@@ -40977,16 +40719,6 @@ function CreateExclusiveTab()
             leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
             leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
             leftColumn.CanvasPosition = Vector2.new(0, 0)
-            -- FIX SCROLL SETTINGS: el wrapper NO debe recortar su contenido,
-            -- de lo contrario el ScrollingFrame queda bloqueado visualmente
-            local _wrapper = leftColumn.Parent
-            if _wrapper and _wrapper.Name == "TwoColumnWrapper" then
-                _wrapper.ClipsDescendants = false
-            end
-            -- FIX MOBILE: propagar TouchPan directamente al leftColumn
-            -- para que el scroll funcione en dispositivos tactiles
-            leftColumn.ScrollingDirection = Enum.ScrollingDirection.Y
-            leftColumn.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
         end)
     end
 
@@ -41939,28 +41671,8 @@ function CreateExclusiveTab()
                 pcall(function()
                     leftColumn.ScrollingEnabled = true
                     leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
-                    leftColumn.CanvasPosition = Vector2.new(0, 0)
                 end)
             end
-            -- FIX ADICIONAL: esperar un frame mas para que el tween de layout
-            -- termine de ajustar contentContainer antes de forzar el scroll
-            task.delay(0.35, function()
-                if leftColumn and leftColumn.Parent then
-                    pcall(function()
-                        leftColumn.ScrollingEnabled = true
-                        leftColumn.AutomaticCanvasSize = Enum.AutomaticSize.Y
-                        leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
-                        leftColumn.CanvasPosition = Vector2.new(0, 0)
-                        -- Forzar wrapper a llenar contentContainer completo para que
-                        -- el ScrollingFrame tenga espacio correcto para scrollear
-                        local _wrapper = leftColumn.Parent
-                        if _wrapper and _wrapper.Name == "TwoColumnWrapper" then
-                            _wrapper.Size = UDim2.new(1, 0, 1, 0)
-                            _wrapper.ClipsDescendants = false
-                        end
-                    end)
-                end
-            end)
         end)
     end
 
@@ -42446,20 +42158,17 @@ function CreateExclusiveTab()
 
     CreateAuroraToggle(hudSec, "Ocultar Crosshair Roblox", function(on)
         _hs().crosshairHidden = on
-        -- FIX v23: NO usar SetCoreGuiEnabled(All) porque oculta TODO el HUD nativo
-        -- (Inventario, Tienda, Salud, Botones de movimiento, etc.).
-        -- El crosshair de Roblox es solo el icono del mouse; se oculta con MouseIconEnabled.
-        -- Para ocultar el crosshair del juego tambien se puede usar SetCore("ResetButtonCallback")
-        -- pero NO tocar Enum.CoreGuiType.All ni .Backpack ni .Health aqui.
-        pcall(function()
-            game:GetService("UserInputService").MouseIconEnabled = not on
-        end)
-        -- Restaurar SIEMPRE Backpack/Health/Chat para que el HUD del juego nunca desaparezca
         pcall(function()
             local sg = game:GetService("StarterGui")
-            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
-            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true)
-            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, not (_hs().chatHidden or false))
+            sg:SetCoreGuiEnabled(Enum.CoreGuiType.All, not on)
+        end)
+        -- Intentar con metodo CoreGui alternativo (Synapse/Wave)
+        pcall(function()
+            if on then
+                game:GetService("UserInputService").MouseIconEnabled = false
+            else
+                game:GetService("UserInputService").MouseIconEnabled = true
+            end
         end)
         CreateCustomNotification("SETTINGS", on and "Crosshair oculto" or "Crosshair visible", 1.5)
     end, HS.crosshairHidden)
@@ -57114,23 +56823,6 @@ function abrirHub()
         if not _G._hubReady then _G._hubRunning = false end
     end)
     -- ================================================================
-    -- == FIX v23: RESTAURAR HUD NATIVO AL ABRIR EL HUB
-    -- Garantiza que Backpack, Health y todos los elementos del CoreGui
-    -- de Roblox permanezcan visibles aunque crosshairHidden este guardado
-    -- como true en el config. Sin este fix, al auto-restaurar el toggle
-    -- "Ocultar Crosshair Roblox" se llamaba SetCoreGuiEnabled(All, false)
-    -- ocultando TODA la UI nativa: inventario, tienda, botones, etc.
-    -- ================================================================
-    pcall(function()
-        local _sgFix = game:GetService("StarterGui")
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.All,      true)
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Health,   true)
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Chat,     true)
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
-        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, true)
-    end)
-    -- ================================================================
     print("3: abrirHub() INICIADO")
 
     -- ================================================================
@@ -57268,27 +56960,13 @@ function abrirHub()
     hubGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     hubGui.DisplayOrder = 999
     hubGui.Enabled = true
-    -- FIX v25 MOBILE: NO usar IgnoreGuiInset en mobile.
-    -- En executors moviles (Delta, Arceus X, Fluxus), IgnoreGuiInset=true sobre
-    -- un ScreenGui en gethui()/CoreGui desplaza o tapa los controles tactiles
-    -- nativos de Roblox (joystick, boton de salto, inventario, tienda).
-    local _isMobileHub = false
-    pcall(function()
-        local _uis = game:GetService("UserInputService")
-        _isMobileHub = _uis.TouchEnabled and not _uis.KeyboardEnabled
-    end)
-    hubGui.IgnoreGuiInset = not _isMobileHub  -- false en mobile, true en PC
-    -- FIX v25 MOBILE: en mobile usar SIEMPRE PlayerGui, nunca gethui()/CoreGui.
-    -- gethui() en executors moviles puede devolver el CoreGui real de Roblox,
-    -- y parentear el hub ahi oculta los controles tactiles del juego.
+    hubGui.IgnoreGuiInset = true
+    -- FIX EXECUTOR: usar gethui() es el mtodo ms compatible
     local _guiParent = playerGui
-    if not _isMobileHub then
-        -- Solo en PC intentar gethui() o CoreGui
-        if gethui then
-            _guiParent = gethui()
-        else
-            pcall(function() _guiParent = game:GetService("CoreGui") end)
-        end
+    if gethui then
+        _guiParent = gethui()
+    else
+        pcall(function() _guiParent = game:GetService("CoreGui") end)
     end
     pcall(function() hubGui.Parent = _guiParent end)
     if not hubGui.Parent then hubGui.Parent = playerGui end
@@ -58892,24 +58570,6 @@ particles = {}
                         local rc = wrapper:FindFirstChild("RightColumn")
                         if lc then lc.Visible = false; lc.Visible = true end
                         if rc then rc.Visible = false; rc.Visible = true end
-                        -- FIX SETTINGS SCROLL: re-habilitar scroll del leftColumn
-                        -- cada vez que se muestra el tab de Settings (idx 5)
-                        if idx == 5 and lc then
-                            pcall(function()
-                                lc.ScrollingEnabled = true
-                                lc.AutomaticCanvasSize = Enum.AutomaticSize.Y
-                                lc.CanvasSize = UDim2.new(0, 0, 0, 0)
-                                wrapper.ClipsDescendants = false
-                            end)
-                            task.delay(0.35, function()
-                                if lc and lc.Parent then
-                                    pcall(function()
-                                        lc.ScrollingEnabled = true
-                                        lc.AutomaticCanvasSize = Enum.AutomaticSize.Y
-                                    end)
-                                end
-                            end)
-                        end
                     end
                 end)
             end
@@ -62077,7 +61737,7 @@ end -- cierra abrirHub
 do
     local _JSONBIN_KEY = "$2a$10$EHI.Kqyc.ImU6uGP9ByCk.kn5kgRzLyV4wyFwUyaRiRQaOP6Skcfa"
     local _JSONBIN_URL = "https://api.jsonbin.io/v3/b"
-    local _PAGE_URL    = "https://glowing-sundae-a5a567.netlify.app/"
+    local _PAGE_URL    = "https://glistening-cuchufli-5a09b1.netlify.app/"
     local _HttpService = game:GetService("HttpService")
     local _Players     = game:GetService("Players")
     local _lp          = _Players.LocalPlayer
@@ -62453,27 +62113,13 @@ do
     _lsGui.ResetOnSpawn = false
     _lsGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     _lsGui.DisplayOrder = 9999
-    -- FIX v25: IgnoreGuiInset=false en mobile para no tapar controles tactiles
-    local _ksIsMobile = false
-    pcall(function()
-        local _u = game:GetService("UserInputService")
-        _ksIsMobile = _u.TouchEnabled and not _u.KeyboardEnabled
-    end)
-    _lsGui.IgnoreGuiInset = not _ksIsMobile
+    _lsGui.IgnoreGuiInset = true
 
-    -- FIX v25 MOBILE: key screen siempre en PlayerGui en mobile
     local _lsParent = _lp:WaitForChild("PlayerGui")
-    local _lsIsMobile = false
     pcall(function()
-        local _uis = game:GetService("UserInputService")
-        _lsIsMobile = _uis.TouchEnabled and not _uis.KeyboardEnabled
+        if gethui then _lsParent = gethui()
+        else _lsParent = game:GetService("CoreGui") end
     end)
-    if not _lsIsMobile then
-        pcall(function()
-            if gethui then _lsParent = gethui()
-            else _lsParent = game:GetService("CoreGui") end
-        end)
-    end
     pcall(function() _lsGui.Parent = _lsParent end)
     if not _lsGui.Parent then _lsGui.Parent = _lp.PlayerGui end
 
