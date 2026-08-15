@@ -42435,17 +42435,31 @@ function CreateExclusiveTab()
 
     CreateAuroraToggle(hudSec, "Ocultar Crosshair Roblox", function(on)
         _hs().crosshairHidden = on
+        -- FIX v23: NO usar SetCoreGuiEnabled(All) porque oculta TODO el HUD nativo
+        -- (Inventario, Tienda, Salud, Botones de movimiento, etc.).
+        -- El crosshair de Roblox es solo el icono del mouse; se oculta con MouseIconEnabled.
+        -- Para ocultar el crosshair del juego tambien se puede usar SetCore("ResetButtonCallback")
+        -- pero NO tocar Enum.CoreGuiType.All ni .Backpack ni .Health aqui.
+        pcall(function()
+            game:GetService("UserInputService").MouseIconEnabled = not on
+        end)
+        -- Metodo alternativo via StarterGui SetCore (oculta solo el crosshair propio del juego)
         pcall(function()
             local sg = game:GetService("StarterGui")
-            sg:SetCoreGuiEnabled(Enum.CoreGuiType.All, not on)
-        end)
-        -- Intentar con metodo CoreGui alternativo (Synapse/Wave)
-        pcall(function()
+            -- Solo ocultar el SelfView (camara del jugador) y no el resto del CoreGui
+            -- En MM2 no hay crosshair nativo separado; el MouseIconEnabled es suficiente
             if on then
-                game:GetService("UserInputService").MouseIconEnabled = false
+                pcall(function() sg:SetCore("TopbarEnabled", false) end)
             else
-                game:GetService("UserInputService").MouseIconEnabled = true
+                pcall(function() sg:SetCore("TopbarEnabled", true) end)
             end
+        end)
+        -- Restaurar SIEMPRE Backpack/Health/Chat para que el HUD del juego nunca desaparezca
+        pcall(function()
+            local sg = game:GetService("StarterGui")
+            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true)
+            sg:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, not (_hs().chatHidden or false))
         end)
         CreateCustomNotification("SETTINGS", on and "Crosshair oculto" or "Crosshair visible", 1.5)
     end, HS.crosshairHidden)
@@ -57098,6 +57112,23 @@ function abrirHub()
     -- Safety net: liberar el lock si algo falla y el hub nunca termina
     task.delay(20, function()
         if not _G._hubReady then _G._hubRunning = false end
+    end)
+    -- ================================================================
+    -- == FIX v23: RESTAURAR HUD NATIVO AL ABRIR EL HUB
+    -- Garantiza que Backpack, Health y todos los elementos del CoreGui
+    -- de Roblox permanezcan visibles aunque crosshairHidden este guardado
+    -- como true en el config. Sin este fix, al auto-restaurar el toggle
+    -- "Ocultar Crosshair Roblox" se llamaba SetCoreGuiEnabled(All, false)
+    -- ocultando TODA la UI nativa: inventario, tienda, botones, etc.
+    -- ================================================================
+    pcall(function()
+        local _sgFix = game:GetService("StarterGui")
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.All,      true)
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Health,   true)
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.Chat,     true)
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
+        _sgFix:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, true)
     end)
     -- ================================================================
     print("3: abrirHub() INICIADO")
