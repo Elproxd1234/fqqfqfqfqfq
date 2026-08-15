@@ -40080,6 +40080,8 @@ function CreatePremiumTab()
             -- para capturar cualquier Tool que aparezca (gun en char o en workspace).
             local function _scTryApplyGun()
                 if not _skinState.enabled then return end
+                -- FIX: no aplicar skin de gun si el modo actual es knife
+                if _skinState.mode ~= "gun" then return end
                 task.wait(0.15)
                 -- FIX MOBILE: buscar tambien en workspace[playerName] ademas de char/backpack
                 local gun = _findGun and _findGun()
@@ -40096,7 +40098,8 @@ function CreatePremiumTab()
                     pcall(function() _skinState._charPickupConn:Disconnect() end)
                 end
                 _skinState._charPickupConn = char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
+                    -- FIX: solo intentar aplicar skin de gun si el modo actual es gun
+                    if child:IsA("Tool") and _skinState.mode == "gun" then
                         task.spawn(_scTryApplyGun)
                     end
                 end)
@@ -40108,6 +40111,8 @@ function CreatePremiumTab()
                 end
                 _skinState._wsConn = workspace.DescendantAdded:Connect(function(obj)
                     if not _skinState.enabled then return end
+                    -- FIX: no aplicar skin de gun si el modo es knife
+                    if _skinState.mode ~= "gun" then return end
                     if obj:IsA("Tool") then
                         local n = obj.Name:lower()
                         if n:find("gun") or n == "gun" or n:find("sheriff") or n:find("revolver") then
@@ -43278,7 +43283,7 @@ function CreateExclusiveTab()
                 if _G._settingsFullscreenActive then
                     _exitFullscreen()
                 end
-                -- FIX BUG PESTAÑA GIGANTE: forzar scale correcto siempre al cambiar de tab
+                -- FIX BUG PESTA?A GIGANTE: forzar scale correcto siempre al cambiar de tab
                 task.defer(function()
                     local _sc = mainFrame and mainFrame:FindFirstChildOfClass("UIScale")
                     if _sc then
