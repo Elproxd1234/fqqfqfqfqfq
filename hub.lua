@@ -40525,6 +40525,186 @@ function CreatePremiumTab()
         end  -- cierra do skin changer
     -- -- FIN SKIN CHANGER ------------------------------------------
 
+    -- --------------------------------------------------------------------
+    -- ?? COLD KATANA — KILL SOUND
+    -- Reemplaza el sonido Slash del knife por un sonido custom cuando
+    -- la skin activa es Cold Katana y el jugador mata a alguien.
+    -- --------------------------------------------------------------------
+    do
+        local _COLD_KILL_SOUND_ID = "rbxassetid://5985793946"
+        local _coldKillConn       = nil  -- listener de KnifeKill
+        local _coldSlashConn      = nil  -- listener de Slash sound
+
+        -- Crear el Sound object una sola vez en SoundService
+        local _coldSnd = nil
+        local function _getColdSnd()
+            if _coldSnd and _coldSnd.Parent then return _coldSnd end
+            local ss = game:GetService("SoundService")
+            -- Reutilizar si ya existe (re-build del tab)
+            local existing = ss:FindFirstChild("ZerqonColdKatanaKillSnd")
+            if existing then _coldSnd = existing; return _coldSnd end
+            local s = Instance.new("Sound", ss)
+            s.Name       = "ZerqonColdKatanaKillSnd"
+            s.SoundId    = _COLD_KILL_SOUND_ID
+            s.Volume     = 1
+            s.RollOffMaxDistance = 0
+            s.RollOffMinDistance = 0
+            _coldSnd = s
+            return s
+        end
+
+        -- Reproduce el kill sound si la skin activa es Cold Katana
+        local function _playColdKillSound()
+            -- Solo sonar si la skin activa ES Cold Katana
+            local skinName = ""
+            pcall(function()
+                local list = _SC_KNIFE_SKINS
+                local skin = list and list[_skinState.skinIdx]
+                skinName = skin and skin.name or ""
+            end)
+            if skinName ~= "Cold Katana" then return end
+            pcall(function()
+                local snd = _getColdSnd()
+                if snd.IsPlaying then snd:Stop() end
+                snd:Play()
+            end)
+        end
+
+        -- Hookear el Remote KnifeKill (MM2) para detectar kills del jugador
+        local function _hookColdKillRemote()
+            if _coldKillConn then
+                pcall(function() _coldKillConn:Disconnect() end)
+                _coldKillConn = nil
+            end
+            task.spawn(function()
+                local ok, remote = pcall(function()
+                    return game:GetService("ReplicatedStorage")
+                        :WaitForChild("Remotes", 10)
+                        :WaitForChild("Gameplay", 10)
+                        :WaitForChild("KnifeKill", 10)
+                end)
+                if not ok or not remote then return end
+                local signal = nil
+                if remote:IsA("RemoteEvent") then
+                    signal = remote.OnClientEvent
+                elseif remote:IsA("BindableEvent") then
+                    signal = remote.Event
+                end
+                if not signal then return end
+                -- KnifeKill se dispara cuando CUALQUIER jugador mata con knife.
+                -- Filtramos: si el killer no aparece como argumento, asumimos que
+                -- es nuestro kill (MM2 manda killedPlayer al cliente del killer).
+                _coldKillConn = signal:Connect(function(killedPlayer)
+                    -- Si el killed es un Player, significa que nuestro cliente recibio
+                    -- la notificacion -> somos el killer
+                    if killedPlayer and typeof(killedPlayer) == "Instance"
+                       and killedPlayer:IsA("Player") then
+                        _playColdKillSound()
+                    end
+                end)
+            end)
+        end
+
+        -- También hookear el Sound Slash del knife directamente
+        -- (reemplaza el sonido de slash cuando Cold Katana esta activa)
+        local function _hookSlashSound(enable)
+            if _coldSlashConn then
+                pcall(function() _coldSlashConn:Disconnect() end)
+                _coldSlashConn = nil
+            end
+            if not enable then return end
+            -- Escuchar cuando el knife es equipado para hookear su Slash sound
+            local function _patchSlash(knife)
+                if not knife or not knife:IsA("Tool") then return end
+                local handle = knife:FindFirstChild("Handle")
+                if not handle then return end
+                local slash = handle:FindFirstChild("Slash")
+                if not slash or not slash:IsA("Sound") then return end
+                -- Verificar que la skin activa sea Cold Katana
+                local skinName = ""
+                pcall(function()
+                    local skin = _SC_KNIFE_SKINS and _SC_KNIFE_SKINS[_skinState.skinIdx]
+                    skinName = skin and skin.name or ""
+                end)
+                if skinName ~= "Cold Katana" then return end
+                -- Reemplazar el SoundId del Slash por el custom
+                pcall(function()
+                    slash.SoundId = _COLD_KILL_SOUND_ID
+                end)
+            end
+
+            -- Aplicar al knife actual si ya está equipado
+            local char = LocalPlayer.Character
+            if char then
+                for _, obj in ipairs(char:GetChildren()) do
+                    if obj:IsA("Tool") then _patchSlash(obj) end
+                end
+            end
+
+            -- Escuchar nuevos tools equipados
+            _coldSlashConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+                newChar.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        _patchSlash(child)
+                    end
+                end)
+            end)
+        end
+
+        -- Limpiar al re-construir el tab
+        if _G._coldKatanaKillConn then
+            pcall(function() _G._coldKatanaKillConn:Disconnect() end)
+            _G._coldKatanaKillConn = nil
+        end
+        if _G._coldKatanaSlashConn then
+            pcall(function() _G._coldKatanaSlashConn:Disconnect() end)
+            _G._coldKatanaSlashConn = nil
+        end
+
+        local _coldEnabled = _G._coldKatanaSoundEnabled or false
+
+        local coldCard = CreateVisualCard(leftColumn, "??", "COLD KATANA", ThemeColors.Aurora2)
+
+        CreateAuroraToggle(coldCard, "Kill Sound (Cold Katana)", function(on)
+            _coldEnabled = on
+            _G._coldKatanaSoundEnabled = on
+            if on then
+                _hookColdKillRemote()
+                _hookSlashSound(true)
+                -- Guardar referencias globales para limpiar al re-build
+                _G._coldKatanaKillConn   = _coldKillConn
+                _G._coldKatanaSlashConn  = _coldSlashConn
+                CreateCustomNotification("?? COLD KATANA", "Kill sound activado", 2)
+            else
+                pcall(function() if _coldKillConn  then _coldKillConn:Disconnect()  end end)
+                pcall(function() if _coldSlashConn then _coldSlashConn:Disconnect() end end)
+                _coldKillConn  = nil
+                _coldSlashConn = nil
+                _G._coldKatanaKillConn  = nil
+                _G._coldKatanaSlashConn = nil
+                -- Restaurar el SoundId original del Slash
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    if not char then return end
+                    for _, tool in ipairs(char:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            local handle = tool:FindFirstChild("Handle")
+                            if handle then
+                                local slash = handle:FindFirstChild("Slash")
+                                if slash and slash:IsA("Sound") then
+                                    slash.SoundId = "rbxassetid://12222216"
+                                end
+                            end
+                        end
+                    end
+                end)
+                CreateCustomNotification("?? COLD KATANA", "Kill sound desactivado", 2)
+            end
+        end, _coldEnabled)
+    end
+    -- -- FIN COLD KATANA KILL SOUND ---------------------------------
+
 
     -- --------------------------------------------------------------------
     -- ?? CUSTOM MIRAS (CROSSHAIRS) - PREMIUM
