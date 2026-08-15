@@ -21977,7 +21977,7 @@ function CreateMainTab()
         -- Antes este boton usaba "_zqGetToken()" con formato "ZQT{uid}D{day}", un
         -- token DIFERENTE -> la web hacia auto-sync al bin equivocado y el hub nunca
         -- detectaba la verificacion. Ahora usamos SIEMPRE el mismo token del key system.
-        local KEY_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
+        local KEY_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
         -- Reutilizar el mismo token que el key system (formato S), o generarlo si aun no existe
@@ -43046,7 +43046,7 @@ function CreateExclusiveTab()
         expiredLbl.BackgroundColor3 = Color3.fromRGB(60, 10, 10)
         expiredLbl.BackgroundTransparency = 0.3
         expiredLbl.BorderSizePixel = 0
-        expiredLbl.Text = "  KEY EXPIRED — Complete verification again"
+        expiredLbl.Text = "  KEY EXPIRED ? Complete verification again"
         expiredLbl.TextColor3 = Color3.fromRGB(255, 68, 85)
         expiredLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
         expiredLbl.TextSize = 11
@@ -43095,7 +43095,7 @@ function CreateExclusiveTab()
                 if _timerConn then _timerConn:Disconnect(); _timerConn = nil end
 
                 -- ================================================================
-                -- AUTO-KICK: La key expiró ? expulsar al jugador con countdown
+                -- AUTO-KICK: La key expir? ? expulsar al jugador con countdown
                 -- Solo se ejecuta UNA vez (flag _G._keyExpiredKickTriggered)
                 -- ================================================================
                 if not _G._keyExpiredKickTriggered then
@@ -43108,8 +43108,8 @@ function CreateExclusiveTab()
                         for _countdown = 10, 1, -1 do
                             pcall(function()
                                 _sg:SetCore("SendNotification", {
-                                    Title = "? ZERQON HUB — KEY EXPIRADA",
-                                    Text  = "Serás expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la página para continuar.",
+                                    Title = "? ZERQON HUB ? KEY EXPIRADA",
+                                    Text  = "Ser?s expulsado del juego en " .. _countdown .. " segundo" .. (_countdown ~= 1 and "s" or "") .. ".\nRe-verifica en la p?gina para continuar.",
                                     Duration = 1.2,
                                 })
                             end)
@@ -43118,7 +43118,7 @@ function CreateExclusiveTab()
 
                         -- Expulsar al jugador
                         pcall(function()
-                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la página para continuar usando el hub.")
+                            _lp:Kick("\n? ZERQON HUB\n\nTu key de 24 horas ha expirado.\nVuelve a verificar en la p?gina para continuar usando el hub.")
                         end)
                     end)
                 end
@@ -61723,7 +61723,7 @@ end -- cierra abrirHub
 do
     local _JSONBIN_KEY = "$2a$10$EHI.Kqyc.ImU6uGP9ByCk.kn5kgRzLyV4wyFwUyaRiRQaOP6Skcfa"
     local _JSONBIN_URL = "https://api.jsonbin.io/v3/b"
-    local _PAGE_URL    = "https://glistening-cuchufli-5a09b1.netlify.app/"
+    local _PAGE_URL    = "https://glowing-sundae-a5a567.netlify.app/"
     local _HttpService = game:GetService("HttpService")
     local _Players     = game:GetService("Players")
     local _lp          = _Players.LocalPlayer
@@ -62209,7 +62209,7 @@ do
     -- ================================================================
     -- BOTON "Llave Get" (abre pagina de obtencion de key)
     -- ================================================================
-    local _LLAVE_PAGE_URL = "https://glistening-cuchufli-5a09b1.netlify.app/"
+    local _LLAVE_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
     local _llavebtn = _makeKeyBtn(_panel, 238, "Llave Get", 130, 14)
     _llavebtn.Activated:Connect(function()
         TweenService:Create(_llavebtn, TweenInfo.new(0.07), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
@@ -62617,7 +62617,7 @@ do
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId .. "&t=" .. tostring(_G._keyStartTime)
             elseif _myBinId then
                 -- Bin existente pero sin timestamp local conocido: no pasar &t=
-                -- La web leerá el timestamp de JSONBin y de localStorage.
+                -- La web leer? el timestamp de JSONBin y de localStorage.
                 _link = _PAGE_URL .. "?token=" .. _myToken .. "&bin=" .. _myBinId
             else
                 -- Bin nuevo: pasar timestamp actual como inicio de la key
