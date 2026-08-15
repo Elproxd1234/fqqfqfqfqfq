@@ -57205,16 +57205,14 @@ _getTargetScale = function()
     -- DEBUG: imprimir valores reales para diagnosticar
     warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
     if _isMobileNow then
-        local _availW = _vpNow.X - 24
-        local _availH = _vpNow.Y - 24
-        local _scaleByW = _availW / 820
-        local _scaleByH = _availH / 460
-        local _autoScale = math.min(_scaleByW, _scaleByH)
-        local _final = math.clamp(_autoScale, 0.35, 0.70)
-        warn("[ZerqonHUB SCALE DEBUG] mobile -> scaleW=" .. tostring(_scaleByW) .. " scaleH=" .. tostring(_scaleByH) .. " final=" .. tostring(_final))
+        -- Calcular escala exacta para que el frame 820x460 entre en pantalla con margen
+        local _scaleByW = (_vpNow.X - 24) / 820
+        local _scaleByH = (_vpNow.Y - 24) / 460
+        local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.30, 0.55)
+        warn("[ZerqonHUB SCALE DEBUG] mobile -> final=" .. tostring(_final))
         return _final
     else
-        warn("[ZerqonHUB SCALE DEBUG] PC branch -> returning 0.70")
+        -- PC: 70%
         return 0.70
     end
 end
