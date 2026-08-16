@@ -794,13 +794,141 @@ _G._isTabRebuild = false
 _G._autoRestoreNotifShown = false
 
 -- ================================================================
--- == PREMIUM GLOBAL DESBLOQUEADO ? TODAS LAS FUNCIONES GRATIS ==
--- Forzar verificacion premium desde el inicio, asi todos los checks
--- en cualquier tab/toggle/selector devuelven true sin pedir Discord.
+-- == PREMIUM: requiere verificacion Discord para acceder
 -- ================================================================
-_G._discordPremiumVerified = true
-_G._discordUsername        = "Usuario"
+_G._discordPremiumVerified = _G._discordPremiumVerified or false
+_G._discordUsername        = _G._discordUsername or nil
 -- ================================================================
+
+-- ================================================================
+-- == AUTO-GUARDADO PREMIUM v1
+-- Lee el archivo de sesion premium guardado localmente.
+-- Si el vínculo sigue siendo reciente (< 24h), restaura el acceso
+-- sin que el usuario tenga que abrir el navegador de nuevo.
+-- El recheck que viene despues igual valida contra el backend.
+-- ================================================================
+do
+    local _lp2   = game:GetService("Players").LocalPlayer
+    local _uid2  = tostring(_lp2 and _lp2.UserId or "0")
+    local _premPath = "zerqon_premium_" .. _uid2 .. ".txt"
+    local _PREM_DUR = 24 * 3600
+
+    pcall(function()
+        if not readfile then return end
+        local _raw = readfile(_premPath)
+        if not _raw or _raw == "" then return end
+        -- formato: discordId|robloxId|username|savedAt
+        local _did, _rid, _uname, _savedStr = _raw:match("^([^|]+)|([^|]+)|([^|]*)|(%d+)$")
+        if not (_did and _savedStr) then return end
+        local _savedT = tonumber(_savedStr)
+        if not _savedT then return end
+        if _savedT > 9999999999 then _savedT = math.floor(_savedT / 1000) end
+        local _elapsed = os.time() - _savedT
+        if _elapsed >= 0 and _elapsed < _PREM_DUR then
+            _G._discordPremiumVerified = true
+            _G._discordUsername        = (_uname and _uname ~= "") and _uname or "Usuario"
+            _G._premiumSavedDiscordId  = _did
+            warn("[ZerqonHUB] Premium guardado encontrado — " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
+        else
+            -- Vencio: borrar
+            pcall(function() if delfile   then delfile(_premPath)       end end)
+            pcall(function() if writefile then writefile(_premPath, "") end end)
+            warn("[ZerqonHUB] Sesion premium guardada vencida. Se requiere re-verificacion.")
+        end
+    end)
+end
+-- ================================================================
+-- == FIN AUTO-GUARDADO PREMIUM
+-- ================================================================
+
+-- RECHECK PREMIUM AL INICIO: si ya estaba verificado de una sesion anterior,
+-- consultar el backend para confirmar que sigue teniendo el rol.
+-- Usa /api/recheck-premium con el RobloxUserId ? no requiere login manual.
+-- Evita que alguien que perdio el premium siga usandolo indefinidamente.
+-- v2: al confirmar premium, destruye el lockScreen del tab VIP y lo
+--     reconstruye limpio aunque el hub ya estuviera abierto.
+if _G._discordPremiumVerified then
+    _G._discordPremiumVerified = false  -- asumir sin premium hasta confirmar
+    task.spawn(function()
+        local _BACKEND_URL = "https://zerqonhub.onrender.com"
+        local _robloxId    = tostring(game:GetService("Players").LocalPlayer.UserId)
+
+        -- Esperar a que el hub este completamente construido antes de tocar los tabs
+        local _waitTick = 0
+        repeat task.wait(0.2); _waitTick += 1 until _G._hubReady or _waitTick > 100
+
+        local ok, response = pcall(function()
+            return request({
+                Url    = _BACKEND_URL .. "/api/recheck-premium?roblox_id=" .. _robloxId,
+                Method = "GET",
+            })
+        end)
+        if ok and response and response.Body then
+            local dok, data = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(response.Body)
+            end)
+            if dok and data then
+                if data.hasPremium == true then
+                    -- Sigue con el rol ? restaurar acceso sin login manual
+                    _G._discordPremiumVerified = true
+                    _G._discordUsername = data.username or _G._discordUsername
+                    warn("[ZerqonHUB] Recheck OK — premium confirmado, RobloxId=" .. _robloxId)
+
+                    -- DESBLOQUEO EN CALIENTE: destruir el tab VIP cacheado (que tiene
+                    -- el lockScreen) y reconstruirlo ya desbloqueado.
+                    -- Si el usuario esta mirando el tab VIP ahora mismo, se actualiza
+                    -- instantaneamente sin que tenga que cambiar de tab.
+                    local _PIDX = 4
+                    pcall(function()
+                        -- 1. Destruir el frame cacheado con el lockScreen
+                        if _G._tabCache and _G._tabCache[_PIDX] then
+                            _G._tabCache[_PIDX]:Destroy()
+                            _G._tabCache[_PIDX] = nil
+                        end
+                        -- 2. Resetear el flag de construido para que SetActiveTab lo reconstruya
+                        if _G._tabBuilt        then _G._tabBuilt[_PIDX]        = nil end
+                        if _G._tabScrollFrames then _G._tabScrollFrames[_PIDX] = nil end
+
+                        -- 3. Si el usuario YA esta en el tab VIP, recargarlo ahora mismo
+                        --    Si esta en otro tab, se reconstruira solo cuando lo abra
+                        if SetActiveTab then
+                            -- Obtener el tab activo actual inspeccionando cual frame es visible
+                            -- Usar _G._activeTabIdx si existe, sino forzar rebuild igual
+                            local _currentTab = _G._activeTabIdx or 0
+                            if _currentTab == _PIDX then
+                                -- Esta mirando el VIP ahora ? recargar de inmediato
+                                SetActiveTab(_PIDX)
+                            end
+                            -- Si no esta en VIP: no hacer nada, se construira cuando lo abra
+                        end
+                    end)
+                else
+                    -- Perdio el rol o vinculo revocado ? limpiar globals y archivo guardado
+                    _G._discordPremiumVerified = false
+                    _G._discordUsername = nil
+                    _G._premiumSavedDiscordId = nil
+                    -- Borrar el archivo de sesion premium para que no intente restaurarlo
+                    pcall(function()
+                        local _uid4  = tostring(game:GetService("Players").LocalPlayer.UserId)
+                        local _pp    = "zerqon_premium_" .. _uid4 .. ".txt"
+                        if delfile   then delfile(_pp)       end
+                        if writefile then writefile(_pp, "") end
+                    end)
+                    if _G._toggleStates then
+                        for _k, _v in pairs(_G._toggleStates) do
+                            if _v == true and _k:find("%(Premium%)") then
+                                _G._toggleStates[_k] = false
+                            end
+                        end
+                    end
+                    warn("[ZerqonHUB] Recheck: premium revocado o no vinculado, RobloxId=" .. _robloxId)
+                end
+            end
+        end
+        -- Si el request falla (servidor caido/sin internet) queda en false
+        -- por seguridad: el jugador tendra que verificar en el tab VIP
+    end)
+end
 
 -- FIX Z-LOGO: limpiar reopener GUIs de ejecuciones anteriores y resetear flag
 _G._hubHidden = false
@@ -1357,6 +1485,21 @@ _G._hubSettings.hubScale = 70
 do
     for _nrtKey, _ in pairs(_neverRestoreToggles) do
         _G._toggleStates[_nrtKey] = false
+    end
+end
+
+-- BLOQUEO PREMIUM AL INICIO: si el usuario NO tiene premium verificado,
+-- forzar a false todos los toggles Premium guardados en JSON y limpiar sus .txt.
+-- Esto evita que se auto-activen al re-ejecutar aunque hayan quedado guardados.
+do
+    if not _G._discordPremiumVerified then
+        for _k, _v in pairs(_G._toggleStates) do
+            if _v == true and _k:find("%(Premium%)") then
+                _G._toggleStates[_k] = false
+                -- Borrar el .txt individual para que no se reactive en el proximo join
+                pcall(function() _saveToggleFile(_k, false) end)
+            end
+        end
     end
 end
 
@@ -30864,6 +31007,16 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
             if _G._activatedToggles then _G._activatedToggles[nombre] = true end
         end
     end
+    -- BLOQUEO PREMIUM: si el toggle es Premium y no tiene verificacion, forzar OFF
+    -- aunque el archivo .txt o JSON diga true (puede haber quedado guardado de antes)
+    if _shouldAutoActivate and nombre:find("%(Premium%)") and not _G._discordPremiumVerified then
+        _shouldAutoActivate = nil
+        estado = false
+        _G._toggleStates[nombre] = false
+        pcall(function() ApplyState(false, false) end)
+        -- Borrar el archivo .txt para que no se reactive en el proximo join
+        pcall(function() _saveToggleFile(nombre, false) end)
+    end
     if _shouldAutoActivate then
         local lower = nombre:lower()
 
@@ -39427,28 +39580,27 @@ function CreatePremiumTab()
     ClearContent()
 
     -- ================================================================
-    -- == PREMIUM DESBLOQUEADO PARA TODOS (sin verificacion Discord)
-    -- ================================================================
-    _G._discordPremiumVerified = true
-    _G._discordUsername        = _G._discordUsername or "Usuario"
-
-    -- ================================================================
-    -- == DISCORD PREMIUM LOCK ? DESACTIVADO (if false bloquea el check)
+    -- == DISCORD PREMIUM LOCK v2 (Discord OAuth2 + Bio Roblox)
+    -- FLUJO:
+    --   1ra vez : Login Discord ? verificar rol ? poner código en bio ? acceso
+    --   Próximas: recheck automático por RobloxUserId vinculado
     -- ================================================================
     local BACKEND_URL = "https://zerqonhub.onrender.com"
     local HttpService  = game:GetService("HttpService")
 
-    -- Check desactivado: premium siempre desbloqueado
-    if false and not _G._discordPremiumVerified then
+    if not _G._discordPremiumVerified then
 
-        -- Generar un ID de sesi?n ?nico para este jugador
+        -- Generar un ID de sesión único para este intento de login
         if not _G._hubSessionId then
             _G._hubSessionId = "HUB-" .. tostring(math.random(100000, 999999))
         end
         local sessionId = _G._hubSessionId
         local loginUrl  = BACKEND_URL .. "/hub-login?code=" .. sessionId
+        local robloxId  = tostring(game:GetService("Players").LocalPlayer.UserId)
 
-        -- Pantalla de bloqueo
+        -- ============================================================
+        -- PANTALLA DE VERIFICACIÓN (Frame principal, ocupa el tab)
+        -- ============================================================
         local lockFrame = Instance.new("Frame", contentContainer)
         lockFrame.Name = "PremiumLockScreen"
         lockFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -39456,10 +39608,10 @@ function CreatePremiumTab()
         lockFrame.BorderSizePixel = 0
 
         local centerFrame = Instance.new("Frame", lockFrame)
-        centerFrame.Size = UDim2.new(0, 280, 0, 185)
-        centerFrame.Position = UDim2.new(0.5, -140, 0.5, -92)
+        centerFrame.Size = UDim2.new(0, 290, 0, 160)  -- paso 1: compacto (solo link Discord)
+        centerFrame.Position = UDim2.new(0.5, -145, 0.5, -80)
         centerFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
-        centerFrame.BackgroundTransparency = 0.1
+        centerFrame.BackgroundTransparency = 0.08
         centerFrame.BorderSizePixel = 0
         Instance.new("UICorner", centerFrame).CornerRadius = UDim.new(0, 16)
         local stroke = Instance.new("UIStroke", centerFrame)
@@ -39467,136 +39619,254 @@ function CreatePremiumTab()
         stroke.Thickness = 1.5
         stroke.Transparency = 0.3
 
-        -- T?tulo
+        -- Título
         local titleLbl = Instance.new("TextLabel", centerFrame)
-        titleLbl.Size = UDim2.new(1, -20, 0, 28)
-        titleLbl.Position = UDim2.new(0, 10, 0, 20)
+        titleLbl.Size = UDim2.new(1, -20, 0, 26)
+        titleLbl.Position = UDim2.new(0, 10, 0, 14)
         titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = "PREMIUM BLOQUEADO"
-        titleLbl.TextSize = 15
+        titleLbl.Text = "PREMIUM — VERIFICACIÓN"
+        titleLbl.TextSize = 14
         titleLbl.Font = Enum.Font.GothamBold
         titleLbl.TextXAlignment = Enum.TextXAlignment.Center
-        titleLbl.TextColor3 = Color3.fromRGB(160, 160, 160)
+        titleLbl.TextColor3 = Color3.fromRGB(200, 200, 210)
 
-        -- Subt?tulo
-        local subLbl = Instance.new("TextLabel", centerFrame)
-        subLbl.Size = UDim2.new(1, -24, 0, 36)
-        subLbl.Position = UDim2.new(0, 12, 0, 54)
-        subLbl.BackgroundTransparency = 1
-        subLbl.Text = "Copy the link and log in with\nyour Discord account to get access"
-        subLbl.TextSize = 11
-        subLbl.Font = Enum.Font.Gotham
-        subLbl.TextWrapped = true
-        subLbl.TextXAlignment = Enum.TextXAlignment.Center
-        subLbl.TextColor3 = Color3.fromRGB(100, 100, 100)
+        -- Status label (arriba)
+        local statusLbl = Instance.new("TextLabel", centerFrame)
+        statusLbl.Size = UDim2.new(1, -20, 0, 32)
+        statusLbl.Position = UDim2.new(0, 10, 0, 44)
+        statusLbl.BackgroundTransparency = 1
+        statusLbl.Text = "Paso 1: Loguéate con Discord"
+        statusLbl.TextSize = 11
+        statusLbl.Font = Enum.Font.Gotham
+        statusLbl.TextWrapped = true
+        statusLbl.TextXAlignment = Enum.TextXAlignment.Center
+        statusLbl.TextColor3 = Color3.fromRGB(100, 100, 120)
 
-        -- Bot?n copiar link (gris)
+        local function setStatus(msg, color)
+            if statusLbl and statusLbl.Parent then
+                statusLbl.Text = msg
+                statusLbl.TextColor3 = color or Color3.fromRGB(100, 100, 120)
+            end
+        end
+
+        -- -- PASO 1: botón copiar link de login --
         local copyBtn = Instance.new("TextButton", centerFrame)
-        copyBtn.Size = UDim2.new(1, -40, 0, 38)
-        copyBtn.Position = UDim2.new(0, 20, 0, 100)
+        copyBtn.Name = "CopyBtn"
+        copyBtn.Size = UDim2.new(1, -40, 0, 36)
+        copyBtn.Position = UDim2.new(0, 20, 0, 82)
         copyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-        copyBtn.Text = "??  Copy login link"
+        copyBtn.Text = "??  Copiar link de login Discord"
         copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         copyBtn.Font = Enum.Font.GothamBold
-        copyBtn.TextSize = 13
+        copyBtn.TextSize = 12
         copyBtn.BorderSizePixel = 0
         Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 10)
 
-        -- Status label
-        local statusLbl = Instance.new("TextLabel", centerFrame)
-        statusLbl.Size = UDim2.new(1, -20, 0, 22)
-        statusLbl.Position = UDim2.new(0, 10, 0, 146)
-        statusLbl.BackgroundTransparency = 1
-        statusLbl.Text = "Esperando login..."
-        statusLbl.TextSize = 11
-        statusLbl.Font = Enum.Font.Gotham
-        statusLbl.TextXAlignment = Enum.TextXAlignment.Center
-        statusLbl.TextColor3 = Color3.fromRGB(90, 90, 90)
-
-        local function setStatus(msg, color)
-            statusLbl.Text = msg
-            statusLbl.TextColor3 = color or Color3.fromRGB(90, 90, 90)
-        end
-
-        -- Click en bot?n = copiar link
         copyBtn.Activated:Connect(function()
             pcall(function() setclipboard(loginUrl) end)
             copyBtn.Text = "?  Link copiado!"
             copyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
             task.wait(2)
-            copyBtn.Text = "??  Copy login link"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+            if copyBtn and copyBtn.Parent then
+                copyBtn.Text = "??  Copiar link de login Discord"
+                copyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+            end
+        end)
+        copyBtn.MouseEnter:Connect(function() copyBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 95) end)
+        copyBtn.MouseLeave:Connect(function() copyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75) end)
+
+        -- Separador visual (oculto hasta paso 2)
+        local sep = Instance.new("Frame", centerFrame)
+        sep.Size = UDim2.new(1, -40, 0, 1)
+        sep.Position = UDim2.new(0, 20, 0, 132)
+        sep.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        sep.BorderSizePixel = 0
+        sep.Visible = false  -- se muestra en paso 2
+
+        -- -- PASO 2: instrucción de bio --
+        local bioInstr = Instance.new("TextLabel", centerFrame)
+        bioInstr.Name = "BioInstr"
+        bioInstr.Size = UDim2.new(1, -20, 0, 38)
+        bioInstr.Position = UDim2.new(0, 10, 0, 142)
+        bioInstr.BackgroundTransparency = 1
+        bioInstr.Text = "Paso 2: Pegá este código en tu bio de Roblox"
+        bioInstr.TextSize = 11
+        bioInstr.Font = Enum.Font.Gotham
+        bioInstr.TextWrapped = true
+        bioInstr.TextXAlignment = Enum.TextXAlignment.Center
+        bioInstr.TextColor3 = Color3.fromRGB(160, 160, 180)
+        bioInstr.Visible = false
+
+        -- Label del código de bio
+        local bioCodeLbl = Instance.new("TextLabel", centerFrame)
+        bioCodeLbl.Name = "BioCodeLbl"
+        bioCodeLbl.Size = UDim2.new(1, -40, 0, 34)
+        bioCodeLbl.Position = UDim2.new(0, 20, 0, 188)
+        bioCodeLbl.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+        bioCodeLbl.BackgroundTransparency = 0
+        bioCodeLbl.BorderSizePixel = 0
+        Instance.new("UICorner", bioCodeLbl).CornerRadius = UDim.new(0, 8)
+        local bioCodeStroke = Instance.new("UIStroke", bioCodeLbl)
+        bioCodeStroke.Color = Color3.fromRGB(87, 242, 135)
+        bioCodeStroke.Thickness = 1
+        bioCodeStroke.Transparency = 0.5
+        bioCodeLbl.Text = ""
+        bioCodeLbl.TextSize = 13
+        bioCodeLbl.Font = Enum.Font.RobotoMono
+        bioCodeLbl.TextXAlignment = Enum.TextXAlignment.Center
+        bioCodeLbl.TextColor3 = Color3.fromRGB(87, 242, 135)
+        bioCodeLbl.Visible = false
+
+        -- Botón copiar código de bio
+        local copyCodeBtn = Instance.new("TextButton", centerFrame)
+        copyCodeBtn.Name = "CopyCodeBtn"
+        copyCodeBtn.Size = UDim2.new(1, -40, 0, 32)
+        copyCodeBtn.Position = UDim2.new(0, 20, 0, 230)
+        copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        copyCodeBtn.Text = "??  Copiar código"
+        copyCodeBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+        copyCodeBtn.Font = Enum.Font.GothamBold
+        copyCodeBtn.TextSize = 12
+        copyCodeBtn.BorderSizePixel = 0
+        Instance.new("UICorner", copyCodeBtn).CornerRadius = UDim.new(0, 8)
+        copyCodeBtn.Visible = false
+
+        local _bioCode = ""  -- código que el backend manda para poner en la bio
+
+        copyCodeBtn.Activated:Connect(function()
+            pcall(function() setclipboard(_bioCode) end)
+            copyCodeBtn.Text = "?  Copiado!"
+            copyCodeBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
+            task.wait(2)
+            if copyCodeBtn and copyCodeBtn.Parent then
+                copyCodeBtn.Text = "??  Copiar código"
+                copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+            end
         end)
 
-        -- Hover bot?n
-        copyBtn.MouseEnter:Connect(function()
-            copyBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 95)
-        end)
-        copyBtn.MouseLeave:Connect(function()
-            copyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-        end)
-
-        -- Polling autom?tico cada 3 seg: espera que el jugador haga login en la web
+        -- ============================================================
+        -- POLLING: Paso 1 ? espera login Discord (igual que antes)
+        --          Paso 2 ? cuando el backend devuelve bioCode, mostrar UI de bio
+        --                   y cambiar el polling a /api/verify-bio
+        -- ============================================================
         local _pollingActive = true
-        lockFrame.AncestryChanged:Connect(function()
+        local _step = 1  -- 1 = esperando Discord login, 2 = esperando bio
+        lockFrame.AncestryChanged:Connect(function() _pollingActive = false end)
+
+        local function _unlockPremium(username)
+            _G._discordPremiumVerified = true
+            _G._discordUsername = username or "Usuario"
+            _G._hubSessionId = nil
+            -- AUTO-GUARDADO: escribir sesion premium al disco para proximas ejecuciones
+            pcall(function()
+                if not writefile then return end
+                local _lp3   = game:GetService("Players").LocalPlayer
+                local _uid3  = tostring(_lp3 and _lp3.UserId or "0")
+                local _pPath = "zerqon_premium_" .. _uid3 .. ".txt"
+                local _dId   = tostring(_G._hubDiscordCode or _G._premiumSavedDiscordId or "")
+                local _uname = tostring(_G._discordUsername or username or "")
+                local _now   = tostring(os.time())
+                writefile(_pPath, _dId .. "|" .. _uid3 .. "|" .. _uname .. "|" .. _now)
+                warn("[ZerqonHUB] Sesion premium guardada en disco (valida 24h).")
+            end)
+            setStatus("? ¡Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
+            task.wait(0.8)
             _pollingActive = false
-        end)
+            if not lockFrame or not lockFrame.Parent then return end
+            local _PI = 4
+            local _pf = _G._tabCache and _G._tabCache[_PI]
+            if _pf then pcall(function() _pf:Destroy() end) end
+            if _G._tabCache        then _G._tabCache[_PI]        = nil end
+            if _G._tabBuilt        then _G._tabBuilt[_PI]        = nil end
+            if _G._tabScrollFrames then _G._tabScrollFrames[_PI] = nil end
+            pcall(function() SetActiveTab(_PI) end)
+        end
 
         task.spawn(function()
             while _pollingActive do
-                -- Usar request() del executor (compatible con Real, Synapse, Delta)
-                local robloxUser = game:GetService("Players").LocalPlayer.Name
-                local ok, response = pcall(function()
-                    return request({
-                        Url    = BACKEND_URL .. "/api/hub-auth?code=" .. sessionId .. "&roblox=" .. robloxUser,
-                        Method = "GET",
-                    })
-                end)
-
-                if not ok then
-                    setStatus("ERR: " .. tostring(response):sub(1, 60), Color3.fromRGB(237, 66, 69))
-                elseif response and response.Body then
-                    local dok, data = pcall(function()
-                        return HttpService:JSONDecode(response.Body)
+                if _step == 1 then
+                    -- -- PASO 1: polling /api/hub-auth --
+                    local ok, response = pcall(function()
+                        return request({
+                            Url    = BACKEND_URL .. "/api/hub-auth?code=" .. sessionId .. "&roblox_id=" .. robloxId,
+                            Method = "GET",
+                        })
                     end)
-                    if not dok then
-                        setStatus("JSON ERR: " .. tostring(data):sub(1, 50), Color3.fromRGB(237, 150, 0))
-                    elseif data then
-                        if data.status == "ok" and data.hasPremium then
-                            _G._discordPremiumVerified = true
-                            _G._discordUsername = data.username or "Usuario"
-                            _G._hubSessionId = nil
-                            setStatus("? ?Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
-                            task.wait(0.8)
-                            _pollingActive = false
-                            -- FIX: si el usuario cambio de pestana mientras esperaba,
-                            -- lockFrame.Parent es nil -> no hacer nada
-                            if not lockFrame or not lockFrame.Parent then return end
-                            -- Invalidar el cache del tab Premium (idx=4) y reconstruirlo
-                            -- via SetActiveTab para que el sistema de tabs lo maneje correctamente
-                            -- (sin llamar ClearContent que rompe el sistema de cache)
-                            local _PI = 4
-                            local _pf = _G._tabCache and _G._tabCache[_PI]
-                            if _pf then pcall(function() _pf:Destroy() end) end
-                            if _G._tabCache       then _G._tabCache[_PI]       = nil end
-                            if _G._tabBuilt       then _G._tabBuilt[_PI]       = nil end
-                            if _G._tabScrollFrames then _G._tabScrollFrames[_PI] = nil end
-                            pcall(function() SetActiveTab(_PI) end)
-                            return
-                        elseif data.status == "ok" and not data.hasPremium then
-                            _pollingActive = false
-                            setStatus("? No ten?s el rol PREMIUM en Discord", Color3.fromRGB(237, 66, 69))
-                            return
-                        elseif data.status == "linked_other" then
-                            _pollingActive = false
-                            setStatus("? " .. (data.error or "Cuenta ya vinculada a otro usuario"), Color3.fromRGB(237, 66, 69))
-                            return
-                        else
-                            setStatus("Esperando login... [" .. tostring(data.status) .. "]", Color3.fromRGB(107, 107, 138))
+
+                    if not ok then
+                        setStatus("ERR: " .. tostring(response):sub(1, 55), Color3.fromRGB(237, 66, 69))
+                    elseif response and response.Body then
+                        local dok, data = pcall(function() return HttpService:JSONDecode(response.Body) end)
+                        if not dok then
+                            setStatus("JSON ERR " .. tostring(data):sub(1,40), Color3.fromRGB(237, 150, 0))
+                        elseif data then
+                            if data.status == "ok" and data.hasPremium and data.verified then
+                                -- Ya está vinculado y tiene premium ? acceso directo
+                                _unlockPremium(data.username)
+                                return
+                            elseif data.status == "ok" and data.hasPremium and data.bioCode then
+                                -- Tiene premium en Discord PERO falta vincular Roblox ? pasar a paso 2
+                                _step = 2
+                                _bioCode = tostring(data.bioCode)
+                                _G._hubDiscordCode = data.discordId
+                                -- Expandir el frame para mostrar el paso 2 correctamente
+                                centerFrame.Size = UDim2.new(0, 290, 0, 280)
+                                centerFrame.Position = UDim2.new(0.5, -145, 0.5, -140)
+                                -- Mostrar UI de paso 2
+                                sep.Visible = true
+                                bioInstr.Visible = true
+                                bioCodeLbl.Text = _bioCode
+                                bioCodeLbl.Visible = true
+                                copyCodeBtn.Visible = true
+                                -- Atenuar el botón del paso 1 (ya completado)
+                                copyBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 45)
+                                copyBtn.TextColor3 = Color3.fromRGB(87, 180, 100)
+                                copyBtn.Text = "?  Discord verificado"
+                                copyBtn.Active = false
+                                setStatus("Discord ?  ·  Ponés el código en tu bio de Roblox", Color3.fromRGB(87, 242, 135))
+                            elseif data.status == "ok" and not data.hasPremium then
+                                _pollingActive = false
+                                setStatus("? No tenés el rol PREMIUM en el servidor de Discord", Color3.fromRGB(237, 66, 69))
+                                return
+                            elseif data.status == "linked_other" then
+                                _pollingActive = false
+                                setStatus("? " .. (data.error or "Cuenta ya vinculada a otro usuario"), Color3.fromRGB(237, 66, 69))
+                                return
+                            else
+                                setStatus("Esperando login Discord... [" .. tostring(data.status or "?") .. "]", Color3.fromRGB(107, 107, 138))
+                            end
                         end
+                    else
+                        setStatus("Sin respuesta del servidor", Color3.fromRGB(237, 150, 0))
                     end
-                else
-                    setStatus("Sin respuesta del servidor", Color3.fromRGB(237, 150, 0))
+
+                elseif _step == 2 then
+                    -- -- PASO 2: polling /api/verify-bio --
+                    -- El backend revisa si la bio de Roblox del jugador contiene el bioCode
+                    local ok2, res2 = pcall(function()
+                        return request({
+                            Url    = BACKEND_URL .. "/api/verify-bio?roblox_id=" .. robloxId .. "&discord_id=" .. tostring(_G._hubDiscordCode or "") .. "&bio_code=" .. tostring(_bioCode or ""),
+                            Method = "GET",
+                        })
+                    end)
+
+                    if ok2 and res2 and res2.Body then
+                        local dok2, data2 = pcall(function() return HttpService:JSONDecode(res2.Body) end)
+                        if dok2 and data2 then
+                            if data2.status == "ok" and data2.verified then
+                                -- ¡Bio verificada! Vínculo guardado en el backend ? acceso
+                                _unlockPremium(data2.username)
+                                return
+                            elseif data2.status == "error" then
+                                setStatus("? " .. (data2.error or "Error al verificar bio"), Color3.fromRGB(237, 66, 69))
+                                -- no paramos el polling: el usuario puede corregir la bio y reintentar
+                            else
+                                setStatus("?? Buscando el código en tu bio de Roblox...", Color3.fromRGB(107, 107, 138))
+                            end
+                        end
+                    else
+                        setStatus("Sin respuesta (bio check)...", Color3.fromRGB(237, 150, 0))
+                    end
                 end
 
                 if _pollingActive then task.wait(3) end
@@ -39606,7 +39876,7 @@ function CreatePremiumTab()
         return  -- No continuar construyendo el tab
     end
     -- ================================================================
-    -- == FIN DISCORD PREMIUM LOCK
+    -- == FIN DISCORD PREMIUM LOCK v2
     -- ================================================================
 
     _makeTwoColumns()
@@ -43996,12 +44266,70 @@ end
 --      el overlay se destruye automaticamente y el toggle queda libre.
 -- ================================================================
 local function CreatePremiumToggle(parent, nombre, callback, initialValue, fireOnInit)
-    -- PREMIUM DESBLOQUEADO: toggle normal sin badge ni overlay de bloqueo
     local container = CreateBorderedToggle(parent, nombre, callback, initialValue, fireOnInit)
+
+    -- Badge PREMIUM visible (fondo dorado, texto negro = maximo contraste)
+    pcall(function()
+        local inner = container
+        if not inner then return end
+        local badge = Instance.new("TextLabel")
+        badge.Name = "PremiumBadge"
+        badge.Size = UDim2.new(0, 82, 0, 16)
+        badge.BackgroundColor3 = Color3.fromRGB(212, 160, 0)
+        badge.BackgroundTransparency = 0
+        badge.BorderSizePixel = 0
+        badge.Text = "? PREMIUM"
+        badge.TextColor3 = Color3.fromRGB(20, 12, 0)
+        badge.TextSize = 10
+        badge.Font = Enum.Font.GothamBold
+        badge.TextXAlignment = Enum.TextXAlignment.Center
+        badge.TextYAlignment = Enum.TextYAlignment.Center
+        badge.ZIndex = 20
+        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+        local badgeStroke = Instance.new("UIStroke", badge)
+        badgeStroke.Color = Color3.fromRGB(255, 230, 80)
+        badgeStroke.Thickness = 1.5
+        badgeStroke.Transparency = 0
+        badge.Parent = inner
+        -- Al costado del texto, entre el label y el track del toggle
+        -- Track esta en UDim2(1, -(96+10), 0.5, 0) => badge va justo a su izquierda
+        badge.AnchorPoint = Vector2.new(1, 0.5)
+        badge.Position = UDim2.new(1, -(96 + 10 + 6), 0.5, 0)
+    end)
+
+    -- BLOQUEO REAL: overlay transparente que intercepta clicks si no hay premium
+    -- Se destruye automaticamente cuando el usuario verifica premium
+    pcall(function()
+        if _G._discordPremiumVerified then return end
+        local inner = container
+        if not inner then return end
+        local overlay = Instance.new("TextButton")
+        overlay.Name = "PremiumLockOverlay"
+        overlay.Size = UDim2.new(1, 0, 1, 0)
+        overlay.Position = UDim2.new(0, 0, 0, 0)
+        overlay.BackgroundTransparency = 1
+        overlay.Text = ""
+        overlay.ZIndex = 30
+        overlay.Parent = inner
+        overlay.Activated:Connect(function()
+            CreateCustomNotification("VIP PREMIUM", "Requiere Premium. Verificate en el tab VIP.", 3)
+        end)
+        -- Auto-destruir cuando se verifique premium
+        task.spawn(function()
+            while overlay and overlay.Parent do
+                task.wait(1)
+                if _G._discordPremiumVerified then
+                    pcall(function() overlay:Destroy() end)
+                    break
+                end
+            end
+        end)
+    end)
+
     return container
 end
 -- ================================================================
--- == FIN HELPER PREMIUM (desbloqueado para todos)
+-- == FIN HELPER PREMIUM
 -- ================================================================
 
 function CreateCombatTab()
@@ -52990,6 +53318,60 @@ function CreateCombatTab()
             end
         end
 
+        -- Helper: agrega badge PREMIUM a un AuroraToggleRow + overlay de bloqueo si no hay premium
+        local function _addPremiumBadgeToAurora(parent, rowName)
+            task.defer(function()
+                local row = parent:FindFirstChild("AuroraToggleRow_" .. rowName)
+                if not row then return end
+                if row:FindFirstChild("PremiumBadge") then return end
+                -- Badge: fondo dorado, texto negro = maximo contraste
+                -- Al costado del texto, entre label y track (track: 76px desde derecha con offset -6)
+                local badge = Instance.new("TextLabel", row)
+                badge.Name = "PremiumBadge"
+                badge.Size = UDim2.new(0, 82, 0, 15)
+                badge.AnchorPoint = Vector2.new(1, 0.5)
+                badge.Position = UDim2.new(1, -(76 + 6 + 6), 0.5, 0)
+                badge.BackgroundColor3 = Color3.fromRGB(212, 160, 0)
+                badge.BackgroundTransparency = 0
+                badge.BorderSizePixel = 0
+                badge.Text = "? PREMIUM"
+                badge.TextColor3 = Color3.fromRGB(20, 12, 0)
+                badge.TextSize = 9
+                badge.Font = Enum.Font.GothamBold
+                badge.TextXAlignment = Enum.TextXAlignment.Center
+                badge.TextYAlignment = Enum.TextYAlignment.Center
+                badge.ZIndex = 25
+                Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+                local st = Instance.new("UIStroke", badge)
+                st.Color = Color3.fromRGB(255, 230, 80)
+                st.Thickness = 1.5
+                st.Transparency = 0
+                -- BLOQUEO REAL: overlay que intercepta clicks si no hay premium
+                if not _G._discordPremiumVerified then
+                    local overlay = Instance.new("TextButton", row)
+                    overlay.Name = "PremiumLockOverlay"
+                    overlay.Size = UDim2.new(1, 0, 1, 0)
+                    overlay.Position = UDim2.new(0, 0, 0, 0)
+                    overlay.BackgroundTransparency = 1
+                    overlay.Text = ""
+                    overlay.ZIndex = 30
+                    overlay.Activated:Connect(function()
+                        CreateCustomNotification("VIP PREMIUM", "Requiere Premium. Verificate en el tab VIP.", 3)
+                    end)
+                    -- Auto-destruir al verificar premium
+                    task.spawn(function()
+                        while overlay and overlay.Parent do
+                            task.wait(1)
+                            if _G._discordPremiumVerified then
+                                pcall(function() overlay:Destroy() end)
+                                break
+                            end
+                        end
+                    end)
+                end
+            end)
+        end
+
         -- LMB hook
         local _pLmb = nil
         CreateAuroraToggle(pierceSec, "Pierce Bullet (Premium)", function(on)
@@ -53190,7 +53572,9 @@ function CreateCombatTab()
             -- [notif removed]
         end, false)
 
-
+        -- Badges PREMIUM en amarillo para los toggles Aurora de esta seccion
+        _addPremiumBadgeToAurora(pierceSec, "Pierce Bullet (Premium)")
+        _addPremiumBadgeToAurora(pierceSec, "Shoot Camuflado (Premium)")
 
     end
     -- -----------------------------------------------------------------
@@ -55775,6 +56159,15 @@ function CreateCombatTab()
                     and _autoRestoreOnReexec and _autoRestoreOnReexec[nombre]
                     and not (_neverRestoreToggles and _neverRestoreToggles[nombre])
                     and _G._toggleCallbacks[nombre] then
+                        -- BLOQUEO PREMIUM: si el toggle requiere Premium y no esta verificado,
+                        -- forzar a false y limpiar el archivo para que no se reactive.
+                        if nombre:find("%(Premium%)") and not _G._discordPremiumVerified then
+                            _G._toggleStates[nombre] = false
+                            if _G._toggleApplyStates and _G._toggleApplyStates[nombre] then
+                                pcall(_G._toggleApplyStates[nombre], false, false)
+                            end
+                            pcall(function() _saveToggleFile(nombre, false) end)
+                        else
                         -- FIX AUTO-SAFE: verificar el .txt antes de activar.
                         -- Si el usuario lo apago manualmente, el .txt dice "false":
                         -- no activar aunque _G._toggleStates diga true.
@@ -55790,6 +56183,7 @@ function CreateCombatTab()
                             pcall(_G._toggleCallbacks[nombre], true)
                             CreateCustomNotification = _origNotif
                         end
+                        end  -- fin bloqueo premium
                     end
                 end
             end)
@@ -59121,6 +59515,7 @@ particles = {}
         if contentContainer and not contentContainer.Visible then
             contentContainer.Visible = true
         end
+        _G._activeTabIdx = idx  -- trackear tab activo para que el recheck sepa donde estamos
         _saveToggleStates(activeTabIdx)
 
         -- FIX PREMIUM: si se abandona el tab Premium sin estar verificado,
