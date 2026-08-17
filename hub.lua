@@ -31173,18 +31173,24 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     -- FIX v21: _noAutoActivateWorld solo bloquea cuando se esta construyendo
     -- el World Tab (idx 2). Combat, Visuals y otros tabs NO se bloquean.
     local _worldBlockActive = _G._noAutoActivateWorld and (_G._currentBuildingTabIdx == 2)
+
+    -- FIX DOBLE ACTIVACION v2: verificar _activatedToggles ANTES de calcular
+    -- _shouldAutoActivate para cortar el path lo mas temprano posible.
+    -- Tab rebuild (_isTabRebuild=true) SIEMPRE bloquea la auto-activacion:
+    -- el callback ya esta corriendo y re-dispararlo duplica loops/efectos.
+    local _alreadyFired = _G._activatedToggles and _G._activatedToggles[nombre]
+
     local _shouldAutoActivate = estado and callback
         and not _isBoostNoAuto
         and not _worldBlockActive
         and not _isNeverRestore
-        and (not _wasUserSet or (savedState == true and not _isTabRebuild))
+        and not _alreadyFired
+        and not _isTabRebuild   -- nunca re-activar en tab rebuild (ya corre)
+        and (not _wasUserSet or (savedState == true))
     if _shouldAutoActivate then
-        -- FIX DOBLE ACTIVACION: si este toggle ya activo su callback, no repetir
-        if _G._activatedToggles and _G._activatedToggles[nombre] then
-            _shouldAutoActivate = nil  -- cancelar
-        else
-            if _G._activatedToggles then _G._activatedToggles[nombre] = true end
-        end
+        -- Marcar como disparado para que futuras reconstrucciones del toggle
+        -- (cambios de tab, reloads) no vuelvan a llamar el callback.
+        if _G._activatedToggles then _G._activatedToggles[nombre] = true end
     end
     -- BLOQUEO PREMIUM: si el toggle es Premium y no tiene verificacion, forzar OFF
     -- aunque el archivo .txt o JSON diga true (puede haber quedado guardado de antes)
@@ -31199,11 +31205,12 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     if _shouldAutoActivate then
         local lower = nombre:lower()
 
-        -- isPhysical: toggles que NO se deben auto-activar al CAMBIAR de pesta?a
-        -- (tab rebuild). Al re-ejecutar el hub desde cero (_isTabRebuild=false)
-        -- se activan TODOS porque nada est? corriendo.
-        -- Solo se bloquean en tab-rebuild para no duplicar loops ya activos.
-        local isPhysical = _isTabRebuild and (
+        -- FIX DOBLE ACTIVACION v2: _isTabRebuild ya esta bloqueado arriba,
+        -- por lo que aqui solo llegamos en re-ejecucion real (hub nuevo).
+        -- Todos los toggles fisicos esperan a que su tab este construido
+        -- antes de disparar el callback para evitar upvalues nil.
+        local lower = nombre:lower()
+        local isPhysical = (
             lower:find("swim fly") or lower:find("fly %+") or lower:find("fly+")
             or (lower:find("fly") and not lower:find("firefly"))
             or lower:find("noclip") or lower:find("no%-clip")
@@ -31260,67 +31267,48 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
             or lower:find("spoof") or lower:find("secure tp")
         )
 
-        -- AUTO-RESTORE: disparar callback para TODOS los toggles con savedState=true
-        -- al re-ejecutar el hub (not _isTabRebuild). En tab rebuild, los toggles fisicos
-        -- se bloquean (isPhysical=true) para no duplicar loops ya activos; los no fisicos
-        -- siempre se disparan porque son stateless (settings, visuals, etc.).
-        if isPhysical and not _isTabRebuild and savedState == true then
-            -- Toggle fisico en re-ejecucion real: esperar a que el tab que lo contiene
-            -- este construido Y el personaje este listo antes de disparar el callback.
-            -- FIX: sin este wait el callback se ejecuta mientras las upvalues del tab
-            -- (ej: _saSMState, findMurderer en CreateCombatTab) aun son nil ? falla silencioso.
+        if isPhysical then
+            -- Toggle fisico: esperar a que el tab que lo contiene este construido
+            -- y el personaje este listo antes de disparar el callback.
             task.spawn(function()
-                -- Primero esperar al personaje (0.3s minimo, igual que antes)
                 task.wait(0.3)
-                -- Luego esperar a que el tab al que pertenece este toggle este construido.
-                -- _G._tabBuilt es la tabla que marca tabs ya construidos (ver _buildTabCached).
-                -- Esperamos hasta 15s como tope para no colgar indefinidamente.
                 if _G._tabBuilt then
                     local _waitTick = 0
-                    -- Detectar a qu? tab pertenece este toggle por nombre
-                    local _lower = nombre:lower()
+                    local _lowerN = nombre:lower()
                     local _targetTabIdx = nil
-                    if _lower:find("silent aim") or _lower:find("aimlock") or _lower:find("shoot")
-                    or _lower:find("auto stab") or _lower:find("auto slash") or _lower:find("fast slash")
-                    or _lower:find("auto throw") or _lower:find("fast throw") or _lower:find("instant throw")
-                    or _lower:find("knife silent") or _lower:find("throwing knife") or _lower:find("bullet tracer")
-                    or _lower:find("prediction tracer") or _lower:find("velocity prediction")
-                    or _lower:find("strafe prediction") or _lower:find("tianca prediction")
-                    or _lower:find("pierce bullet") or _lower:find("shooper") or _lower:find("bindable silent")
-                    or _lower:find("shoot pick") or _lower:find("wall check") or _lower:find("auto ping")
-                    or _lower:find("lead time") or _lower:find("jump prediction") or _lower:find("lag compensation")
-                    or _lower:find("shoot studs") or _lower:find("shoot view") or _lower:find("trajectory")
-                    or _lower:find("dual knife") or _lower:find("dual gun") or _lower:find("auto shoot") then
-                        _targetTabIdx = 6  -- CreateCombatTab
-                    elseif _lower:find("fly") or _lower:find("noclip") or _lower:find("walkspeed")
-                    or _lower:find("speed glitch") or _lower:find("power jump") or _lower:find("infinite jump")
-                    or _lower:find("infinity jump") or _lower:find("auto jump") or _lower:find("wall hop")
-                    or _lower:find("spin") or _lower:find("click tp") or _lower:find("tp low map")
-                    or _lower:find("orbit") or _lower:find("invisible") or _lower:find("second life")
-                    or _lower:find("trap immune") or _lower:find("bug tramp") or _lower:find("skip death")
-                    or _lower:find("auto farm") or _lower:find("auto prestige") or _lower:find("auto grab")
-                    or _lower:find("auto equip") or _lower:find("coin aura") or _lower:find("auto remove")
-                    or _lower:find("auto esquivar") or _lower:find("auto spectate") or _lower:find("auto announce")
-                    or _lower:find("auto reset") or _lower:find("ping boost") or _lower:find("own ping")
-                    or _lower:find("secure auto") or _lower:find("booster") or _lower:find("bindable boton")
-                    or _lower:find("show bindable") then
-                        _targetTabIdx = 7  -- CreateUseTab
+                    if _lowerN:find("silent aim") or _lowerN:find("aimlock") or _lowerN:find("shoot")
+                    or _lowerN:find("auto stab") or _lowerN:find("auto slash") or _lowerN:find("fast slash")
+                    or _lowerN:find("auto throw") or _lowerN:find("fast throw") or _lowerN:find("instant throw")
+                    or _lowerN:find("knife silent") or _lowerN:find("throwing knife") or _lowerN:find("bullet tracer")
+                    or _lowerN:find("prediction tracer") or _lowerN:find("velocity prediction")
+                    or _lowerN:find("strafe prediction") or _lowerN:find("tianca prediction")
+                    or _lowerN:find("pierce bullet") or _lowerN:find("shooper") or _lowerN:find("bindable silent")
+                    or _lowerN:find("shoot pick") or _lowerN:find("wall check") or _lowerN:find("auto ping")
+                    or _lowerN:find("lead time") or _lowerN:find("jump prediction") or _lowerN:find("lag compensation")
+                    or _lowerN:find("shoot studs") or _lowerN:find("shoot view") or _lowerN:find("trajectory")
+                    or _lowerN:find("dual knife") or _lowerN:find("dual gun") or _lowerN:find("auto shoot") then
+                        _targetTabIdx = 6
+                    elseif _lowerN:find("fly") or _lowerN:find("noclip") or _lowerN:find("walkspeed")
+                    or _lowerN:find("speed glitch") or _lowerN:find("power jump") or _lowerN:find("infinite jump")
+                    or _lowerN:find("infinity jump") or _lowerN:find("auto jump") or _lowerN:find("wall hop")
+                    or _lowerN:find("spin") or _lowerN:find("click tp") or _lowerN:find("tp low map")
+                    or _lowerN:find("orbit") or _lowerN:find("invisible") or _lowerN:find("second life")
+                    or _lowerN:find("trap immune") or _lowerN:find("bug tramp") or _lowerN:find("skip death")
+                    or _lowerN:find("auto farm") or _lowerN:find("auto prestige") or _lowerN:find("auto grab")
+                    or _lowerN:find("auto equip") or _lowerN:find("coin aura") or _lowerN:find("auto remove")
+                    or _lowerN:find("auto esquivar") or _lowerN:find("auto spectate") or _lowerN:find("auto announce")
+                    or _lowerN:find("auto reset") or _lowerN:find("ping boost") or _lowerN:find("own ping")
+                    or _lowerN:find("secure auto") or _lowerN:find("booster") or _lowerN:find("bindable boton")
+                    or _lowerN:find("show bindable") then
+                        _targetTabIdx = 7
                     end
-                    -- Esperar a que el tab est? construido (max 15s)
                     if _targetTabIdx then
-                        -- FIX AUTO-SAFE: si el tab ya fue buildeado antes de que este
-                        -- closure lo chequee (ej: re-ejecucion rapida), salir inmediatamente.
-                        -- Si _G._tabBuilt cambio (nuevo hub), esperar con timeout de seguridad.
                         local _waitStart = tick()
                         while not (_G._tabBuilt and _G._tabBuilt[_targetTabIdx]) and _waitTick < 150 do
                             task.wait(0.1)
                             _waitTick = _waitTick + 1
-                            -- FIX: si hay callback registrado en _G._toggleCallbacks, el tab ya fue construido
-                            if _G._toggleCallbacks and _G._toggleCallbacks[nombre] then
-                                break
-                            end
+                            if _G._toggleCallbacks and _G._toggleCallbacks[nombre] then break end
                         end
-                        -- Peque?o delay extra para que las upvalues locales del tab queden listas
                         task.wait(0.05)
                     end
                 end
@@ -31328,23 +31316,18 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                 CreateCustomNotification = function() end
                 pcall(callback, true)
                 CreateCustomNotification = _orig
-                -- FIX VISUAL TOGGLE ON RESTORE: actualizar knob a ON despues de activar la feature
                 pcall(function() ApplyState(true, true) end)
             end)
-        elseif not isPhysical then
-            -- FIX LAG: escalonar auto-activaciones para no explotar N callbacks en el mismo frame.
-            -- Usamos un contador global que aumenta con cada toggle activo y lo multiplicamos
-            -- por un delay minimo, distribuyendo la carga a lo largo de varios frames.
+        else
+            -- Toggle no fisico (visual, setting): disparar escalonado para no saturar un frame.
             _G._autoActivateCount = (_G._autoActivateCount or 0) + 1
-            local _myDelay = (_G._autoActivateCount - 1) * 0.02  -- 20ms entre cada toggle
+            local _myDelay = (_G._autoActivateCount - 1) * 0.02
             task.delay(_myDelay, function()
                 local _orig = CreateCustomNotification
                 CreateCustomNotification = function() end
                 pcall(callback, true)
                 CreateCustomNotification = _orig
-                -- FIX VISUAL TOGGLE ON RESTORE: actualizar knob a ON despues de activar la feature
                 pcall(function() ApplyState(true, false) end)
-                -- FIX VISUALS AUTO-RESTORE: toggles visuales
                 local _ln = nombre:lower()
                 local _isVisualToggle = _ln:find("^esp ") or _ln:find("^cham ") or _ln:find("^box esp")
                     or _ln:find("^outline ") or _ln:find("^skeleton ") or _ln:find("^tracer ")
@@ -58400,33 +58383,92 @@ do
     local _bgAnimRunning = true
     _G._hubBgAnimStop = function() _bgAnimRunning = false end
 
-    -- -- MOVIMIENTO DE FONDO: pan lento + zoom suave (Ken Burns mejorado) --
-    -- La imagen se desplaza y hace zoom en un ciclo continuo de 6 keyframes,
-    -- combinando con la aurora para un efecto de profundidad cinematica.
+    -- ================================================================
+    -- ANIMACION DE FONDO v4 - PARALLAX CINEMATICO CONTINUO
+    -- Sistema de doble loop independiente:
+    --   Loop A (tween): ciclo de 8 keyframes con easing variado,
+    --                   zoom IN/OUT suave + pan en espiral lenta.
+    --   Loop B (frame): micro-deriva organica por seno/coseno doble
+    --                   que corre frame a frame encima del tween,
+    --                   dando una sensacion de "camara viva".
+    -- El resultado: imagen que nunca se queda estatica, con movimiento
+    -- cinematico fluido, zoom respira, deriva lateral y profundidad.
+    -- ================================================================
+
+    -- Estado compartido entre loops A y B
+    local _bgOx, _bgOy = 0, 0      -- offset actual (actualizado por loop A)
+    local _bgSx, _bgSy = 900, 480   -- size actual
+
+    -- LOOP A: Tween de keyframes (8 poses con transiciones suaves)
     task.spawn(function()
         local _kf = {
-            -- {offsetX, offsetY, sizeX, sizeY, duracion}
-            {ox =   0, oy =   0, sx = 900, sy = 480, t = 0 },   -- inicio: imagen completa
-            {ox =  40, oy =  10, sx = 820, sy = 437, t = 14},   -- zoom IN + pan derecha/abajo
-            {ox =  80, oy =  30, sx = 780, sy = 416, t = 10},   -- zoom maximo + drift abajo
-            {ox =  55, oy =  45, sx = 810, sy = 432, t = 11},   -- retroceso suave
-            {ox =  15, oy =  20, sx = 860, sy = 459, t = 13},   -- zoom out + regreso izquierda
-            {ox =   0, oy =   0, sx = 900, sy = 480, t = 10},   -- vuelta al inicio
+            -- {ox, oy, sx, sy, duracion, easing}
+            -- Pan en espiral hacia adentro (zoom-in cinematico lento)
+            {ox =   0, oy =   0, sx = 900, sy = 480, t =  0, e = Enum.EasingStyle.Sine},
+            {ox =  20, oy =   5, sx = 860, sy = 459, t = 10, e = Enum.EasingStyle.Cubic},
+            {ox =  50, oy =  15, sx = 820, sy = 437, t =  9, e = Enum.EasingStyle.Sine},
+            {ox =  80, oy =  30, sx = 790, sy = 422, t =  8, e = Enum.EasingStyle.Quad},
+            -- Pausa en punto maximo de zoom, drift diagonal
+            {ox = 100, oy =  50, sx = 780, sy = 416, t =  7, e = Enum.EasingStyle.Sine},
+            -- Zoom-out suave + regreso al centro en espiral contraria
+            {ox =  70, oy =  40, sx = 810, sy = 432, t =  9, e = Enum.EasingStyle.Cubic},
+            {ox =  35, oy =  20, sx = 850, sy = 454, t = 10, e = Enum.EasingStyle.Sine},
+            {ox =   5, oy =   5, sx = 890, sy = 476, t = 10, e = Enum.EasingStyle.Quart},
         }
         local _idx = 1
         while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
             local _nxt = (_idx % (#_kf - 1)) + 2
             if _idx == 1 then _nxt = 2 end
-            local _to  = _kf[_nxt]
-            local _eStyle = (_nxt % 2 == 0) and Enum.EasingStyle.Sine or Enum.EasingStyle.Quad
-            local _ti = TweenInfo.new(_to.t, _eStyle, Enum.EasingDirection.InOut)
+            local _to = _kf[_nxt]
+            _bgOx = _to.ox; _bgOy = _to.oy
+            _bgSx = _to.sx; _bgSy = _to.sy
+            local _ti = TweenInfo.new(_to.t, _to.e, Enum.EasingDirection.InOut)
             TweenService:Create(hubBgImage, _ti, {
                 ImageRectOffset = Vector2.new(_to.ox, _to.oy),
                 ImageRectSize   = Vector2.new(_to.sx, _to.sy),
             }):Play()
+            -- Pulso de transparencia sincronizado: fondo "respira" con el movimiento
+            local _halfT = _to.t * 0.45
+            TweenService:Create(hubBgImage,
+                TweenInfo.new(_halfT, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true),
+                {ImageTransparency = 0.50}
+            ):Play()
             task.wait(_to.t)
             _idx = _nxt
             if _nxt == #_kf then _idx = 1 end
+        end
+    end)
+
+    -- LOOP B: Micro-deriva frame-a-frame con doble seno (movimiento organico)
+    -- Corre a 20fps y modifica ImageRectOffset con un offset sinusoidal
+    -- encima de la posicion del tween, creando un efecto de "camara a mano".
+    task.spawn(function()
+        local _t = 0
+        local _SPEED_X = 0.28   -- Hz de la onda horizontal
+        local _SPEED_Y = 0.19   -- Hz de la onda vertical (primo de X -> nunca se sincronizan)
+        local _AMP_X   = 6      -- amplitud en pixeles
+        local _AMP_Y   = 4
+        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
+            task.wait(0.05)  -- ~20fps
+            _t = _t + 0.05
+            -- Doble seno con frecuencias irracionales para que el patron nunca se repita
+            local _driftX = math.sin(_t * _SPEED_X * math.pi * 2) * _AMP_X
+                          + math.sin(_t * _SPEED_X * 1.618 * math.pi * 2) * (_AMP_X * 0.4)
+            local _driftY = math.cos(_t * _SPEED_Y * math.pi * 2) * _AMP_Y
+                          + math.cos(_t * _SPEED_Y * 1.414 * math.pi * 2) * (_AMP_Y * 0.35)
+            -- Sumar la deriva al offset actual del keyframe (clampear para no salir del borde)
+            local _newOx = math.clamp(_bgOx + _driftX, 0, 120)
+            local _newOy = math.clamp(_bgOy + _driftY, 0, 60)
+            pcall(function()
+                hubBgImage.ImageRectOffset = Vector2.new(_newOx, _newOy)
+            end)
+            -- Pulso de color: ciclo lento HSV para que el fondo cambie de tono suavemente
+            -- (azul frio -> cian -> azul violeta -> repite en ~30s)
+            local _hue  = (_t * 0.018) % 1  -- 1 ciclo cada ~55s
+            local _sat  = 0.18
+            local _val  = 0.92
+            local _col  = Color3.fromHSV(_hue, _sat, _val)
+            pcall(function() hubBgImage.ImageColor3 = _col end)
         end
     end)
 
@@ -58714,9 +58756,12 @@ do
     local _guardAnchor = Vector2.new(0.5, 0.5)
     local _guardBusy   = false   -- re-entrancy lock
 
+    -- HUB MOVIBLE: allowDragMove permite que el drag actualice _guardPos
+    _G._hubAllowDragMove = true
+    _G._hubDragging = false
+
     mainFrame:GetPropertyChangedSignal("Size"):Connect(function()
         if _guardBusy then return end
-        -- Permitir cambios que vengan del propio hub (son iguales al valor guardado)
         if mainFrame.Size == _guardSize then return end
         _guardBusy = true
         mainFrame.Size = _guardSize
@@ -58725,6 +58770,11 @@ do
 
     mainFrame:GetPropertyChangedSignal("Position"):Connect(function()
         if _guardBusy then return end
+        -- HUB MOVIBLE: si el drag esta activo, actualizar _guardPos en vez de revertir
+        if _G._hubDragging then
+            _guardPos = mainFrame.Position
+            return
+        end
         if mainFrame.Position == _guardPos then return end
         _guardBusy = true
         mainFrame.Position = _guardPos
@@ -58739,8 +58789,6 @@ do
         _guardBusy = false
     end)
 
-    -- Exponer un updater para que el hub mismo pueda cambiar el tamano
-    -- (ej: slider de escala) sin que el guardian lo revierta.
     _G._setHubFrameSize = function(newSize)
         _guardSize = newSize
         _guardBusy = true
@@ -58754,6 +58802,92 @@ do
         _guardBusy = false
     end
 end
+
+-- ================================================================
+-- == HUB MOVIBLE v3: Drag al mantener click en cualquier parte del hub
+-- Sin boton visible. El hub se mueve al presionar y arrastrar sobre el.
+-- El guardián de posicion se actualiza durante el drag para no revertir.
+-- ================================================================
+do
+    local _hubDragConn2 = nil
+    local _hubDragStart2 = nil
+    local _hubPosStart2  = nil
+    local _hubMoving2    = false
+    local UIS2 = game:GetService("UserInputService")
+
+    -- Frame invisible que cubre todo el hub para capturar drag
+    -- ZIndex 0: queda debajo de todos los controles del hub
+    local _invisHandle = Instance.new("Frame", mainFrame)
+    _invisHandle.Name                   = "HubDragZone"
+    _invisHandle.Size                   = UDim2.new(1, 0, 1, 0)
+    _invisHandle.Position               = UDim2.new(0, 0, 0, 0)
+    _invisHandle.BackgroundTransparency = 1
+    _invisHandle.BorderSizePixel        = 0
+    _invisHandle.ZIndex                 = 1
+    _invisHandle.Active                 = true
+
+    -- Intentar UIDragDetector primero (executors modernos)
+    local _ddOk2 = pcall(function()
+        local dd2 = Instance.new("UIDragDetector", _invisHandle)
+        dd2.DragStyle     = Enum.UIDragDetectorDragStyle.TranslatePlane
+        dd2.ResponseStyle = Enum.UIDragDetectorResponseStyle.CustomWithFallback
+        dd2.DragContinue:Connect(function()
+            _G._hubDragging = true
+            local sc2  = mainFrame:FindFirstChildOfClass("UIScale")
+            local sw   = 900 * (sc2 and sc2.Scale or 1)
+            local sh   = 480 * (sc2 and sc2.Scale or 1)
+            local vp2  = workspace.CurrentCamera.ViewportSize
+            mainFrame.Position = UDim2.fromOffset(
+                math.clamp(mainFrame.Position.X.Offset, 0, math.max(0, vp2.X - sw)),
+                math.clamp(mainFrame.Position.Y.Offset, 0, math.max(0, vp2.Y - sh))
+            )
+        end)
+        dd2.DragEnd:Connect(function()
+            task.defer(function() _G._hubDragging = false end)
+        end)
+    end)
+
+    -- Fallback manual (mobile / executors sin UIDragDetector)
+    if not _ddOk2 then
+        _invisHandle.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _hubMoving2     = true
+                _G._hubDragging = true
+                _hubDragStart2  = inp.Position
+                _hubPosStart2   = mainFrame.Position
+                mainFrame.AnchorPoint = Vector2.new(0, 0)
+            end
+        end)
+        _invisHandle.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                _hubMoving2     = false
+                task.defer(function() _G._hubDragging = false end)
+            end
+        end)
+        _hubDragConn2 = UIS2.InputChanged:Connect(function(inp)
+            if not _hubMoving2 then return end
+            if inp.UserInputType ~= Enum.UserInputType.MouseMovement
+            and inp.UserInputType ~= Enum.UserInputType.Touch then return end
+            local delta = inp.Position - _hubDragStart2
+            local sc2  = mainFrame:FindFirstChildOfClass("UIScale")
+            local sw   = 900 * (sc2 and sc2.Scale or 1)
+            local sh   = 480 * (sc2 and sc2.Scale or 1)
+            local vp3  = workspace.CurrentCamera.ViewportSize
+            local nx   = math.clamp(_hubPosStart2.X.Offset + delta.X, 0, math.max(0, vp3.X - sw))
+            local ny   = math.clamp(_hubPosStart2.Y.Offset + delta.Y, 0, math.max(0, vp3.Y - sh))
+            if _G._setHubFramePos then
+                _G._setHubFramePos(UDim2.fromOffset(nx, ny))
+            else
+                mainFrame.Position = UDim2.fromOffset(nx, ny)
+            end
+        end)
+    end
+end
+-- ================================================================
+-- == FIN HUB MOVIBLE v3
+-- ================================================================
 -- ================================================================
 -- == FIN GUARDIAN DE FORMA DEL HUB
 -- ================================================================
@@ -60310,11 +60444,59 @@ particles = {}
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
     -- Dock colorido y transparente para ver el juego detras
-    tabDockFrame.BackgroundColor3 = Color3.fromRGB(5, 15, 50)
-    tabDockFrame.BackgroundTransparency = 0.55  -- semi-transparente
+    -- DISEÑO MOBILE: fondo más oscuro y vibrante en celular
+    local _isMobileFrame = false
+    pcall(function()
+        local _uis3 = game:GetService("UserInputService")
+        _isMobileFrame = _uis3.TouchEnabled and not _uis3.KeyboardEnabled
+    end)
+    tabDockFrame.BackgroundColor3 = _isMobileFrame
+        and Color3.fromRGB(2, 8, 30)   -- más oscuro en mobile
+        or  Color3.fromRGB(5, 15, 50)
+    tabDockFrame.BackgroundTransparency = _isMobileFrame and 0.30 or 0.55
     tabDockFrame.Position = UDim2.new(0.78, 0, 0, 36)
     tabDockFrame.Size = UDim2.new(0.22, 0, 1, -36)
     tabDockFrame.Visible  = true
+
+    -- Gradiente lateral neon para celular
+    if _isMobileFrame then
+        local _mobileGrad = Instance.new("UIGradient", tabDockFrame)
+        _mobileGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0, 40, 80)),
+            ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0, 20, 50)),
+            ColorSequenceKeypoint.new(1,    Color3.fromRGB(0, 10, 30)),
+        })
+        _mobileGrad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   0.15),
+            NumberSequenceKeypoint.new(0.5, 0.28),
+            NumberSequenceKeypoint.new(1,   0.20),
+        })
+        _mobileGrad.Rotation = 180
+
+        -- Borde izquierdo neon animado (solo mobile)
+        local _neonLine = Instance.new("Frame", tabDockFrame)
+        _neonLine.Size = UDim2.new(0, 2, 1, 0)
+        _neonLine.Position = UDim2.new(0, 0, 0, 0)
+        _neonLine.BackgroundColor3 = Color3.fromRGB(0, 220, 180)
+        _neonLine.BackgroundTransparency = 0
+        _neonLine.BorderSizePixel = 0
+        _neonLine.ZIndex = 14
+        local _nlGrad = Instance.new("UIGradient", _neonLine)
+        _nlGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,   Color3.fromRGB(0, 255, 200)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 180, 255)),
+            ColorSequenceKeypoint.new(1,   Color3.fromRGB(180, 60, 255)),
+        })
+        _nlGrad.Rotation = 90
+        task.spawn(function()
+            local _r2 = 0
+            while _neonLine and _neonLine.Parent do
+                task.wait(0.05)
+                _r2 = (_r2 + 3) % 360
+                pcall(function() _nlGrad.Rotation = 90 + math.sin(math.rad(_r2)) * 30 end)
+            end
+        end)
+    end
     -- Gradiente colorido en el panel de tabs
     local _dockBgGrad = Instance.new("UIGradient", tabDockFrame)
     _dockBgGrad.Color = ColorSequence.new({
@@ -60427,24 +60609,71 @@ particles = {}
     tabDockList.Position = UDim2.new(0, 0, 0, 0)
     tabDockList.BackgroundTransparency = 1
     tabDockList.ZIndex = 13
-    tabDockList.ScrollBarThickness = 0
-    tabDockList.ScrollingDirection = Enum.ScrollingDirection.Y
-    tabDockList.ScrollingEnabled = false
-    tabDockList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabDockList.AutomaticCanvasSize = Enum.AutomaticSize.None
-    tabDockList.ClipsDescendants = true
-    tabDockList.ElasticBehavior = Enum.ElasticBehavior.Never
-    tabDockList.ScrollBarImageTransparency = 1
+    -- SCROLL PESTANAS: activado para cuando hay muchas tabs
+    local _isMobileScroll = false
+    pcall(function()
+        local _uis2 = game:GetService("UserInputService")
+        _isMobileScroll = _uis2.TouchEnabled and not _uis2.KeyboardEnabled
+    end)
+    tabDockList.ScrollBarThickness    = _isMobileScroll and 5 or 3
+    tabDockList.ScrollingDirection    = Enum.ScrollingDirection.Y
+    tabDockList.ScrollingEnabled      = true
+    tabDockList.CanvasSize            = UDim2.new(0, 0, 0, 0)
+    tabDockList.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+    tabDockList.ClipsDescendants      = true
+    tabDockList.ElasticBehavior       = Enum.ElasticBehavior.WhenScrollable
+    tabDockList.ScrollBarImageColor3  = Color3.fromRGB(0, 220, 180)
+    tabDockList.ScrollBarImageTransparency = 0.25
+    tabDockList.TopImage  = ""
+    tabDockList.BottomImage = ""
+
+    -- Flechas de scroll en celular
+    if _isMobileScroll then
+        local _arrowUp = Instance.new("TextLabel", tabDockFrame)
+        _arrowUp.Name = "DockArrowUp"
+        _arrowUp.Size = UDim2.new(1, 0, 0, 18)
+        _arrowUp.Position = UDim2.new(0, 0, 0, 0)
+        _arrowUp.BackgroundColor3 = Color3.fromRGB(0, 180, 140)
+        _arrowUp.BackgroundTransparency = 0.6
+        _arrowUp.BorderSizePixel = 0
+        _arrowUp.Text = "?"
+        _arrowUp.TextColor3 = Color3.fromRGB(0, 255, 210)
+        _arrowUp.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+        _arrowUp.TextSize = 11
+        _arrowUp.ZIndex = 20
+        _arrowUp.Visible = false
+        local _arrowDn = Instance.new("TextLabel", tabDockFrame)
+        _arrowDn.Name = "DockArrowDn"
+        _arrowDn.Size = UDim2.new(1, 0, 0, 18)
+        _arrowDn.Position = UDim2.new(0, 0, 1, -18)
+        _arrowDn.BackgroundColor3 = Color3.fromRGB(0, 180, 140)
+        _arrowDn.BackgroundTransparency = 0.6
+        _arrowDn.BorderSizePixel = 0
+        _arrowDn.Text = "?"
+        _arrowDn.TextColor3 = Color3.fromRGB(0, 255, 210)
+        _arrowDn.FontFace = Font.fromEnum(Enum.Font.GothamBold)
+        _arrowDn.TextSize = 11
+        _arrowDn.ZIndex = 20
+        tabDockList:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+            local pos = tabDockList.CanvasPosition.Y
+            local maxS = math.max(0, tabDockList.AbsoluteCanvasSize.Y - tabDockList.AbsoluteSize.Y)
+            pcall(function()
+                _arrowUp.Visible = pos > 8
+                _arrowDn.Visible = maxS > 8 and pos < maxS - 8
+            end)
+        end)
+    end
+
     local dockLayout = Instance.new("UIListLayout", tabDockList)
     dockLayout.FillDirection = Enum.FillDirection.Vertical
     dockLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    dockLayout.Padding = UDim.new(0, 0)  -- sin separacion entre pestanas
+    dockLayout.Padding = UDim.new(0, 5)
     dockLayout.SortOrder = Enum.SortOrder.LayoutOrder
     local dockPad = Instance.new("UIPadding", tabDockList)
-    dockPad.PaddingTop    = UDim.new(0, 0)
-    dockPad.PaddingBottom = UDim.new(0, 0)
-    dockPad.PaddingLeft   = UDim.new(0, 0)
-    dockPad.PaddingRight  = UDim.new(0, 0)
+    dockPad.PaddingTop    = UDim.new(0, 5)
+    dockPad.PaddingBottom = UDim.new(0, 5)
+    dockPad.PaddingLeft   = UDim.new(0, 3)
+    dockPad.PaddingRight  = UDim.new(0, 3)
 
     -- Panel izquierdo: contentContainer (area de contenido de tabs)
     contentContainer.Position = UDim2.new(0, 0, 0, 36)
