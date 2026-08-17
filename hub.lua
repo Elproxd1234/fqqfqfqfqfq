@@ -64165,9 +64165,13 @@ do
     _bg.ZIndex = 2
 
     -- Panel principal -- colores del hub (Neon Green theme)
+    -- FIX MOBILE: panel responsivo - max 420px pero no mas ancho que la pantalla
     local _panel = Instance.new("Frame", _bg)
-    _panel.Size = UDim2.new(0, 420, 0, 220)
-    _panel.Position = UDim2.new(0.5, -210, 0.5, -110)
+    local _vpSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+    local _panelW = math.min(420, _vpSize.X - 24)
+    local _panelH = 220
+    _panel.Size = UDim2.new(0, _panelW, 0, _panelH)
+    _panel.Position = UDim2.new(0.5, -math.floor(_panelW/2), 0.5, -110)
     _panel.BackgroundColor3 = Color3.fromRGB(2, 6, 16)   -- Background del hub
     _panel.BackgroundTransparency = 0.05
     _panel.BorderSizePixel = 0
@@ -64349,7 +64353,7 @@ do
     task.spawn(function()
         task.wait(0.05)
         TweenService:Create(_panel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 420, 0, 220),
+            Size = UDim2.new(0, _panelW, 0, _panelH),
             BackgroundTransparency = 0.05
         }):Play()
         TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0.45}):Play()
@@ -64867,8 +64871,12 @@ do
             end
         end)
         -- Expandir panel para que quepa el error panel
+        -- FIX MOBILE: expansion responsiva
+        local _vpSz2 = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+        local _panelW2 = math.min(420, _vpSz2.X - 24)
+        local _panelH2 = math.min(315, _vpSz2.Y - 40)
         TweenService:Create(_panel, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 420, 0, 315)
+            Size = UDim2.new(0, _panelW2, 0, _panelH2)
         }):Play()
         task.wait(0.15)
         _errorPanel.Visible = true
@@ -64882,7 +64890,10 @@ do
         if not _errorShown then return end
         _errorShown = false
         _errorPanel.Visible = false
-        TweenService:Create(_panel, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 420, 0, 220)}):Play()
+        -- FIX MOBILE: collapse responsivo
+        local _vpSz3 = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+        local _panelW3 = math.min(420, _vpSz3.X - 24)
+        TweenService:Create(_panel, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, _panelW3, 0, 220)}):Play()
         -- Reiniciar fila 2 spinner
         pcall(function()
             if _G._ksRow2 then
