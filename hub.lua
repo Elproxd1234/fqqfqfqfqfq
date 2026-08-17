@@ -65050,6 +65050,11 @@ do
     -- Forward declaration: _openHub se define m?s abajo pero el spinner la necesita
     local _openHub
     local _pollingActive = false
+    -- FIX MOBILE v3: forward-declarar _startPolling para que el task.spawn de abajo
+    -- no crashee con "attempt to call a nil value" en ejecutores moviles (Delta, Arceus X).
+    -- En mobile, task.spawn puede reanudar la coroutine ANTES de que el resto del
+    -- script termine de ejecutarse, dejando _startPolling como nil al momento del call.
+    local _startPolling
 
     -- Iniciar spinners de las 3 filas inmediatamente
     task.spawn(function()
@@ -65575,7 +65580,9 @@ do
         end)
     end
 
-    local function _startPolling()
+    -- FIX MOBILE v3: asignar a la variable forward-declarada arriba (no re-declarar con "local")
+    -- para que el task.spawn que llama _startPolling() encuentre la funcion correcta.
+    _startPolling = function()
         if _pollingActive then return end
         if _ksExiting then return end
         _pollingActive = true
