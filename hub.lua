@@ -9398,7 +9398,9 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
             if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
                 _dragging = true; _moved = false
-                _dragStart = input.Position; _startPos = bg.Position
+                -- FIX MOVIL: guardar solo X/Y del inicio
+                _dragStart = Vector3.new(input.Position.X, input.Position.Y, 0)
+                _startPos = bg.Position
             end
         end)
         _dragConn = UserInputService.InputChanged:Connect(function(input)
@@ -9406,12 +9408,17 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
             if _G._sliderDragging then return end
             if input.UserInputType ~= Enum.UserInputType.MouseMovement
             and input.UserInputType ~= Enum.UserInputType.Touch then return end
-            local delta = input.Position - _dragStart
-            if delta.Magnitude > 4 then _moved = true end
+            -- FIX MOVIL: delta incremental para que no salte a esquina en touch
+            local curX = input.Position.X
+            local curY = input.Position.Y
+            local dX = curX - _dragStart.X
+            local dY = curY - _dragStart.Y
+            if math.abs(dX) > 4 or math.abs(dY) > 4 then _moved = true end
+            _dragStart = Vector3.new(curX, curY, 0)
             local vpNow = workspace.CurrentCamera.ViewportSize
             bg.Position = UDim2.fromOffset(
-                math.clamp(_startPos.X.Offset + delta.X, 0, vpNow.X - BTN_W),
-                math.clamp(_startPos.Y.Offset + delta.Y, 0, vpNow.Y - BTN_H)
+                math.clamp(bg.Position.X.Offset + dX, 0, vpNow.X - BTN_W),
+                math.clamp(bg.Position.Y.Offset + dY, 0, vpNow.Y - BTN_H)
             )
         end)
         fill.InputEnded:Connect(function(input)
@@ -9833,7 +9840,8 @@ function createBindableButton(name, color)
             or input.UserInputType == Enum.UserInputType.Touch then
                 _dragging  = true
                 _moved     = false
-                _dragStart = input.Position
+                -- FIX MOVIL: guardar solo X/Y
+                _dragStart = Vector3.new(input.Position.X, input.Position.Y, 0)
                 _startPos  = bg.Position
             end
         end)
@@ -9841,12 +9849,17 @@ function createBindableButton(name, color)
             if not _dragging then return end
             if input.UserInputType ~= Enum.UserInputType.MouseMovement
             and input.UserInputType ~= Enum.UserInputType.Touch then return end
-            local delta = input.Position - _dragStart
-            if delta.Magnitude > 4 then _moved = true end
+            -- FIX MOVIL: delta incremental (evita salto a esquina en touch)
+            local curX = input.Position.X
+            local curY = input.Position.Y
+            local dX = curX - _dragStart.X
+            local dY = curY - _dragStart.Y
+            if math.abs(dX) > 4 or math.abs(dY) > 4 then _moved = true end
+            _dragStart = Vector3.new(curX, curY, 0)
             local vpN = workspace.CurrentCamera.ViewportSize
             bg.Position = UDim2.fromOffset(
-                math.clamp(_startPos.X.Offset + delta.X, 0, vpN.X - BTN_W),
-                math.clamp(_startPos.Y.Offset + delta.Y, 0, vpN.Y - BTN_H))
+                math.clamp(bg.Position.X.Offset + dX, 0, vpN.X - BTN_W),
+                math.clamp(bg.Position.Y.Offset + dY, 0, vpN.Y - BTN_H))
         end)
         fill.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -10066,12 +10079,21 @@ function updateBindables()
                         if not _saDragging then return end
                         if input.UserInputType ~= Enum.UserInputType.MouseMovement
                         and input.UserInputType ~= Enum.UserInputType.Touch then return end
-                        local delta = input.Position - _saDragStart
-                        if delta.Magnitude > 4 then _saMoved = true end
+                        -- FIX MOVIL: usar delta incremental (frame a frame) en lugar de
+                        -- delta acumulado desde _saDragStart. En Touch, inp.Position
+                        -- incluye eje Z (profundidad) que rompe el cálculo acumulado.
+                        local curX = input.Position.X
+                        local curY = input.Position.Y
+                        local dX = curX - _saDragStart.X
+                        local dY = curY - _saDragStart.Y
+                        if math.abs(dX) > 4 or math.abs(dY) > 4 then _saMoved = true end
+                        _saDragStart = Vector3.new(curX, curY, 0)  -- actualizar para siguiente frame
                         local vpN = workspace.CurrentCamera.ViewportSize
+                        local curPosX = _saBg.Position.X.Offset
+                        local curPosY = _saBg.Position.Y.Offset
                         _saBg.Position = UDim2.fromOffset(
-                            math.clamp(_saStartPos.X.Offset + delta.X, 0, vpN.X - BTN_W),
-                            math.clamp(_saStartPos.Y.Offset + delta.Y, 0, vpN.Y - BTN_H))
+                            math.clamp(curPosX + dX, 0, vpN.X - BTN_W),
+                            math.clamp(curPosY + dY, 0, vpN.Y - BTN_H))
                     end)
                     shootButton.InputEnded:Connect(function(input)
                         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -31312,11 +31334,28 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                         task.wait(0.05)
                     end
                 end
+                -- FIX MULTI-FIRE INVISIBLE: guard para toggles que modifican transparencia
+                -- del personaje (invisible, xray). Si ya hay una ejecucion corriendo,
+                -- no disparar otra vez para evitar que el fondo/personaje quede opaco.
+                local _lowerFire = nombre:lower()
+                local _isInvisToggle = _lowerFire:find("invisible") or _lowerFire:find("xray")
+                local _fireKey = "_autoFiring_" .. nombre:gsub("[^%w]", "_")
+                if _isInvisToggle then
+                    if _G[_fireKey] then
+                        -- Ya hay una activacion en curso para este toggle: saltar
+                        return
+                    end
+                    _G[_fireKey] = true
+                end
                 local _orig = CreateCustomNotification
                 CreateCustomNotification = function() end
                 pcall(callback, true)
                 CreateCustomNotification = _orig
                 pcall(function() ApplyState(true, true) end)
+                -- Liberar guard despues de que el callback termino
+                if _isInvisToggle then
+                    task.defer(function() _G[_fireKey] = nil end)
+                end
             end)
         else
             -- Toggle no fisico (visual, setting): disparar escalonado para no saturar un frame.
@@ -45727,19 +45766,26 @@ function CreateCombatTab()
                     if inp.UserInputType == Enum.UserInputType.MouseButton1
                     or inp.UserInputType == Enum.UserInputType.Touch then
                         _dragging = true; _moved = false
-                        _dragStart = inp.Position; _startPos = btnRoot.Position
+                        -- FIX MOVIL: guardar solo X/Y
+                        _dragStart = Vector3.new(inp.Position.X, inp.Position.Y, 0)
+                        _startPos = btnRoot.Position
                     end
                 end)
                 UserInputService.InputChanged:Connect(function(inp)
                     if not _dragging then return end
                     if inp.UserInputType ~= Enum.UserInputType.MouseMovement
                     and inp.UserInputType ~= Enum.UserInputType.Touch then return end
-                    local d = inp.Position - _dragStart
-                    if d.Magnitude > 4 then _moved = true end
+                    -- FIX MOVIL: delta incremental para evitar salto a esquina en touch
+                    local curX = inp.Position.X
+                    local curY = inp.Position.Y
+                    local dX = curX - _dragStart.X
+                    local dY = curY - _dragStart.Y
+                    if math.abs(dX) > 4 or math.abs(dY) > 4 then _moved = true end
+                    _dragStart = Vector3.new(curX, curY, 0)
                     local vpN = workspace.CurrentCamera.ViewportSize
                     btnRoot.Position = UDim2.fromOffset(
-                        math.clamp(_startPos.X.Offset + d.X, 0, vpN.X - BTN_W),
-                        math.clamp(_startPos.Y.Offset + d.Y, 0, vpN.Y - BTN_H))
+                        math.clamp(btnRoot.Position.X.Offset + dX, 0, vpN.X - BTN_W),
+                        math.clamp(btnRoot.Position.Y.Offset + dY, 0, vpN.Y - BTN_H))
                 end)
                 clickBtn.InputEnded:Connect(function(inp)
                     if inp.UserInputType == Enum.UserInputType.MouseButton1
@@ -46049,20 +46095,27 @@ function CreateCombatTab()
                 bsaFill.InputBegan:Connect(function(inp)
                     if inp.UserInputType == Enum.UserInputType.MouseButton1
                     or inp.UserInputType == Enum.UserInputType.Touch then
-                        _bDragStart = inp.Position; _bRootStart = bsaRoot.Position; _bDragging = false; _bMoved = false
+                        -- FIX MOVIL: guardar solo X/Y
+                        _bDragStart = Vector3.new(inp.Position.X, inp.Position.Y, 0)
+                        _bRootStart = bsaRoot.Position; _bDragging = false; _bMoved = false
                     end
                 end)
                 RegisterTabConn(UserInputService.InputChanged:Connect(function(inp)
                     if not _bDragStart then return end
                     if inp.UserInputType ~= Enum.UserInputType.MouseMovement
                     and inp.UserInputType ~= Enum.UserInputType.Touch then return end
-                    local delta = inp.Position - _bDragStart
-                    if delta.Magnitude > 6 then _bDragging = true; _bMoved = true end
+                    -- FIX MOVIL: delta incremental para evitar salto a esquina en touch
+                    local curX = inp.Position.X
+                    local curY = inp.Position.Y
+                    local dX = curX - _bDragStart.X
+                    local dY = curY - _bDragStart.Y
+                    if math.abs(dX) > 6 or math.abs(dY) > 6 then _bDragging = true; _bMoved = true end
+                    _bDragStart = Vector3.new(curX, curY, 0)
                     if _bDragging then
                         local vp = workspace.CurrentCamera.ViewportSize
                         bsaRoot.Position = UDim2.fromOffset(
-                            math.clamp(_bRootStart.X.Offset + delta.X, 0, vp.X - BTN_W),
-                            math.clamp(_bRootStart.Y.Offset + delta.Y, 0, vp.Y - BTN_H))
+                            math.clamp(bsaRoot.Position.X.Offset + dX, 0, vp.X - BTN_W),
+                            math.clamp(bsaRoot.Position.Y.Offset + dY, 0, vp.Y - BTN_H))
                     end
                 end))
                 RegisterTabConn(UserInputService.InputEnded:Connect(function(inp)
@@ -58372,7 +58425,7 @@ do
     hubBgImage.Position        = UDim2.new(0, 0, 0, 0)
     hubBgImage.ZIndex          = 1
     hubBgImage.Image           = "rbxassetid://96937964432645"
-    hubBgImage.ImageTransparency = 0.40   -- semitransparente para que la aurora brille encima
+    hubBgImage.ImageTransparency = 0.30   -- discreta: los orbs pulsantes dan la profundidad visual
     hubBgImage.BackgroundTransparency = 1
     hubBgImage.ScaleType       = Enum.ScaleType.Stretch
     hubBgImage.ImageRectSize   = Vector2.new(900, 480)
@@ -58384,36 +58437,30 @@ do
     _G._hubBgAnimStop = function() _bgAnimRunning = false end
 
     -- ================================================================
-    -- ANIMACION DE FONDO v4 - PARALLAX CINEMATICO CONTINUO
-    -- Sistema de doble loop independiente:
-    --   Loop A (tween): ciclo de 8 keyframes con easing variado,
-    --                   zoom IN/OUT suave + pan en espiral lenta.
-    --   Loop B (frame): micro-deriva organica por seno/coseno doble
-    --                   que corre frame a frame encima del tween,
-    --                   dando una sensacion de "camara viva".
-    -- El resultado: imagen que nunca se queda estatica, con movimiento
-    -- cinematico fluido, zoom respira, deriva lateral y profundidad.
+    -- ANIMACION DE FONDO v5 - NEBULA CINEMATICA CON ORBS PULSANTES
+    -- Capas de animacion:
+    --   Loop A: parallax suave con zoom cinematico (keyframes)
+    --   Loop B: micro-deriva organica frame-a-frame
+    --   Loop C: orbs de luz pulsantes que flotan (glassmorphism)
+    --   Loop D: aurora de 4 franjas con ciclo de color vivo
+    --   Loop E: particulas triple con fade-in/out suave
     -- ================================================================
 
     -- Estado compartido entre loops A y B
-    local _bgOx, _bgOy = 0, 0      -- offset actual (actualizado por loop A)
-    local _bgSx, _bgSy = 900, 480   -- size actual
+    local _bgOx, _bgOy = 0, 0
+    local _bgSx, _bgSy = 900, 480
 
-    -- LOOP A: Tween de keyframes (8 poses con transiciones suaves)
+    -- LOOP A: Tween de keyframes (parallax cinematico)
     task.spawn(function()
         local _kf = {
-            -- {ox, oy, sx, sy, duracion, easing}
-            -- Pan en espiral hacia adentro (zoom-in cinematico lento)
             {ox =   0, oy =   0, sx = 900, sy = 480, t =  0, e = Enum.EasingStyle.Sine},
-            {ox =  20, oy =   5, sx = 860, sy = 459, t = 10, e = Enum.EasingStyle.Cubic},
-            {ox =  50, oy =  15, sx = 820, sy = 437, t =  9, e = Enum.EasingStyle.Sine},
-            {ox =  80, oy =  30, sx = 790, sy = 422, t =  8, e = Enum.EasingStyle.Quad},
-            -- Pausa en punto maximo de zoom, drift diagonal
-            {ox = 100, oy =  50, sx = 780, sy = 416, t =  7, e = Enum.EasingStyle.Sine},
-            -- Zoom-out suave + regreso al centro en espiral contraria
-            {ox =  70, oy =  40, sx = 810, sy = 432, t =  9, e = Enum.EasingStyle.Cubic},
-            {ox =  35, oy =  20, sx = 850, sy = 454, t = 10, e = Enum.EasingStyle.Sine},
-            {ox =   5, oy =   5, sx = 890, sy = 476, t = 10, e = Enum.EasingStyle.Quart},
+            {ox =  15, oy =   8, sx = 855, sy = 456, t = 12, e = Enum.EasingStyle.Cubic},
+            {ox =  45, oy =  20, sx = 815, sy = 435, t = 10, e = Enum.EasingStyle.Sine},
+            {ox =  85, oy =  35, sx = 788, sy = 420, t =  9, e = Enum.EasingStyle.Quad},
+            {ox = 105, oy =  55, sx = 778, sy = 415, t =  8, e = Enum.EasingStyle.Sine},
+            {ox =  72, oy =  42, sx = 808, sy = 430, t = 10, e = Enum.EasingStyle.Cubic},
+            {ox =  32, oy =  18, sx = 848, sy = 452, t = 11, e = Enum.EasingStyle.Sine},
+            {ox =   4, oy =   4, sx = 888, sy = 475, t = 12, e = Enum.EasingStyle.Quart},
         }
         local _idx = 1
         while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
@@ -58427,67 +58474,115 @@ do
                 ImageRectOffset = Vector2.new(_to.ox, _to.oy),
                 ImageRectSize   = Vector2.new(_to.sx, _to.sy),
             }):Play()
-            -- Pulso de transparencia sincronizado: fondo "respira" con el movimiento
-            local _halfT = _to.t * 0.45
-            TweenService:Create(hubBgImage,
-                TweenInfo.new(_halfT, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true),
-                {ImageTransparency = 0.50}
-            ):Play()
+            -- El fondo respira con el movimiento (transparencia fija, sin pulso)
             task.wait(_to.t)
             _idx = _nxt
             if _nxt == #_kf then _idx = 1 end
         end
     end)
 
-    -- LOOP B: Micro-deriva frame-a-frame con doble seno (movimiento organico)
-    -- Corre a 20fps y modifica ImageRectOffset con un offset sinusoidal
-    -- encima de la posicion del tween, creando un efecto de "camara a mano".
+    -- LOOP B: Micro-deriva organica con doble seno
     task.spawn(function()
         local _t = 0
-        local _SPEED_X = 0.28   -- Hz de la onda horizontal
-        local _SPEED_Y = 0.19   -- Hz de la onda vertical (primo de X -> nunca se sincronizan)
-        local _AMP_X   = 6      -- amplitud en pixeles
-        local _AMP_Y   = 4
+        local _SPEED_X = 0.22
+        local _SPEED_Y = 0.17
+        local _AMP_X   = 5
+        local _AMP_Y   = 3.5
         while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
-            task.wait(0.05)  -- ~20fps
+            task.wait(0.05)
             _t = _t + 0.05
-            -- Doble seno con frecuencias irracionales para que el patron nunca se repita
             local _driftX = math.sin(_t * _SPEED_X * math.pi * 2) * _AMP_X
-                          + math.sin(_t * _SPEED_X * 1.618 * math.pi * 2) * (_AMP_X * 0.4)
+                          + math.sin(_t * _SPEED_X * 1.618 * math.pi * 2) * (_AMP_X * 0.35)
             local _driftY = math.cos(_t * _SPEED_Y * math.pi * 2) * _AMP_Y
-                          + math.cos(_t * _SPEED_Y * 1.414 * math.pi * 2) * (_AMP_Y * 0.35)
-            -- Sumar la deriva al offset actual del keyframe (clampear para no salir del borde)
+                          + math.cos(_t * _SPEED_Y * 1.414 * math.pi * 2) * (_AMP_Y * 0.30)
             local _newOx = math.clamp(_bgOx + _driftX, 0, 120)
             local _newOy = math.clamp(_bgOy + _driftY, 0, 60)
             pcall(function()
                 hubBgImage.ImageRectOffset = Vector2.new(_newOx, _newOy)
+                -- Tinte HSV muy sutil (no cambia el color principal, solo tono calido/frio)
+                local _hue = (_t * 0.012) % 1
+                hubBgImage.ImageColor3 = Color3.fromHSV(_hue, 0.12, 0.96)
             end)
-            -- Pulso de color: ciclo lento HSV para que el fondo cambie de tono suavemente
-            -- (azul frio -> cian -> azul violeta -> repite en ~30s)
-            local _hue  = (_t * 0.018) % 1  -- 1 ciclo cada ~55s
-            local _sat  = 0.18
-            local _val  = 0.92
-            local _col  = Color3.fromHSV(_hue, _sat, _val)
-            pcall(function() hubBgImage.ImageColor3 = _col end)
         end
     end)
 
-    -- -- CAPA 2: AURORA ? 3 franjas de luz que se mueven y cambian de color --
-    -- Paleta de colores del ciclo aurora (HSV-friendly, 6 estados)
+    -- ================================================================
+    -- LOOP C: ORBS DE LUZ PULSANTES (glassmorphism flotante)
+    -- 5 esferas de luz difusa que flotan, escalan y cambian de color
+    -- dando el efecto "nebula/space" que no se nota el fondo solido
+    -- ================================================================
+    local _orbDefs = {
+        -- {xPos, yPos, size, colorHue, speed, phaseOffset}
+        {x=0.08, y=0.15, sz=200, hue=0.68, spd=0.07,  ph=0.0 },  -- violeta esquina TL
+        {x=0.75, y=0.05, sz=170, hue=0.58, spd=0.055, ph=1.2 },  -- azul esquina TR
+        {x=0.50, y=0.55, sz=230, hue=0.72, spd=0.045, ph=2.5 },  -- purpura centro
+        {x=0.20, y=0.75, sz=150, hue=0.62, spd=0.065, ph=0.8 },  -- cian BL
+        {x=0.85, y=0.65, sz=180, hue=0.80, spd=0.05,  ph=3.1 },  -- magenta BR
+    }
+    local _orbFrames = {}
+    for _, od in ipairs(_orbDefs) do
+        local orbF = Instance.new("Frame", mainFrame)
+        orbF.AnchorPoint  = Vector2.new(0.5, 0.5)
+        orbF.Position     = UDim2.new(od.x, 0, od.y, 0)
+        orbF.Size         = UDim2.new(0, od.sz, 0, od.sz)
+        orbF.BorderSizePixel = 0
+        orbF.ZIndex       = 2
+        orbF.BackgroundColor3 = Color3.fromHSV(od.hue, 0.9, 0.8)
+        orbF.BackgroundTransparency = 0.72
+        Instance.new("UICorner", orbF).CornerRadius = UDim.new(1, 0)
+        -- Gradiente radial simulado: UIGradient de 0% a 100% transparente
+        local og = Instance.new("UIGradient", orbF)
+        og.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   0.30),
+            NumberSequenceKeypoint.new(0.55, 0.68),
+            NumberSequenceKeypoint.new(1,   1.0),
+        })
+        table.insert(_orbFrames, {frame=orbF, grad=og, def=od, t=od.ph})
+    end
+
+    task.spawn(function()
+        local _ot = 0
+        while _bgAnimRunning do
+            task.wait(0.05)
+            _ot = _ot + 0.05
+            for _, orb in ipairs(_orbFrames) do
+                orb.t = orb.t + 0.05
+                local od = orb.def
+                -- Flotacion: posicion oscila suavemente
+                local floatX = od.x + math.sin(orb.t * od.spd * math.pi * 2) * 0.06
+                local floatY = od.y + math.cos(orb.t * od.spd * 0.7 * math.pi * 2) * 0.055
+                -- Pulso de escala: el orb "respira" (90%-115%)
+                local pulse = 1.0 + math.sin(orb.t * od.spd * 1.3 * math.pi * 2) * 0.13
+                local newSz = math.floor(od.sz * pulse)
+                -- Ciclo de color HSV lento
+                local newHue = (od.hue + orb.t * 0.004) % 1
+                -- Transparencia pulsante (mas visible en pico, casi invisible en valle)
+                local transPulse = 0.72 - math.sin(orb.t * od.spd * 2 * math.pi * 2) * 0.18
+                pcall(function()
+                    orb.frame.Position = UDim2.new(floatX, 0, floatY, 0)
+                    orb.frame.Size = UDim2.new(0, newSz, 0, newSz)
+                    orb.frame.BackgroundColor3 = Color3.fromHSV(newHue, 0.88, 0.82)
+                    orb.frame.BackgroundTransparency = math.clamp(transPulse, 0.55, 0.90)
+                end)
+            end
+        end
+    end)
+
+    -- -- CAPA 2: AURORA - 4 franjas de luz mas vivas y amplias --
     local _auroraPalette = {
-        { Color3.fromRGB(30,  0,  90), Color3.fromRGB( 80,  0, 180), Color3.fromRGB(  0, 60, 200) },  -- violeta profundo
-        { Color3.fromRGB( 0, 20, 120), Color3.fromRGB(  0, 80, 220), Color3.fromRGB( 20,  0, 160) },  -- azul electrico
-        { Color3.fromRGB( 0, 80, 160), Color3.fromRGB(  0,180, 220), Color3.fromRGB( 20, 60, 200) },  -- cian aurora
-        { Color3.fromRGB(60,  0, 160), Color3.fromRGB(140,  0, 255), Color3.fromRGB( 80,  0, 200) },  -- purpura neon
-        { Color3.fromRGB(20,  0,  80), Color3.fromRGB( 60, 20, 180), Color3.fromRGB(  0, 40, 160) },  -- indigo oscuro
-        { Color3.fromRGB( 0, 40, 140), Color3.fromRGB( 20,140, 255), Color3.fromRGB( 60,  0, 200) },  -- azul + violeta
+        { Color3.fromRGB(40,  0, 110), Color3.fromRGB(100,  0, 200), Color3.fromRGB(  0, 80, 230), Color3.fromRGB(20, 0, 140) },
+        { Color3.fromRGB( 0, 30, 140), Color3.fromRGB(  0,100, 240), Color3.fromRGB( 30,  0, 180), Color3.fromRGB( 0, 60, 200) },
+        { Color3.fromRGB( 0,100, 190), Color3.fromRGB(  0,200, 240), Color3.fromRGB( 30, 80, 220), Color3.fromRGB( 0,140, 210) },
+        { Color3.fromRGB(80,  0, 190), Color3.fromRGB(160,  0, 255), Color3.fromRGB(100,  0, 220), Color3.fromRGB(50,  0, 170) },
+        { Color3.fromRGB(10,  0, 100), Color3.fromRGB( 80, 30, 200), Color3.fromRGB(  0, 50, 180), Color3.fromRGB(30, 10, 150) },
+        { Color3.fromRGB( 0, 60, 170), Color3.fromRGB( 30,160, 255), Color3.fromRGB( 70,  0, 220), Color3.fromRGB( 0, 80, 190) },
     }
     local _auroraPaletteIdx = 1
 
     local function _makeAuroraStrip(yScale, heightScale, zidx, initRot)
         local f = Instance.new("Frame", mainFrame)
-        f.Size = UDim2.new(1.3, 0, heightScale, 0)
-        f.Position = UDim2.new(-0.15, 0, yScale, 0)
+        f.Size = UDim2.new(1.4, 0, heightScale, 0)
+        f.Position = UDim2.new(-0.20, 0, yScale, 0)
         f.BackgroundTransparency = 1
         f.BorderSizePixel = 0
         f.ZIndex = zidx
@@ -58498,119 +58593,121 @@ do
         return f, g
     end
 
-    local _auroraA, _gradA = _makeAuroraStrip(0.05, 0.55, 2,  12)
-    local _auroraB, _gradB = _makeAuroraStrip(0.30, 0.50, 2, -8)
-    local _auroraC, _gradC = _makeAuroraStrip(0.55, 0.45, 2,  18)
+    local _auroraA, _gradA = _makeAuroraStrip(0.02, 0.60, 2,  10)
+    local _auroraB, _gradB = _makeAuroraStrip(0.28, 0.55, 2, -10)
+    local _auroraC, _gradC = _makeAuroraStrip(0.52, 0.50, 2,  16)
+    local _auroraD, _gradD = _makeAuroraStrip(0.72, 0.40, 2,  -5)
 
     local function _applyAuroraPalette(pal)
-        local c0, c1, c2 = pal[1], pal[2], pal[3]
+        local c0, c1, c2, c3 = pal[1], pal[2], pal[3], pal[4]
         local function makeGrad(cA, cB)
             return ColorSequence.new({
                 ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,0,0)),
-                ColorSequenceKeypoint.new(0.20, cA),
+                ColorSequenceKeypoint.new(0.18, cA),
                 ColorSequenceKeypoint.new(0.50, cB),
-                ColorSequenceKeypoint.new(0.80, cA),
+                ColorSequenceKeypoint.new(0.82, cA),
                 ColorSequenceKeypoint.new(1,    Color3.fromRGB(0,0,0)),
             })
         end
         local makeTr = NumberSequence.new({
             NumberSequenceKeypoint.new(0,    1),
-            NumberSequenceKeypoint.new(0.20, 0.55),
-            NumberSequenceKeypoint.new(0.50, 0.35),
-            NumberSequenceKeypoint.new(0.80, 0.55),
+            NumberSequenceKeypoint.new(0.18, 0.50),
+            NumberSequenceKeypoint.new(0.50, 0.28),
+            NumberSequenceKeypoint.new(0.82, 0.50),
             NumberSequenceKeypoint.new(1,    1),
         })
         _gradA.Color = makeGrad(c0, c1); _gradA.Transparency = makeTr
         _gradB.Color = makeGrad(c1, c2); _gradB.Transparency = makeTr
-        _gradC.Color = makeGrad(c2, c0); _gradC.Transparency = makeTr
+        _gradC.Color = makeGrad(c2, c3); _gradC.Transparency = makeTr
+        _gradD.Color = makeGrad(c3, c0); _gradD.Transparency = makeTr
     end
     _applyAuroraPalette(_auroraPalette[1])
 
-    -- Loop de movimiento aurora: cada franja se mueve independientemente
     task.spawn(function()
-        local _tA, _tB, _tC = 0, 0.8, 1.6   -- offsets de fase para asincronismo
-        local _rotA, _rotB, _rotC = 12, -8, 18
+        local _tA, _tB, _tC, _tD = 0, 0.6, 1.3, 2.1
+        local _rotA, _rotB, _rotC, _rotD = 10, -10, 16, -5
         local _palTimer = 0
-        local _PAL_DUR  = 12  -- segundos por color
+        local _PAL_DUR  = 10
         while _bgAnimRunning and _auroraA and _auroraA.Parent do
             local dt = 0.05
             task.wait(dt)
-            _tA = _tA + dt; _tB = _tB + dt; _tC = _tC + dt
+            _tA = _tA+dt; _tB = _tB+dt; _tC = _tC+dt; _tD = _tD+dt
 
-            -- Movimiento vertical sinusoidal suave e independiente por franja
-            local yA = 0.05 + math.sin(_tA * 0.18) * 0.08
-            local yB = 0.30 + math.sin(_tB * 0.13) * 0.10
-            local yC = 0.55 + math.sin(_tC * 0.16) * 0.07
+            local yA = 0.02 + math.sin(_tA * 0.16) * 0.10
+            local yB = 0.28 + math.sin(_tB * 0.11) * 0.12
+            local yC = 0.52 + math.sin(_tC * 0.14) * 0.09
+            local yD = 0.72 + math.sin(_tD * 0.18) * 0.07
 
-            -- Rotacion del gradiente oscilando lentamente
-            _rotA = 12  + math.sin(_tA * 0.10) * 20
-            _rotB = -8  + math.sin(_tB * 0.12) * 18
-            _rotC = 18  + math.sin(_tC * 0.09) * 22
+            _rotA = 10  + math.sin(_tA * 0.08) * 24
+            _rotB = -10 + math.sin(_tB * 0.10) * 20
+            _rotC = 16  + math.sin(_tC * 0.07) * 26
+            _rotD = -5  + math.sin(_tD * 0.12) * 18
 
             pcall(function()
-                _auroraA.Position = UDim2.new(-0.15, 0, yA, 0)
-                _auroraB.Position = UDim2.new(-0.15, 0, yB, 0)
-                _auroraC.Position = UDim2.new(-0.15, 0, yC, 0)
+                _auroraA.Position = UDim2.new(-0.20, 0, yA, 0)
+                _auroraB.Position = UDim2.new(-0.20, 0, yB, 0)
+                _auroraC.Position = UDim2.new(-0.20, 0, yC, 0)
+                _auroraD.Position = UDim2.new(-0.20, 0, yD, 0)
                 _gradA.Rotation = _rotA
                 _gradB.Rotation = _rotB
                 _gradC.Rotation = _rotC
+                _gradD.Rotation = _rotD
             end)
 
-            -- Ciclo de color: cada _PAL_DUR segundos cambia la paleta con tween
             _palTimer = _palTimer + dt
             if _palTimer >= _PAL_DUR then
                 _palTimer = 0
                 _auroraPaletteIdx = (_auroraPaletteIdx % #_auroraPalette) + 1
-                local _newPal = _auroraPalette[_auroraPaletteIdx]
-                -- Aplicar nueva paleta suavemente via tween en los frames
-                local _ti = TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-                pcall(function() _applyAuroraPalette(_newPal) end)
+                pcall(function() _applyAuroraPalette(_auroraPalette[_auroraPaletteIdx]) end)
             end
         end
     end)
 
-    -- -- CAPA 3: PARTICULAS ? puntos de luz que suben y se desvanecen --
-    local _PARTICLE_COUNT = 22
+    -- -- CAPA 3: PARTICULAS mejoradas (30 puntos, 3 tamanos, mas visibles) --
+    local _PARTICLE_COUNT = 30
     local _particles = {}
 
     local function _makeParticle()
         local p = Instance.new("Frame", mainFrame)
-        local sz = math.random(2, 5)
+        -- 3 tamanios: pequeno, medio, grande (estrella)
+        local tier = math.random(1, 3)
+        local sz = tier == 1 and math.random(1, 3) or tier == 2 and math.random(3, 6) or math.random(6, 10)
         p.Size = UDim2.new(0, sz, 0, sz)
         p.BackgroundTransparency = 1
         p.BorderSizePixel = 0
         p.ZIndex = 3
         Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
-        -- Color aleatorio entre azul, cian y violeta
         local palIdx = math.random(1, #_auroraPalette)
-        local cIdx   = math.random(1, 3)
+        local cIdx   = math.random(1, 4)
         p.BackgroundColor3 = _auroraPalette[palIdx][cIdx]
-        return p
+        return p, tier
     end
 
     local function _resetParticle(entry)
         local p = entry.frame
-        local startX = math.random(2, 96) / 100
-        local startY = math.random(70, 100) / 100
+        local startX = math.random(1, 99) / 100
+        local startY = math.random(72, 100) / 100
         p.Position = UDim2.new(startX, 0, startY, 0)
         p.BackgroundTransparency = 1
         local palIdx = math.random(1, #_auroraPalette)
-        local cIdx   = math.random(1, 3)
+        local cIdx   = math.random(1, 4)
         pcall(function() p.BackgroundColor3 = _auroraPalette[palIdx][cIdx] end)
-        entry.x      = startX
-        entry.y      = startY
-        entry.speed  = math.random(4, 12) / 100   -- studs por ciclo
-        entry.drift  = (math.random(-15, 15)) / 1000  -- deriva horizontal
-        entry.life   = 0
-        entry.maxLife = math.random(40, 100)  -- ciclos de vida
-        entry.phase  = math.random(0, 62) / 10  -- offset sinusoidal
+        entry.x       = startX
+        entry.y       = startY
+        -- Particulas grandes suben mas lento pero brillan mas
+        entry.speed   = entry.tier == 3 and math.random(2, 5)/100 or math.random(4, 14)/100
+        entry.drift   = (math.random(-20, 20)) / 1000
+        entry.life    = 0
+        entry.maxLife = entry.tier == 3 and math.random(60, 130) or math.random(35, 90)
+        entry.phase   = math.random(0, 62) / 10
+        -- Particulas grandes brillan mas (menor transparencia en pico)
+        entry.maxAlpha = entry.tier == 3 and 0.95 or entry.tier == 2 and 0.85 or 0.70
     end
 
     for i = 1, _PARTICLE_COUNT do
-        local p = _makeParticle()
-        local entry = { frame = p, x=0, y=0, speed=0, drift=0, life=0, maxLife=60, phase=0 }
+        local p, tier = _makeParticle()
+        local entry = { frame=p, tier=tier, x=0, y=0, speed=0, drift=0, life=0, maxLife=60, phase=0, maxAlpha=0.80 }
         _resetParticle(entry)
-        -- Distribuir en posiciones iniciales aleatorias (no todas abajo)
         entry.y = math.random(0, 100) / 100
         p.Position = UDim2.new(entry.x, 0, entry.y, 0)
         entry.life = math.random(0, entry.maxLife)
@@ -58623,25 +58720,22 @@ do
             for _, e in ipairs(_particles) do
                 if not (e.frame and e.frame.Parent) then continue end
                 e.life = e.life + 1
-                -- Subir + deriva sinusoidal
                 e.y = e.y - e.speed * 0.01
-                e.x = e.x + e.drift + math.sin(e.life * 0.15 + e.phase) * 0.0015
-                -- Opacidad: fade-in al nacer, fade-out al morir
+                e.x = e.x + e.drift + math.sin(e.life * 0.12 + e.phase) * 0.0018
                 local lifeRatio = e.life / e.maxLife
                 local alpha
-                if lifeRatio < 0.2 then
-                    alpha = lifeRatio / 0.2
-                elseif lifeRatio > 0.75 then
-                    alpha = 1 - (lifeRatio - 0.75) / 0.25
+                if lifeRatio < 0.18 then
+                    alpha = lifeRatio / 0.18
+                elseif lifeRatio > 0.72 then
+                    alpha = 1 - (lifeRatio - 0.72) / 0.28
                 else
                     alpha = 1
                 end
                 pcall(function()
-                    e.frame.BackgroundTransparency = 1 - (alpha * 0.82)
+                    e.frame.BackgroundTransparency = 1 - (alpha * e.maxAlpha)
                     e.frame.Position = UDim2.new(e.x, 0, e.y, 0)
                 end)
-                -- Renacer si murio o salio de pantalla
-                if e.life >= e.maxLife or e.y < -0.05 then
+                if e.life >= e.maxLife or e.y < -0.06 then
                     _resetParticle(e)
                 end
             end
@@ -58806,7 +58900,7 @@ end
 -- ================================================================
 -- == HUB MOVIBLE v3: Drag al mantener click en cualquier parte del hub
 -- Sin boton visible. El hub se mueve al presionar y arrastrar sobre el.
--- El guardián de posicion se actualiza durante el drag para no revertir.
+-- El guardi?n de posicion se actualiza durante el drag para no revertir.
 -- ================================================================
 do
     local _hubDragConn2 = nil
@@ -59728,16 +59822,10 @@ particles = {}
         -- Helpers
 
         local function _resolveFrameTopLeft()
-            local ap  = mainFrame.AnchorPoint
-            local pos = mainFrame.Position
-            local vp  = workspace.CurrentCamera.ViewportSize
-            if ap == Vector2.new(0, 0) then
-                return Vector2.new(pos.X.Offset, pos.Y.Offset)
-            end
-            local cx = pos.X.Scale * vp.X + pos.X.Offset
-            local cy = pos.Y.Scale * vp.Y + pos.Y.Offset
-            return Vector2.new(cx - mainFrame.AbsoluteSize.X * ap.X,
-                               cy - mainFrame.AbsoluteSize.Y * ap.Y)
+            -- FIX: usar AbsolutePosition directamente (ya tiene en cuenta AnchorPoint,
+            -- Scale, Offset y GuiInset de Roblox). Es la forma más confiable en móvil.
+            local ap = mainFrame.AbsolutePosition
+            return Vector2.new(ap.X, ap.Y)
         end
 
         local function _mouseOverHeader(p2d)
@@ -59797,8 +59885,9 @@ particles = {}
             local fSiz = mainFrame.AbsoluteSize
             if inputPos2D.X < fPos.X or inputPos2D.X > fPos.X + fSiz.X then return end
             if inputPos2D.Y < fPos.Y or inputPos2D.Y > fPos.Y + fSiz.Y then return end
-            -- Convertir posicion a offset absoluto
-            local tl = _resolveFrameTopLeft()
+            -- FIX: usar AbsolutePosition como top-left real (confiable en móvil con cualquier AnchorPoint)
+            local tl = Vector2.new(fPos.X, fPos.Y)
+            -- Normalizar a AnchorPoint(0,0) para que el drag sea predecible
             mainFrame.AnchorPoint = Vector2.new(0, 0)
             mainFrame.Position    = UDim2.new(0, tl.X, 0, tl.Y)
             _dragActive     = true
@@ -59834,16 +59923,17 @@ particles = {}
         end)
 
         -- dragIcon: compatibilidad con executors que no exponen UIS correctamente
-        dragIcon.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                local mp = UserInputService:GetMouseLocation()
-                _onHeaderPress(Vector2.new(mp.X, mp.Y))
-            elseif inp.UserInputType == Enum.UserInputType.Touch then
-                _onHeaderPress(Vector2.new(inp.Position.X, inp.Position.Y))
-            end
-        end)
+        -- FIX: dragIcon ya no llama _onHeaderPress por separado.
+        -- El _safeConnect(UserInputService.InputBegan) de arriba ya lo maneja.
+        -- Llamarlo de nuevo desde dragIcon reseteaba _dragStartMouse mientras
+        -- ya se arrastraba, haciendo que el hub saltara a una esquina.
+        -- dragIcon.InputBegan queda vacio intencionalmente.
+        dragIcon.InputBegan:Connect(function(_inp) end)
 
-        -- Movimiento (un solo _safeConnect ? no duplicado)
+        -- Movimiento (un solo _safeConnect – no duplicado)
+        -- FIX MOBILE BARRERA: se usa GuiService:GetGuiInset() para compensar
+        -- la barra de status de Roblox en celular (~36px arriba).
+        -- Sin esto el hub no puede subirse más allá del inset (barrera invisible).
         _safeConnect(UserInputService.InputChanged, function(input)
             if not _dragActive then return end
             if _G._sliderDragging then return end
@@ -59853,9 +59943,16 @@ particles = {}
             local vp    = workspace.CurrentCamera.ViewportSize
             local fw    = mainFrame.AbsoluteSize.X
             local fh    = mainFrame.AbsoluteSize.Y
+            -- FIX BARRERA: obtener inset real de la GUI (barra de status Roblox en movil)
+            local _insetTop = 0
+            pcall(function()
+                local gs = game:GetService("GuiService")
+                local inset = gs:GetGuiInset()
+                _insetTop = inset.Y  -- tipicamente 36px en movil
+            end)
             mainFrame.Position = UDim2.new(0,
                 math.clamp(_dragStartFrame.X + delta.X, 0, vp.X - fw), 0,
-                math.clamp(_dragStartFrame.Y + delta.Y, 0, vp.Y - fh))
+                math.clamp(_dragStartFrame.Y + delta.Y, _insetTop, vp.Y - fh))
             -- Sincronizar estela si existe
             task.defer(function()
                 local trailSG = hubGui and hubGui:FindFirstChild("EstelaContainer")
@@ -60444,14 +60541,14 @@ particles = {}
     tabDockFrame.ZIndex = 12
     tabDockFrame.ClipsDescendants = false
     -- Dock colorido y transparente para ver el juego detras
-    -- DISEÑO MOBILE: fondo más oscuro y vibrante en celular
+    -- DISE?O MOBILE: fondo m?s oscuro y vibrante en celular
     local _isMobileFrame = false
     pcall(function()
         local _uis3 = game:GetService("UserInputService")
         _isMobileFrame = _uis3.TouchEnabled and not _uis3.KeyboardEnabled
     end)
     tabDockFrame.BackgroundColor3 = _isMobileFrame
-        and Color3.fromRGB(2, 8, 30)   -- más oscuro en mobile
+        and Color3.fromRGB(2, 8, 30)   -- m?s oscuro en mobile
         or  Color3.fromRGB(5, 15, 50)
     tabDockFrame.BackgroundTransparency = _isMobileFrame and 0.30 or 0.55
     tabDockFrame.Position = UDim2.new(0.78, 0, 0, 36)
