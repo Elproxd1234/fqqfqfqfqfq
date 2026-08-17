@@ -45399,23 +45399,38 @@ function CreateCombatTab()
     end
 
     local function _saRemoveHook()
-        local _oldNC = CombatTabState._saOldNamecall
-        local _mt    = CombatTabState._saMt
-        if not CombatTabState._saHookActive or not _mt or not _oldNC then return end
+        local _mt = CombatTabState._saMt
+        -- FIX GUNFIRED: siempre restaurar el namecall REAL del juego (_G._saRealNamecall),
+        -- nunca _saOldNamecall que puede apuntar a un hook anterior roto (re-ejecucion).
+        local _realNC = _G._saRealNamecall
+        if not CombatTabState._saHookActive or not _mt or not _realNC then
+            -- Aun asi limpiar estado para consistencia
+            CombatTabState._saHookActive  = false
+            CombatTabState._saOldNamecall = nil
+            CombatTabState._saMt          = nil
+            _G._saClickSnap = nil
+            if _G._saInputConn then
+                pcall(function() _G._saInputConn:Disconnect() end)
+                _G._saInputConn = nil
+            end
+            return
+        end
         pcall(function()
             setreadonly(_mt, false)
-            _mt.__namecall = _oldNC
+            _mt.__namecall = _realNC   -- restaurar el namecall ORIGINAL del juego
             setreadonly(_mt, true)
         end)
         CombatTabState._saHookActive   = false
         CombatTabState._saOldNamecall  = nil
         CombatTabState._saMt           = nil
-        -- Limpiar snapshot y conexin de input al desactivar
+        _G._saRealNamecall             = nil   -- limpiar para proxima instalacion limpia
+        -- Limpiar snapshot y conexion de input al desactivar
         _G._saClickSnap = nil
         if _G._saInputConn then
             pcall(function() _G._saInputConn:Disconnect() end)
             _G._saInputConn = nil
         end
+    end
     end
 
     -- Restaurar hook si ya estaba activo al reabrir la pestaa
@@ -45831,7 +45846,8 @@ function CreateCombatTab()
                 _createSASMButton()
                 CreateCustomNotification("SILENT AIM", "Bot?n 'Shoot Murderer' activado ? presionalo para disparar al murder", 3)
             else
-                -- Desactivar hook si no hay otros sistemas SA activos
+                -- FIX GUNFIRED: siempre desactivar el hook al apagar el toggle,
+                -- usando _G._saRealNamecall para restaurar el namecall REAL del juego
                 if _saRemoveHook then pcall(_saRemoveHook) end
                 -- Animaci?n de salida antes de destruir
                 if _saSMState.gui then
