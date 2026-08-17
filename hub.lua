@@ -10083,7 +10083,7 @@ function updateBindables()
                         and input.UserInputType ~= Enum.UserInputType.Touch then return end
                         -- FIX MOVIL: usar delta incremental (frame a frame) en lugar de
                         -- delta acumulado desde _saDragStart. En Touch, inp.Position
-                        -- incluye eje Z (profundidad) que rompe el cálculo acumulado.
+                        -- incluye eje Z (profundidad) que rompe el c?lculo acumulado.
                         local curX = input.Position.X
                         local curY = input.Position.Y
                         local dX = curX - _saDragStart.X
@@ -59797,7 +59797,7 @@ particles = {}
 
         local function _resolveFrameTopLeft()
             -- FIX: usar AbsolutePosition directamente (ya tiene en cuenta AnchorPoint,
-            -- Scale, Offset y GuiInset de Roblox). Es la forma más confiable en móvil.
+            -- Scale, Offset y GuiInset de Roblox). Es la forma m?s confiable en m?vil.
             local ap = mainFrame.AbsolutePosition
             return Vector2.new(ap.X, ap.Y)
         end
@@ -59860,7 +59860,7 @@ particles = {}
             local fSiz = mainFrame.AbsoluteSize
             if inputPos2D.X < fPos.X or inputPos2D.X > fPos.X + fSiz.X then return end
             if inputPos2D.Y < fPos.Y or inputPos2D.Y > fPos.Y + fSiz.Y then return end
-            -- FIX: usar AbsolutePosition como top-left real (confiable en móvil con cualquier AnchorPoint)
+            -- FIX: usar AbsolutePosition como top-left real (confiable en m?vil con cualquier AnchorPoint)
             local tl = Vector2.new(fPos.X, fPos.Y)
             -- Normalizar a AnchorPoint(0,0) para que el drag sea predecible
             mainFrame.AnchorPoint = Vector2.new(0, 0)
@@ -59905,10 +59905,10 @@ particles = {}
         -- dragIcon.InputBegan queda vacio intencionalmente.
         dragIcon.InputBegan:Connect(function(_inp) end)
 
-        -- Movimiento (un solo _safeConnect – no duplicado)
+        -- Movimiento (un solo _safeConnect ? no duplicado)
         -- FIX MOBILE BARRERA: se usa GuiService:GetGuiInset() para compensar
         -- la barra de status de Roblox en celular (~36px arriba).
-        -- Sin esto el hub no puede subirse más allá del inset (barrera invisible).
+        -- Sin esto el hub no puede subirse m?s all? del inset (barrera invisible).
         _safeConnect(UserInputService.InputChanged, function(input)
             if not _dragActive then return end
             if _G._sliderDragging then return end
@@ -60303,8 +60303,8 @@ particles = {}
         if isActive then
             -- ACTIVA: mas transparente + muy iluminado
             TweenService:Create(btn, _ti_smooth, {
-                BackgroundTransparency = 0.25,
-                BackgroundColor3       = Color3.fromRGB(15, 50, 120),
+                BackgroundTransparency = 0.30,
+                BackgroundColor3       = Color3.fromRGB(0, 80, 100),
             }):Play()
             if stroke then TweenService:Create(stroke, _ti_smooth, {
                 Transparency = 0.0,
@@ -60334,8 +60334,8 @@ particles = {}
         else
             -- INACTIVA: transparente, texto visible
             TweenService:Create(btn, _ti_smooth, {
-                BackgroundTransparency = 0.45,
-                BackgroundColor3       = Color3.fromRGB(10, 30, 70),
+                BackgroundTransparency = 0.65,
+                BackgroundColor3       = Color3.fromRGB(0, 60, 80),
             }):Play()
             if stroke then TweenService:Create(stroke, _ti_smooth, {
                 Transparency = 0.55,
@@ -60523,9 +60523,9 @@ particles = {}
         _isMobileFrame = _uis3.TouchEnabled and not _uis3.KeyboardEnabled
     end)
     tabDockFrame.BackgroundColor3 = _isMobileFrame
-        and Color3.fromRGB(2, 8, 30)   -- m?s oscuro en mobile
+        and Color3.fromRGB(5, 40, 55)  -- fondo panel mobile (Secondary hub)
         or  Color3.fromRGB(5, 15, 50)
-    tabDockFrame.BackgroundTransparency = _isMobileFrame and 0.30 or 0.55
+    tabDockFrame.BackgroundTransparency = _isMobileFrame and 0.65 or 0.55
     tabDockFrame.Position = UDim2.new(0.78, 0, 0, 36)
     tabDockFrame.Size = UDim2.new(0.22, 0, 1, -36)
     tabDockFrame.Visible  = true
@@ -60534,14 +60534,14 @@ particles = {}
     if _isMobileFrame then
         local _mobileGrad = Instance.new("UIGradient", tabDockFrame)
         _mobileGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0, 40, 80)),
-            ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0, 20, 50)),
-            ColorSequenceKeypoint.new(1,    Color3.fromRGB(0, 10, 30)),
+            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0, 80, 100)),
+            ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0, 55, 75)),
+            ColorSequenceKeypoint.new(1,    Color3.fromRGB(0, 40, 60)),
         })
         _mobileGrad.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0,   0.15),
-            NumberSequenceKeypoint.new(0.5, 0.28),
-            NumberSequenceKeypoint.new(1,   0.20),
+            NumberSequenceKeypoint.new(0,   0.45),
+            NumberSequenceKeypoint.new(0.5, 0.55),
+            NumberSequenceKeypoint.new(1,   0.50),
         })
         _mobileGrad.Rotation = 180
 
@@ -60786,7 +60786,7 @@ particles = {}
         local btn = Instance.new("Frame", tabDockList)
         btn.Name                   = tabNames[i] .. "SideBtn"
         btn.Size                   = UDim2.new(1, 0, _tabScaleH, 0)
-        btn.BackgroundColor3       = Color3.fromRGB(10, 30, 70)
+        btn.BackgroundColor3       = Color3.fromRGB(0, 60, 80)
         btn.BackgroundTransparency = 0.45
         btn.BorderSizePixel        = 0
         btn.ClipsDescendants       = false
