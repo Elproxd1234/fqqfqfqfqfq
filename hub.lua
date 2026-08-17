@@ -1557,9 +1557,11 @@ local TweenService = game:GetService("TweenService")
 local _shimmerRegistry = {}   -- {grad=UIGradient, speed=number, offset=number}
 local _shimmerAngle    = 0    -- angulo base compartido
 
-local function RegisterShimmer(gradObj, speed, offset)
+local function RegisterShimmer(gradObj, speed, offset)  -- MODIFICADO: shimmers desactivados
+    if false then  -- desactivado: no registrar ninguna animacion shimmer
     if not gradObj then return end
     table.insert(_shimmerRegistry, {grad=gradObj, speed=speed or 80, offset=offset or 0})
+    end
 end
 
 -- FIX LAG: singleton ? un solo loop de shimmer aunque el script se re-ejecute N veces
@@ -10081,7 +10083,7 @@ function updateBindables()
                         and input.UserInputType ~= Enum.UserInputType.Touch then return end
                         -- FIX MOVIL: usar delta incremental (frame a frame) en lugar de
                         -- delta acumulado desde _saDragStart. En Touch, inp.Position
-                        -- incluye eje Z (profundidad) que rompe el c?lculo acumulado.
+                        -- incluye eje Z (profundidad) que rompe el cálculo acumulado.
                         local curX = input.Position.X
                         local curY = input.Position.Y
                         local dX = curX - _saDragStart.X
@@ -45399,38 +45401,23 @@ function CreateCombatTab()
     end
 
     local function _saRemoveHook()
-        local _mt = CombatTabState._saMt
-        -- FIX GUNFIRED: siempre restaurar el namecall REAL del juego (_G._saRealNamecall),
-        -- nunca _saOldNamecall que puede apuntar a un hook anterior roto (re-ejecucion).
-        local _realNC = _G._saRealNamecall
-        if not CombatTabState._saHookActive or not _mt or not _realNC then
-            -- Aun asi limpiar estado para consistencia
-            CombatTabState._saHookActive  = false
-            CombatTabState._saOldNamecall = nil
-            CombatTabState._saMt          = nil
-            _G._saClickSnap = nil
-            if _G._saInputConn then
-                pcall(function() _G._saInputConn:Disconnect() end)
-                _G._saInputConn = nil
-            end
-            return
-        end
+        local _oldNC = CombatTabState._saOldNamecall
+        local _mt    = CombatTabState._saMt
+        if not CombatTabState._saHookActive or not _mt or not _oldNC then return end
         pcall(function()
             setreadonly(_mt, false)
-            _mt.__namecall = _realNC   -- restaurar el namecall ORIGINAL del juego
+            _mt.__namecall = _oldNC
             setreadonly(_mt, true)
         end)
         CombatTabState._saHookActive   = false
         CombatTabState._saOldNamecall  = nil
         CombatTabState._saMt           = nil
-        _G._saRealNamecall             = nil   -- limpiar para proxima instalacion limpia
-        -- Limpiar snapshot y conexion de input al desactivar
+        -- Limpiar snapshot y conexin de input al desactivar
         _G._saClickSnap = nil
         if _G._saInputConn then
             pcall(function() _G._saInputConn:Disconnect() end)
             _G._saInputConn = nil
         end
-    end
     end
 
     -- Restaurar hook si ya estaba activo al reabrir la pestaa
@@ -45657,11 +45644,11 @@ function CreateCombatTab()
         local function _createSASMButton()
             _destroySASMGui()
 
-            -- BOT?N PERSONALIZADO: compacto con color del hub
-            local BTN_W, BTN_H = 120, 60
+            -- BOT?N PERSONALIZADO: transparente con borde oscuro y esquinas redondeadas
+            local BTN_W, BTN_H = 250, 180
             local vp = workspace.CurrentCamera.ViewportSize
             local posX = math.clamp(vp.X * 0.5 - BTN_W / 2, 4, vp.X - BTN_W - 4)
-            local posY = math.clamp(vp.Y * 0.75 - BTN_H / 2, 4, vp.Y - BTN_H - 4)
+            local posY = math.clamp(vp.Y * 0.5 - BTN_H / 2, 4, vp.Y - BTN_H - 4)
 
             local sg = Instance.new("ScreenGui")
             sg.Name           = "SilentAimShootMurderGui"
@@ -45688,42 +45675,56 @@ function CreateCombatTab()
             local sc = Instance.new("UIScale", btnRoot)
             sc.Scale = 0
 
-            -- Bot?n principal: color del hub (ThemeColors.Primary)
+            -- Bot?n principal: fondo degradado oscuro azul del hub + borde neon cian
             local clickBtn = Instance.new("TextButton", btnRoot)
             clickBtn.Name                   = "ShootButton"
             clickBtn.Size                   = UDim2.new(1, 0, 1, 0)
             clickBtn.Position               = UDim2.new(0, 0, 0, 0)
             clickBtn.AnchorPoint            = Vector2.new(0.5, 0.5)
-            clickBtn.BackgroundColor3       = ThemeColors.Primary
-            clickBtn.BackgroundTransparency = 0.20
-            clickBtn.Text                   = "SHOOT"
-            clickBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
-            clickBtn.TextSize               = 14
-            clickBtn.Font                   = Enum.Font.GothamBold
+            clickBtn.BackgroundColor3       = Color3.fromRGB(4, 10, 28)
+            clickBtn.BackgroundTransparency = 0.15
+            clickBtn.Text                   = "Shoot"
+            clickBtn.TextColor3             = Color3.fromRGB(0, 210, 240)
+            clickBtn.TextSize               = 24
+            clickBtn.Font                   = Enum.Font.GothamMedium
             clickBtn.AutoButtonColor        = false
             clickBtn.ZIndex                 = 210
 
-            -- Glow en el texto color del hub
+            -- Gradiente interno glassmorphism (igual que los botones del hub)
+            local _btnGrad = Instance.new("UIGradient", clickBtn)
+            _btnGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0,   Color3.fromRGB( 5, 20, 60)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB( 2, 10, 35)),
+                ColorSequenceKeypoint.new(1,   Color3.fromRGB( 5, 20, 60)),
+            })
+            _btnGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0,   0.30),
+                NumberSequenceKeypoint.new(0.5, 0.18),
+                NumberSequenceKeypoint.new(1,   0.30),
+            })
+            _btnGrad.Rotation = 90
+
+            -- Glow en el texto
             local _txtStroke = Instance.new("UIStroke", clickBtn)
-            _txtStroke.Color       = ThemeColors.Primary
-            _txtStroke.Thickness   = 0.8
-            _txtStroke.Transparency = 0.40
+            _txtStroke.Color       = Color3.fromRGB(0, 210, 240)
+            _txtStroke.Thickness   = 0.9
+            _txtStroke.Transparency = 0.50
             _txtStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 
             local uiCorner = Instance.new("UICorner", clickBtn)
-            uiCorner.CornerRadius = UDim.new(0, 12)
+            uiCorner.CornerRadius = UDim.new(0, 20)
 
-            -- Borde color del hub
+            -- Borde neon cian (igual que el hub)
             local uiStroke = Instance.new("UIStroke", clickBtn)
-            uiStroke.Color           = ThemeColors.Primary
-            uiStroke.Thickness       = 2.0
+            uiStroke.Color           = Color3.fromRGB(0, 200, 240)
+            uiStroke.Thickness       = 2.5
             uiStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            uiStroke.Transparency    = 0.05
+            uiStroke.Transparency    = 0.10
             local _strokeGrad = Instance.new("UIGradient", uiStroke)
             _strokeGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0,   ThemeColors.Primary),
-                ColorSequenceKeypoint.new(0.5, ThemeColors.Accent),
-                ColorSequenceKeypoint.new(1,   ThemeColors.Primary),
+                ColorSequenceKeypoint.new(0,   Color3.fromRGB(0, 220, 255)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 100, 255)),
+                ColorSequenceKeypoint.new(1,   Color3.fromRGB(0, 220, 255)),
             })
             _strokeGrad.Rotation = 90
 
@@ -45797,31 +45798,31 @@ function CreateCombatTab()
                 end)
             end
 
-            -- Hover (color del hub)
+            -- Hover
             clickBtn.MouseEnter:Connect(function()
-                TweenService:Create(uiStroke, TweenInfo.new(0.12), {Color = ThemeColors.Accent, Thickness = 2.5, Transparency = 0}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(120, 240, 255), Thickness = 3.0, Transparency = 0}):Play()
                 TweenService:Create(clickBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.05}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.12), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.12), {TextColor3 = Color3.fromRGB(180, 255, 255)}):Play()
             end)
             clickBtn.MouseLeave:Connect(function()
-                TweenService:Create(uiStroke, TweenInfo.new(0.15), {Color = ThemeColors.Primary, Thickness = 2.0, Transparency = 0.05}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.20}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(0, 200, 240), Thickness = 2.5, Transparency = 0.10}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(0, 210, 240)}):Play()
             end)
 
-            -- Press / Release (color del hub)
+            -- Press / Release
             local _lastClick = 0
             clickBtn.MouseButton1Down:Connect(function()
                 if _moved then return end
                 TweenService:Create(sc, TweenInfo.new(0.07), {Scale=0.94}):Play()
-                TweenService:Create(uiStroke, TweenInfo.new(0.07), {Thickness=1.5, Color=ThemeColors.Accent}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.07), {BackgroundTransparency=0.0}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.07), {Thickness=1.5, Color=Color3.fromRGB(0,255,255)}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.07), {BackgroundColor3=Color3.fromRGB(0,30,60)}):Play()
             end)
             clickBtn.MouseButton1Up:Connect(function()
                 if _moved then return end
                 TweenService:Create(sc, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
-                TweenService:Create(uiStroke, TweenInfo.new(0.18), {Thickness=2.0, Color=ThemeColors.Primary}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.18), {BackgroundTransparency=0.20}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.18), {Thickness=2.5, Color=Color3.fromRGB(0,200,240)}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.18), {BackgroundColor3=Color3.fromRGB(4,10,28)}):Play()
             end)
             clickBtn.Activated:Connect(function()
                 if _moved then return end
@@ -45846,8 +45847,7 @@ function CreateCombatTab()
                 _createSASMButton()
                 CreateCustomNotification("SILENT AIM", "Bot?n 'Shoot Murderer' activado ? presionalo para disparar al murder", 3)
             else
-                -- FIX GUNFIRED: siempre desactivar el hook al apagar el toggle,
-                -- usando _G._saRealNamecall para restaurar el namecall REAL del juego
+                -- Desactivar hook si no hay otros sistemas SA activos
                 if _saRemoveHook then pcall(_saRemoveHook) end
                 -- Animaci?n de salida antes de destruir
                 if _saSMState.gui then
@@ -58420,60 +58420,398 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 do
     mainFrame.BackgroundTransparency = 1
 
-    -- FONDO: imagen del ojo abierto
+    -- -- CAPA 1: imagen de fondo con transparencia leve --------------
     local hubBgImage = Instance.new("ImageLabel", mainFrame)
-    hubBgImage.Name                  = "HubBackground"
-    hubBgImage.Size                  = UDim2.new(1, 0, 1, 0)
-    hubBgImage.Position              = UDim2.new(0, 0, 0, 0)
-    hubBgImage.ZIndex                = 1
-    hubBgImage.Image                 = "rbxassetid://96937964432645"
-    hubBgImage.ImageTransparency     = 0
+    hubBgImage.Name            = "HubBackground"
+    hubBgImage.Size            = UDim2.new(1, 0, 1, 0)
+    hubBgImage.Position        = UDim2.new(0, 0, 0, 0)
+    hubBgImage.ZIndex          = 1
+    hubBgImage.Image           = "rbxassetid://96937964432645"
+    hubBgImage.ImageTransparency = 0.30   -- discreta: los orbs pulsantes dan la profundidad visual
     hubBgImage.BackgroundTransparency = 1
-    hubBgImage.ScaleType             = Enum.ScaleType.Stretch
-    hubBgImage.ImageRectSize         = Vector2.new(900, 480)
-    hubBgImage.ImageRectOffset       = Vector2.new(0, 0)
+    hubBgImage.ScaleType       = Enum.ScaleType.Stretch
+    hubBgImage.ImageRectSize   = Vector2.new(900, 480)
+    hubBgImage.ImageRectOffset = Vector2.new(0, 0)
     Instance.new("UICorner", hubBgImage).CornerRadius = UDim.new(0, 8)
     _G._hubBgMainImageRef = hubBgImage
 
-    local _bgAnimRunning = true
+    local _bgAnimRunning = false   -- MODIFICADO: animaciones del fondo desactivadas
     _G._hubBgAnimStop = function() _bgAnimRunning = false end
 
-    -- ANIMACION: parpadeo del ojo (cierra -> abre)
-    local _blinkOverlay = Instance.new("ImageLabel", mainFrame)
-    _blinkOverlay.Name                   = "EyeBlinkOverlay"
-    _blinkOverlay.Size                   = UDim2.new(1, 0, 1, 0)
-    _blinkOverlay.Position               = UDim2.new(0, 0, 0, 0)
-    _blinkOverlay.AnchorPoint            = Vector2.new(0, 0)
-    _blinkOverlay.BackgroundTransparency = 1
-    _blinkOverlay.Image                  = "rbxassetid://124196125990159"
-    _blinkOverlay.ScaleType              = Enum.ScaleType.Stretch
-    _blinkOverlay.ImageRectSize          = Vector2.new(900, 480)
-    _blinkOverlay.ImageRectOffset        = Vector2.new(0, 0)
-    _blinkOverlay.ImageTransparency      = 1
-    _blinkOverlay.ZIndex                 = 2
-    Instance.new("UICorner", _blinkOverlay).CornerRadius = UDim.new(0, 8)
+    -- ================================================================
+    -- ANIMACION DE FONDO v5 - NEBULA CINEMATICA CON ORBS PULSANTES
+    -- Capas de animacion:
+    --   Loop A: parallax suave con zoom cinematico (keyframes)
+    --   Loop B: micro-deriva organica frame-a-frame
+    --   Loop C: orbs de luz pulsantes que flotan (glassmorphism)
+    --   Loop D: aurora de 4 franjas con ciclo de color vivo
+    --   Loop E: particulas triple con fade-in/out suave
+    -- ================================================================
+
+    -- Estado compartido entre loops A y B
+    local _bgOx, _bgOy = 0, 0
+    local _bgSx, _bgSy = 900, 480
+
+    -- LOOP A: Tween de keyframes (parallax cinematico)
+    task.spawn(function()
+        local _kf = {
+            {ox =   0, oy =   0, sx = 900, sy = 480, t =  0, e = Enum.EasingStyle.Sine},
+            {ox =  15, oy =   8, sx = 855, sy = 456, t = 12, e = Enum.EasingStyle.Cubic},
+            {ox =  45, oy =  20, sx = 815, sy = 435, t = 10, e = Enum.EasingStyle.Sine},
+            {ox =  85, oy =  35, sx = 788, sy = 420, t =  9, e = Enum.EasingStyle.Quad},
+            {ox = 105, oy =  55, sx = 778, sy = 415, t =  8, e = Enum.EasingStyle.Sine},
+            {ox =  72, oy =  42, sx = 808, sy = 430, t = 10, e = Enum.EasingStyle.Cubic},
+            {ox =  32, oy =  18, sx = 848, sy = 452, t = 11, e = Enum.EasingStyle.Sine},
+            {ox =   4, oy =   4, sx = 888, sy = 475, t = 12, e = Enum.EasingStyle.Quart},
+        }
+        local _idx = 1
+        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
+            local _nxt = (_idx % (#_kf - 1)) + 2
+            if _idx == 1 then _nxt = 2 end
+            local _to = _kf[_nxt]
+            _bgOx = _to.ox; _bgOy = _to.oy
+            _bgSx = _to.sx; _bgSy = _to.sy
+            local _ti = TweenInfo.new(_to.t, _to.e, Enum.EasingDirection.InOut)
+            TweenService:Create(hubBgImage, _ti, {
+                ImageRectOffset = Vector2.new(_to.ox, _to.oy),
+                ImageRectSize   = Vector2.new(_to.sx, _to.sy),
+            }):Play()
+            -- El fondo respira con el movimiento (transparencia fija, sin pulso)
+            task.wait(_to.t)
+            _idx = _nxt
+            if _nxt == #_kf then _idx = 1 end
+        end
+    end)
+
+    -- LOOP B: Micro-deriva organica con doble seno
+    task.spawn(function()
+        local _t = 0
+        local _SPEED_X = 0.22
+        local _SPEED_Y = 0.17
+        local _AMP_X   = 5
+        local _AMP_Y   = 3.5
+        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
+            task.wait(0.05)
+            _t = _t + 0.05
+            local _driftX = math.sin(_t * _SPEED_X * math.pi * 2) * _AMP_X
+                          + math.sin(_t * _SPEED_X * 1.618 * math.pi * 2) * (_AMP_X * 0.35)
+            local _driftY = math.cos(_t * _SPEED_Y * math.pi * 2) * _AMP_Y
+                          + math.cos(_t * _SPEED_Y * 1.414 * math.pi * 2) * (_AMP_Y * 0.30)
+            local _newOx = math.clamp(_bgOx + _driftX, 0, 120)
+            local _newOy = math.clamp(_bgOy + _driftY, 0, 60)
+            pcall(function()
+                hubBgImage.ImageRectOffset = Vector2.new(_newOx, _newOy)
+                -- Tinte HSV muy sutil (no cambia el color principal, solo tono calido/frio)
+                local _hue = (_t * 0.012) % 1
+                hubBgImage.ImageColor3 = Color3.fromHSV(_hue, 0.12, 0.96)
+            end)
+        end
+    end)
+
+    -- ================================================================
+    -- LOOP C: ORBS DE LUZ PULSANTES (glassmorphism flotante)
+    -- 5 esferas de luz difusa que flotan, escalan y cambian de color
+    -- dando el efecto "nebula/space" que no se nota el fondo solido
+    -- ================================================================
+    local _orbDefs = {
+        -- {xPos, yPos, size, colorHue, speed, phaseOffset}
+        {x=0.08, y=0.15, sz=200, hue=0.68, spd=0.07,  ph=0.0 },  -- violeta esquina TL
+        {x=0.75, y=0.05, sz=170, hue=0.58, spd=0.055, ph=1.2 },  -- azul esquina TR
+        {x=0.50, y=0.55, sz=230, hue=0.72, spd=0.045, ph=2.5 },  -- purpura centro
+        {x=0.20, y=0.75, sz=150, hue=0.62, spd=0.065, ph=0.8 },  -- cian BL
+        {x=0.85, y=0.65, sz=180, hue=0.80, spd=0.05,  ph=3.1 },  -- magenta BR
+    }
+    local _orbFrames = {}
+    for _, od in ipairs(_orbDefs) do
+        local orbF = Instance.new("Frame", mainFrame)
+        orbF.AnchorPoint  = Vector2.new(0.5, 0.5)
+        orbF.Position     = UDim2.new(od.x, 0, od.y, 0)
+        orbF.Size         = UDim2.new(0, od.sz, 0, od.sz)
+        orbF.BorderSizePixel = 0
+        orbF.ZIndex       = 2
+        orbF.BackgroundColor3 = Color3.fromHSV(od.hue, 0.9, 0.8)
+        orbF.BackgroundTransparency = 0.72
+        Instance.new("UICorner", orbF).CornerRadius = UDim.new(1, 0)
+        -- Gradiente radial simulado: UIGradient de 0% a 100% transparente
+        local og = Instance.new("UIGradient", orbF)
+        og.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   0.30),
+            NumberSequenceKeypoint.new(0.55, 0.68),
+            NumberSequenceKeypoint.new(1,   1.0),
+        })
+        table.insert(_orbFrames, {frame=orbF, grad=og, def=od, t=od.ph})
+    end
 
     task.spawn(function()
-        local BLINK_INTERVAL = 2.5
-        local CLOSE_TIME     = 0.18
-        local OPEN_TIME      = 0.18
+        local _ot = 0
+        while _bgAnimRunning do
+            task.wait(0.05)
+            _ot = _ot + 0.05
+            for _, orb in ipairs(_orbFrames) do
+                orb.t = orb.t + 0.05
+                local od = orb.def
+                -- Flotacion: posicion oscila suavemente
+                local floatX = od.x + math.sin(orb.t * od.spd * math.pi * 2) * 0.06
+                local floatY = od.y + math.cos(orb.t * od.spd * 0.7 * math.pi * 2) * 0.055
+                -- Pulso de escala: el orb "respira" (90%-115%)
+                local pulse = 1.0 + math.sin(orb.t * od.spd * 1.3 * math.pi * 2) * 0.13
+                local newSz = math.floor(od.sz * pulse)
+                -- Ciclo de color HSV lento
+                local newHue = (od.hue + orb.t * 0.004) % 1
+                -- Transparencia pulsante (mas visible en pico, casi invisible en valle)
+                local transPulse = 0.72 - math.sin(orb.t * od.spd * 2 * math.pi * 2) * 0.18
+                pcall(function()
+                    orb.frame.Position = UDim2.new(floatX, 0, floatY, 0)
+                    orb.frame.Size = UDim2.new(0, newSz, 0, newSz)
+                    orb.frame.BackgroundColor3 = Color3.fromHSV(newHue, 0.88, 0.82)
+                    orb.frame.BackgroundTransparency = math.clamp(transPulse, 0.55, 0.90)
+                end)
+            end
+        end
+    end)
 
-        while _bgAnimRunning and _blinkOverlay and _blinkOverlay.Parent do
-            task.wait(BLINK_INTERVAL)
-            if not (_bgAnimRunning and _blinkOverlay and _blinkOverlay.Parent) then break end
+    -- -- CAPA 2: AURORA - 4 franjas de luz mas vivas y amplias --
+    local _auroraPalette = {
+        { Color3.fromRGB(40,  0, 110), Color3.fromRGB(100,  0, 200), Color3.fromRGB(  0, 80, 230), Color3.fromRGB(20, 0, 140) },
+        { Color3.fromRGB( 0, 30, 140), Color3.fromRGB(  0,100, 240), Color3.fromRGB( 30,  0, 180), Color3.fromRGB( 0, 60, 200) },
+        { Color3.fromRGB( 0,100, 190), Color3.fromRGB(  0,200, 240), Color3.fromRGB( 30, 80, 220), Color3.fromRGB( 0,140, 210) },
+        { Color3.fromRGB(80,  0, 190), Color3.fromRGB(160,  0, 255), Color3.fromRGB(100,  0, 220), Color3.fromRGB(50,  0, 170) },
+        { Color3.fromRGB(10,  0, 100), Color3.fromRGB( 80, 30, 200), Color3.fromRGB(  0, 50, 180), Color3.fromRGB(30, 10, 150) },
+        { Color3.fromRGB( 0, 60, 170), Color3.fromRGB( 30,160, 255), Color3.fromRGB( 70,  0, 220), Color3.fromRGB( 0, 80, 190) },
+    }
+    local _auroraPaletteIdx = 1
 
-            -- Cerrar ojo
-            _blinkOverlay.ImageTransparency = 1
-            TweenService:Create(_blinkOverlay,
-                TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-                {ImageTransparency = 0}):Play()
-            task.wait(CLOSE_TIME)
+    local function _makeAuroraStrip(yScale, heightScale, zidx, initRot)
+        local f = Instance.new("Frame", mainFrame)
+        f.Size = UDim2.new(1.4, 0, heightScale, 0)
+        f.Position = UDim2.new(-0.20, 0, yScale, 0)
+        f.BackgroundTransparency = 1
+        f.BorderSizePixel = 0
+        f.ZIndex = zidx
+        f.ClipsDescendants = false
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0.5, 0)
+        local g = Instance.new("UIGradient", f)
+        g.Rotation = initRot or 0
+        return f, g
+    end
 
-            -- Abrir ojo
-            TweenService:Create(_blinkOverlay,
-                TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-                {ImageTransparency = 1}):Play()
-            task.wait(OPEN_TIME)
+    local _auroraA, _gradA = _makeAuroraStrip(0.02, 0.60, 2,  10)
+    local _auroraB, _gradB = _makeAuroraStrip(0.28, 0.55, 2, -10)
+    local _auroraC, _gradC = _makeAuroraStrip(0.52, 0.50, 2,  16)
+    local _auroraD, _gradD = _makeAuroraStrip(0.72, 0.40, 2,  -5)
+
+    local function _applyAuroraPalette(pal)
+        local c0, c1, c2, c3 = pal[1], pal[2], pal[3], pal[4]
+        local function makeGrad(cA, cB)
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,0,0)),
+                ColorSequenceKeypoint.new(0.18, cA),
+                ColorSequenceKeypoint.new(0.50, cB),
+                ColorSequenceKeypoint.new(0.82, cA),
+                ColorSequenceKeypoint.new(1,    Color3.fromRGB(0,0,0)),
+            })
+        end
+        local makeTr = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,    1),
+            NumberSequenceKeypoint.new(0.18, 0.50),
+            NumberSequenceKeypoint.new(0.50, 0.28),
+            NumberSequenceKeypoint.new(0.82, 0.50),
+            NumberSequenceKeypoint.new(1,    1),
+        })
+        _gradA.Color = makeGrad(c0, c1); _gradA.Transparency = makeTr
+        _gradB.Color = makeGrad(c1, c2); _gradB.Transparency = makeTr
+        _gradC.Color = makeGrad(c2, c3); _gradC.Transparency = makeTr
+        _gradD.Color = makeGrad(c3, c0); _gradD.Transparency = makeTr
+    end
+    _applyAuroraPalette(_auroraPalette[1])
+
+    task.spawn(function()
+        local _tA, _tB, _tC, _tD = 0, 0.6, 1.3, 2.1
+        local _rotA, _rotB, _rotC, _rotD = 10, -10, 16, -5
+        local _palTimer = 0
+        local _PAL_DUR  = 10
+        while _bgAnimRunning and _auroraA and _auroraA.Parent do
+            local dt = 0.05
+            task.wait(dt)
+            _tA = _tA+dt; _tB = _tB+dt; _tC = _tC+dt; _tD = _tD+dt
+
+            local yA = 0.02 + math.sin(_tA * 0.16) * 0.10
+            local yB = 0.28 + math.sin(_tB * 0.11) * 0.12
+            local yC = 0.52 + math.sin(_tC * 0.14) * 0.09
+            local yD = 0.72 + math.sin(_tD * 0.18) * 0.07
+
+            _rotA = 10  + math.sin(_tA * 0.08) * 24
+            _rotB = -10 + math.sin(_tB * 0.10) * 20
+            _rotC = 16  + math.sin(_tC * 0.07) * 26
+            _rotD = -5  + math.sin(_tD * 0.12) * 18
+
+            pcall(function()
+                _auroraA.Position = UDim2.new(-0.20, 0, yA, 0)
+                _auroraB.Position = UDim2.new(-0.20, 0, yB, 0)
+                _auroraC.Position = UDim2.new(-0.20, 0, yC, 0)
+                _auroraD.Position = UDim2.new(-0.20, 0, yD, 0)
+                _gradA.Rotation = _rotA
+                _gradB.Rotation = _rotB
+                _gradC.Rotation = _rotC
+                _gradD.Rotation = _rotD
+            end)
+
+            _palTimer = _palTimer + dt
+            if _palTimer >= _PAL_DUR then
+                _palTimer = 0
+                _auroraPaletteIdx = (_auroraPaletteIdx % #_auroraPalette) + 1
+                pcall(function() _applyAuroraPalette(_auroraPalette[_auroraPaletteIdx]) end)
+            end
+        end
+    end)
+
+    -- -- CAPA 3: PARTICULAS mejoradas (30 puntos, 3 tamanos, mas visibles) --
+    local _PARTICLE_COUNT = 30
+    local _particles = {}
+
+    local function _makeParticle()
+        local p = Instance.new("Frame", mainFrame)
+        -- 3 tamanios: pequeno, medio, grande (estrella)
+        local tier = math.random(1, 3)
+        local sz = tier == 1 and math.random(1, 3) or tier == 2 and math.random(3, 6) or math.random(6, 10)
+        p.Size = UDim2.new(0, sz, 0, sz)
+        p.BackgroundTransparency = 1
+        p.BorderSizePixel = 0
+        p.ZIndex = 3
+        Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
+        local palIdx = math.random(1, #_auroraPalette)
+        local cIdx   = math.random(1, 4)
+        p.BackgroundColor3 = _auroraPalette[palIdx][cIdx]
+        return p, tier
+    end
+
+    local function _resetParticle(entry)
+        local p = entry.frame
+        local startX = math.random(1, 99) / 100
+        local startY = math.random(72, 100) / 100
+        p.Position = UDim2.new(startX, 0, startY, 0)
+        p.BackgroundTransparency = 1
+        local palIdx = math.random(1, #_auroraPalette)
+        local cIdx   = math.random(1, 4)
+        pcall(function() p.BackgroundColor3 = _auroraPalette[palIdx][cIdx] end)
+        entry.x       = startX
+        entry.y       = startY
+        -- Particulas grandes suben mas lento pero brillan mas
+        entry.speed   = entry.tier == 3 and math.random(2, 5)/100 or math.random(4, 14)/100
+        entry.drift   = (math.random(-20, 20)) / 1000
+        entry.life    = 0
+        entry.maxLife = entry.tier == 3 and math.random(60, 130) or math.random(35, 90)
+        entry.phase   = math.random(0, 62) / 10
+        -- Particulas grandes brillan mas (menor transparencia en pico)
+        entry.maxAlpha = entry.tier == 3 and 0.95 or entry.tier == 2 and 0.85 or 0.70
+    end
+
+    for i = 1, _PARTICLE_COUNT do
+        local p, tier = _makeParticle()
+        local entry = { frame=p, tier=tier, x=0, y=0, speed=0, drift=0, life=0, maxLife=60, phase=0, maxAlpha=0.80 }
+        _resetParticle(entry)
+        entry.y = math.random(0, 100) / 100
+        p.Position = UDim2.new(entry.x, 0, entry.y, 0)
+        entry.life = math.random(0, entry.maxLife)
+        _particles[i] = entry
+    end
+
+    task.spawn(function()
+        while _bgAnimRunning do
+            task.wait(0.05)
+            for _, e in ipairs(_particles) do
+                if not (e.frame and e.frame.Parent) then continue end
+                e.life = e.life + 1
+                e.y = e.y - e.speed * 0.01
+                e.x = e.x + e.drift + math.sin(e.life * 0.12 + e.phase) * 0.0018
+                local lifeRatio = e.life / e.maxLife
+                local alpha
+                if lifeRatio < 0.18 then
+                    alpha = lifeRatio / 0.18
+                elseif lifeRatio > 0.72 then
+                    alpha = 1 - (lifeRatio - 0.72) / 0.28
+                else
+                    alpha = 1
+                end
+                pcall(function()
+                    e.frame.BackgroundTransparency = 1 - (alpha * e.maxAlpha)
+                    e.frame.Position = UDim2.new(e.x, 0, e.y, 0)
+                end)
+                if e.life >= e.maxLife or e.y < -0.06 then
+                    _resetParticle(e)
+                end
+            end
+        end
+    end)
+
+    -- -- CAPA 4: VI?ETA perimetral con pulso de color suave -----------
+    local _vigFrame = Instance.new("Frame", mainFrame)
+    _vigFrame.Name = "HubVignette"
+    _vigFrame.Size = UDim2.new(1, 0, 1, 0)
+    _vigFrame.Position = UDim2.new(0, 0, 0, 0)
+    _vigFrame.BackgroundTransparency = 1
+    _vigFrame.BorderSizePixel = 0
+    _vigFrame.ZIndex = 4
+    Instance.new("UICorner", _vigFrame).CornerRadius = UDim.new(0, 8)
+    local _vigGrad = Instance.new("UIGradient", _vigFrame)
+    _vigGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,  0, 20)),
+        ColorSequenceKeypoint.new(0.28, Color3.fromRGB(2,  2, 10)),
+        ColorSequenceKeypoint.new(0.72, Color3.fromRGB(2,  2, 10)),
+        ColorSequenceKeypoint.new(1,   Color3.fromRGB(10, 0, 30)),
+    })
+    _vigGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0,    0.38),
+        NumberSequenceKeypoint.new(0.28, 0.97),
+        NumberSequenceKeypoint.new(0.72, 0.97),
+        NumberSequenceKeypoint.new(1,    0.34),
+    })
+
+    -- Pulso: la vigneta rota su gradiente suavemente para efecto de "latido"
+    task.spawn(function()
+        local _vRot = 0
+        while _bgAnimRunning and _vigFrame and _vigFrame.Parent do
+            task.wait(0.08)
+            _vRot = (_vRot + 0.4) % 360
+            pcall(function() _vigGrad.Rotation = _vRot end)
+        end
+    end)
+
+    -- -- CAPA 5: SHIMMER diagonal ? barre cada 8s ---------------------
+    local _shimFrame = Instance.new("Frame", mainFrame)
+    _shimFrame.Name = "HubShimmer"
+    _shimFrame.Size = UDim2.new(0.32, 0, 1.4, 0)
+    _shimFrame.Position = UDim2.new(-0.40, 0, -0.20, 0)
+    _shimFrame.BackgroundTransparency = 1
+    _shimFrame.BorderSizePixel = 0
+    _shimFrame.ZIndex = 5
+    _shimFrame.ClipsDescendants = false
+    local _shimGrad = Instance.new("UIGradient", _shimFrame)
+    _shimGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,   0,   0)),
+        ColorSequenceKeypoint.new(0.30, Color3.fromRGB(100, 180, 255)),
+        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(200, 240, 255)),
+        ColorSequenceKeypoint.new(0.70, Color3.fromRGB(100, 180, 255)),
+        ColorSequenceKeypoint.new(1,    Color3.fromRGB(0,   0,   0)),
+    })
+    _shimGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0,    1),
+        NumberSequenceKeypoint.new(0.30, 0.84),
+        NumberSequenceKeypoint.new(0.50, 0.72),
+        NumberSequenceKeypoint.new(0.70, 0.84),
+        NumberSequenceKeypoint.new(1,    1),
+    })
+    _shimGrad.Rotation = 22
+
+    task.spawn(function()
+        task.wait(2.5)
+        while _bgAnimRunning and _shimFrame and _shimFrame.Parent do
+            _shimFrame.Position = UDim2.new(-0.40, 0, -0.20, 0)
+            TweenService:Create(_shimFrame,
+                TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                { Position = UDim2.new(1.15, 0, -0.20, 0) }
+            ):Play()
+            task.wait(2.2 + 6.5)
         end
     end)
 end
@@ -58514,6 +58852,10 @@ do
     local _guardAnchor = Vector2.new(0.5, 0.5)
     local _guardBusy   = false   -- re-entrancy lock
 
+    -- HUB MOVIBLE: allowDragMove permite que el drag actualice _guardPos
+    _G._hubAllowDragMove = true
+    _G._hubDragging = false
+
     mainFrame:GetPropertyChangedSignal("Size"):Connect(function()
         if _guardBusy then return end
         if mainFrame.Size == _guardSize then return end
@@ -58524,6 +58866,7 @@ do
 
     mainFrame:GetPropertyChangedSignal("Position"):Connect(function()
         if _guardBusy then return end
+        -- HUB FIJO: el drag esta desactivado, nunca actualizar _guardPos por drag
         if mainFrame.Position == _guardPos then return end
         _guardBusy = true
         mainFrame.Position = _guardPos
@@ -58552,6 +58895,69 @@ do
     end
 end
 
+-- ================================================================
+-- == HUB FIJO: drag desactivado (hub no movible)
+-- ================================================================
+-- (El hub permanece fijo en pantalla, no se puede arrastrar)
+-- ================================================================
+-- == FIN HUB FIJO
+-- ================================================================
+
+-- ================================================================
+-- == EFECTO PARPADEO / PESTANEAR DEL FONDO (3 segundos despues de abrir)
+-- Usa rbxassetid://124196125990159 (animacion de ojos que cierran y abren)
+-- Se muestra como overlay encima del fondo del hub cada cierto tiempo.
+-- ================================================================
+do
+    local BLINK_ASSET    = "rbxassetid://124196125990159"
+    local BLINK_DELAY    = 3     -- segundos antes del primer parpadeo
+    local BLINK_CLOSED   = 0.18  -- tiempo con los ojos cerrados
+    local BLINK_OPEN_T   = 0.12  -- duracion del fade al abrir
+    local BLINK_INTERVAL = 5     -- segundos entre parpadeos
+
+    -- Overlay de imagen que cubre todo el fondo del hub
+    local blinkOverlay = Instance.new("ImageLabel", mainFrame)
+    blinkOverlay.Name                   = "BlinkOverlay"
+    blinkOverlay.Size                   = UDim2.new(1, 0, 1, 0)         -- igual al fondo principal
+    blinkOverlay.Position               = UDim2.new(0, 0, 0, 0)         -- igual al fondo principal
+    blinkOverlay.AnchorPoint            = Vector2.new(0, 0)              -- igual al fondo principal
+    blinkOverlay.Image                  = BLINK_ASSET
+    blinkOverlay.BackgroundTransparency = 1
+    blinkOverlay.ImageTransparency      = 1                              -- empieza invisible
+    blinkOverlay.ScaleType              = Enum.ScaleType.Stretch         -- igual al fondo principal
+    blinkOverlay.ImageRectSize          = Vector2.new(900, 480)          -- igual al fondo principal
+    blinkOverlay.ImageRectOffset        = Vector2.new(0, 0)              -- igual al fondo principal
+    blinkOverlay.ZIndex                 = 3
+    blinkOverlay.Active                 = false
+    Instance.new("UICorner", blinkOverlay).CornerRadius = UDim.new(0, 8)
+
+    local function _doBlink()
+        if not (blinkOverlay and blinkOverlay.Parent) then return end
+        -- Cerrar ojos: fade in rapido
+        TweenService:Create(blinkOverlay,
+            TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {ImageTransparency = 0}):Play()
+        task.wait(BLINK_CLOSED)
+        -- Abrir ojos: fade out suave
+        TweenService:Create(blinkOverlay,
+            TweenInfo.new(BLINK_OPEN_T, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {ImageTransparency = 1}):Play()
+        task.wait(BLINK_OPEN_T)
+    end
+
+    task.spawn(function()
+        task.wait(BLINK_DELAY)
+        while mainFrame and mainFrame.Parent do
+            pcall(_doBlink)
+            task.wait(BLINK_INTERVAL)
+        end
+    end)
+end
+-- ================================================================
+-- == FIN EFECTO PARPADEO
+-- ================================================================
+-- ================================================================
+-- == FIN GUARDIAN DE FORMA DEL HUB
 -- ================================================================
 
 -- Fondo: referencia guardada en el bloque do de arriba; aplicar ID si se provee uno
@@ -58599,7 +59005,7 @@ do
     -- Animacion rapida: gira 360? en ~1.8 segundos (muy rapida y vistosa)
     local _borderHue = 0
     local _borderRotation = 0
-    local _borderAnimRunning = true
+    local _borderAnimRunning = false   -- MODIFICADO: animacion del borde desactivada
     _G._hubBorderAnimStop = function() _borderAnimRunning = false end
 
     -- Paleta de colores arcoiris para ciclar el gradiente completo
@@ -58676,10 +59082,10 @@ _getTargetScale = function()
     -- DEBUG: imprimir valores reales para diagnosticar
     warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
     if _isMobileNow then
-        -- MOBILE: escala reducida para ocupar menos pantalla (m?x 42% del ancho)
-        local _scaleByW = (_vpNow.X - 16) / 900
-        local _scaleByH = (_vpNow.Y * 0.55) / 480
-        local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.26, 0.42)
+        -- Calcular escala exacta para que el frame 900x480 entre en pantalla con margen
+        local _scaleByW = (_vpNow.X - 24) / 900
+        local _scaleByH = (_vpNow.Y - 24) / 480
+        local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.30, 0.55)
         warn("[ZerqonHUB SCALE DEBUG] mobile -> final=" .. tostring(_final))
         return _final
     else
@@ -59363,6 +59769,209 @@ particles = {}
 
     -- (animacion de titulo removida: header usa layout Capybara estilo con textos visibles)
 
+    -- ================================================================
+    -- DRAG DEL HUB ? sistema ?nico consolidado (v-fix)
+    -- Un solo flag global _G._hubDragging evita que dos sistemas
+    -- compitan y dejen el flag stuck al cambiar de tab o re-ejecutar.
+    -- ================================================================
+    _G._hubDragging = false  -- flag global visible por el pulso del borde
+
+    -- dragIcon: boton transparente sobre todo el mainFrame para capturar drag desde cualquier parte
+    local dragIcon = Instance.new("TextButton", mainFrame)
+    dragIcon.Size = UDim2.new(1, 0, 1, 0)
+    dragIcon.Position = UDim2.new(0, 0, 0, 0)
+    dragIcon.BackgroundTransparency = 1
+    dragIcon.Text = ""
+    dragIcon.TextTransparency = 1
+    dragIcon.ZIndex = 0  -- ZIndex bajo para no bloquear botones y sliders del hub
+    dragIcon.AutoButtonColor = false
+    dragIcon.Active = true
+
+    do
+        -- Estado de drag en upvalues locales (no closures anidadas)
+        local _dragActive    = false
+        local _dragStartMouse = nil   -- Vector3
+        local _dragStartFrame = nil   -- Vector2 (top-left del frame al iniciar)
+
+        -- Helpers
+
+        local function _resolveFrameTopLeft()
+            -- FIX: usar AbsolutePosition directamente (ya tiene en cuenta AnchorPoint,
+            -- Scale, Offset y GuiInset de Roblox). Es la forma más confiable en móvil.
+            local ap = mainFrame.AbsolutePosition
+            return Vector2.new(ap.X, ap.Y)
+        end
+
+        local function _mouseOverHeader(p2d)
+            -- Drag desde CUALQUIER parte del hub manteniendo presionado
+            local fPos = mainFrame.AbsolutePosition
+            local fSiz = mainFrame.AbsoluteSize
+            return p2d.X >= fPos.X and p2d.X <= fPos.X + fSiz.X
+               and p2d.Y >= fPos.Y and p2d.Y <= fPos.Y + fSiz.Y
+        end
+
+        -- Drag desde cualquier parte del frame (no solo borde)
+        local function _mouseOverBorder(p2d)
+            return false
+        end
+
+        -- Efectos visuales al arrastrar / soltar
+        local function _activateDragEffect()
+            _G._hubDragging = true
+            local _hubCorner = mainFrame:FindFirstChildOfClass("UICorner")
+            if _hubCorner then
+                TweenService:Create(_hubCorner, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {CornerRadius = UDim.new(0, 28)}):Play()
+            end
+            TweenService:Create(glowBorder, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Thickness    = 0,
+                Transparency = 1.0,
+            }):Play()
+        end
+
+        local function _deactivateDragEffect()
+            _G._hubDragging = false
+            local _hubCorner = mainFrame:FindFirstChildOfClass("UICorner")
+            if _hubCorner then
+                TweenService:Create(_hubCorner, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                    {CornerRadius = UDim.new(0, 14)}):Play()
+            end
+            TweenService:Create(glowBorder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Thickness    = 0,
+                Transparency = 1.0,
+            }):Play()
+        end
+
+        -- Estado de hold (el drag requiere mantener presionado en el header)
+        local _holdPending   = false   -- mouse/touch est? presionado en el header
+        local _holdStartPos  = nil     -- posicion al presionar
+        local _holdThread    = nil     -- coroutine del delay de hold
+
+        -- DRAG INSTANTANEO: sin delay de hold, se activa apenas se presiona en cualquier parte del hub
+        local MOVE_THRESHOLD = 3  -- pixeles minimos para que cuente como drag (evita click accidental)
+
+        -- Inicio de drag inmediato desde cualquier parte del mainFrame
+        local function _startDrag(inputPos2D)
+            if true then return end  -- DESACTIVADO: hub no movible
+            if _G._hubSettings and _G._hubSettings.allowHubDrag == false then return end
+            if _dragActive then return end  -- ya dragging, no re-iniciar
+            -- Verificar que el click sea dentro del hub
+            local fPos = mainFrame.AbsolutePosition
+            local fSiz = mainFrame.AbsoluteSize
+            if inputPos2D.X < fPos.X or inputPos2D.X > fPos.X + fSiz.X then return end
+            if inputPos2D.Y < fPos.Y or inputPos2D.Y > fPos.Y + fSiz.Y then return end
+            -- FIX: usar AbsolutePosition como top-left real (confiable en móvil con cualquier AnchorPoint)
+            local tl = Vector2.new(fPos.X, fPos.Y)
+            -- Normalizar a AnchorPoint(0,0) para que el drag sea predecible
+            mainFrame.AnchorPoint = Vector2.new(0, 0)
+            mainFrame.Position    = UDim2.new(0, tl.X, 0, tl.Y)
+            _dragActive     = true
+            _dragStartMouse = Vector2.new(inputPos2D.X, inputPos2D.Y)
+            _dragStartFrame = tl
+            if leftColumn then pcall(function() leftColumn.ScrollingEnabled = false end) end
+            _activateDragEffect()
+        end
+
+        -- _onHeaderPress ahora activa drag inmediatamente sin esperar hold
+        local function _onHeaderPress(inputPos2D)
+            _startDrag(inputPos2D)
+        end
+
+        -- Soltar: terminar drag
+        local function _onRelease()
+            -- noop: el estado se limpia en InputEnded abajo
+        end
+
+        -- InputBegan: activar drag inmediatamente al presionar
+        _safeConnect(UserInputService.InputBegan, function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mp = UserInputService:GetMouseLocation()
+                _onHeaderPress(Vector2.new(mp.X, mp.Y))
+            elseif inp.UserInputType == Enum.UserInputType.Touch then
+                _onHeaderPress(Vector2.new(inp.Position.X, inp.Position.Y))
+            end
+        end)
+
+        -- InputChanged: sin logica de hold, solo movimiento real del drag activo
+        _safeConnect(UserInputService.InputChanged, function(inp)
+            -- no se necesita logica extra aqui: el drag activo lo maneja el bloque de abajo
+        end)
+
+        -- dragIcon: compatibilidad con executors que no exponen UIS correctamente
+        -- FIX: dragIcon ya no llama _onHeaderPress por separado.
+        -- El _safeConnect(UserInputService.InputBegan) de arriba ya lo maneja.
+        -- Llamarlo de nuevo desde dragIcon reseteaba _dragStartMouse mientras
+        -- ya se arrastraba, haciendo que el hub saltara a una esquina.
+        -- dragIcon.InputBegan queda vacio intencionalmente.
+        dragIcon.InputBegan:Connect(function(_inp) end)
+
+        -- Movimiento (un solo _safeConnect – no duplicado)
+        -- FIX MOBILE BARRERA: se usa GuiService:GetGuiInset() para compensar
+        -- la barra de status de Roblox en celular (~36px arriba).
+        -- Sin esto el hub no puede subirse más allá del inset (barrera invisible).
+        _safeConnect(UserInputService.InputChanged, function(input)
+            if not _dragActive then return end
+            if _G._sliderDragging then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseMovement
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            local delta = Vector2.new(input.Position.X, input.Position.Y) - _dragStartMouse
+            local vp    = workspace.CurrentCamera.ViewportSize
+            local fw    = mainFrame.AbsoluteSize.X
+            local fh    = mainFrame.AbsoluteSize.Y
+            -- FIX BARRERA: obtener inset real de la GUI (barra de status Roblox en movil)
+            local _insetTop = 0
+            pcall(function()
+                local gs = game:GetService("GuiService")
+                local inset = gs:GetGuiInset()
+                _insetTop = inset.Y  -- tipicamente 36px en movil
+            end)
+            mainFrame.Position = UDim2.new(0,
+                math.clamp(_dragStartFrame.X + delta.X, 0, vp.X - fw), 0,
+                math.clamp(_dragStartFrame.Y + delta.Y, _insetTop, vp.Y - fh))
+            -- Sincronizar estela si existe
+            task.defer(function()
+                local trailSG = hubGui and hubGui:FindFirstChild("EstelaContainer")
+                if trailSG and trailSG.Parent then
+                    trailSG.Position    = mainFrame.Position
+                    trailSG.AnchorPoint = mainFrame.AnchorPoint
+                end
+            end)
+        end)
+
+        -- Fin de drag (un solo _safeConnect ? resetea flag siempre)
+        _safeConnect(UserInputService.InputEnded, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+                _onRelease()  -- cancelar hold pendiente siempre
+                if _dragActive then
+                    _dragActive = false
+                    if leftColumn then pcall(function() leftColumn.ScrollingEnabled = true end) end
+                    _deactivateDragEffect()
+                end
+            end
+        end)
+
+        -- Hover del header: resaltar borde (solo visual, no inicia drag)
+        -- FIX DRAG: header.Active siempre true para que dragIcon reciba inputs
+        header.Active = true
+        header.MouseEnter:Connect(function()
+            if not _dragActive then
+                TweenService:Create(glowBorder, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Thickness    = 0,
+                    Transparency = 1.0,
+                }):Play()
+            end
+        end)
+        header.MouseLeave:Connect(function()
+            if not _dragActive then
+                -- FIX DRAG: NO desactivar header.Active en MouseLeave (rompe drag en algunos ejecutores)
+                TweenService:Create(glowBorder, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Thickness    = 0,
+                    Transparency = 1.0,
+                }):Play()
+            end
+        end)
+    end -- cierra do drag
 
     -- -- BOTON CERRAR (X imagen custom) ? esquina superior derecha, fuera del header --
     local arrowToggleBtn = Instance.new("TextButton", mainFrame)
@@ -62959,67 +63568,15 @@ local function _ZerqonLoadingScreen(onComplete)
     end)
     if not sg.Parent then sg.Parent = lp.PlayerGui end
 
-    -- ============================================================
-    -- FONDO PRINCIPAL: imagen del ojo abierto + animacion de parpadeo
-    -- IDs:
-    --   Ojo abierto -> rbxassetid://96937964432645
-    --   Cierre ojo  -> rbxassetid://124196125990159
-    -- ============================================================
+    -- Fondo oscuro semitransparente (backdrop)
     local backdrop = Instance.new("Frame", sg)
     backdrop.Name                 = "Backdrop"
     backdrop.Size                 = UDim2.new(1, 0, 1, 0)
     backdrop.Position             = UDim2.new(0, 0, 0, 0)
     backdrop.BackgroundColor3     = Color3.fromRGB(0, 0, 0)
-    backdrop.BackgroundTransparency = 0
+    backdrop.BackgroundTransparency = 1  -- empieza invisible, fade in
     backdrop.BorderSizePixel      = 0
     backdrop.ZIndex               = 8
-
-    -- Imagen principal del fondo (ojo abierto)
-    local bgImg = Instance.new("ImageLabel", backdrop)
-    bgImg.Name                   = "BgEye"
-    bgImg.Size                   = UDim2.new(1, 0, 1, 0)
-    bgImg.Position               = UDim2.new(0, 0, 0, 0)
-    bgImg.BackgroundTransparency = 1
-    bgImg.Image                  = "rbxassetid://96937964432645"
-    bgImg.ScaleType              = Enum.ScaleType.Stretch
-    bgImg.ImageTransparency      = 0
-    bgImg.ZIndex                 = 9
-
-    -- Overlay de cierre (empieza invisible)
-    local blinkImg = Instance.new("ImageLabel", backdrop)
-    blinkImg.Name                   = "BlinkOverlay"
-    blinkImg.Size                   = UDim2.new(1, 0, 1, 0)
-    blinkImg.Position               = UDim2.new(0, 0, 0, 0)
-    blinkImg.BackgroundTransparency = 1
-    blinkImg.Image                  = "rbxassetid://124196125990159"
-    blinkImg.ScaleType              = Enum.ScaleType.Stretch
-    blinkImg.ImageTransparency      = 1
-    blinkImg.ZIndex                 = 10
-
-    -- Animacion de parpadeo en loop (cierra -> abre)
-    task.spawn(function()
-        local BLINK_INTERVAL = 2.5
-        local CLOSE_TIME     = 0.18
-        local OPEN_TIME      = 0.18
-
-        while backdrop and backdrop.Parent do
-            task.wait(BLINK_INTERVAL)
-            if not (backdrop and backdrop.Parent) then break end
-
-            -- FASE 1: Cerrar ojo
-            blinkImg.ImageTransparency = 1
-            TweenService:Create(blinkImg,
-                TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-                {ImageTransparency = 0}):Play()
-            task.wait(CLOSE_TIME)
-
-            -- FASE 2: Abrir ojo
-            TweenService:Create(blinkImg,
-                TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-                {ImageTransparency = 1}):Play()
-            task.wait(OPEN_TIME)
-        end
-    end)
 
     -- Contenedor principal (MAS GRANDE: 420x220)
     local rect = Instance.new("Frame", sg)
@@ -63196,7 +63753,8 @@ local function _ZerqonLoadingScreen(onComplete)
     uiScale.Scale = 0.7  -- empieza peque?o
 
     task.spawn(function()
-        -- Backdrop ya visible (fondo de ojo), sin fade-in
+        -- Fade in del backdrop
+        TweenService:Create(backdrop, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.55}):Play()
         task.wait(0.15)
 
         -- El rect aparece con: escala 0.7->1, posicion slide up, fade in, borde brilla
@@ -63320,7 +63878,7 @@ local function _ZerqonLoadingScreen(onComplete)
             Position = UDim2.new(0.5, -210, 0.5, -160),
         }):Play()
         TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
-        -- Backdrop (fondo de ojo) se destruye junto con el sg, sin fade-out separado
+        TweenService:Create(backdrop, TweenInfo.new(0.35, Enum.EasingStyle.Sine), {BackgroundTransparency = 1}):Play()
         for _, r in ipairs(rows) do
             TweenService:Create(r.check, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
             TweenService:Create(r.txt,   TweenInfo.new(0.2), {TextTransparency = 1}):Play()
