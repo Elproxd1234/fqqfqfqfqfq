@@ -808,7 +808,7 @@ _G._discordAvatarUrl       = _G._discordAvatarUrl or ""
 -- ================================================================
 -- == AUTO-GUARDADO PREMIUM v1
 -- Lee el archivo de sesion premium guardado localmente.
--- Si el vínculo sigue siendo reciente (< 24h), restaura el acceso
+-- Si el v?nculo sigue siendo reciente (< 24h), restaura el acceso
 -- sin que el usuario tenga que abrir el navegador de nuevo.
 -- El recheck que viene despues igual valida contra el backend.
 -- ================================================================
@@ -816,7 +816,7 @@ do
     local _lp2   = game:GetService("Players").LocalPlayer
     local _uid2  = tostring(_lp2 and _lp2.UserId or "0")
     local _premPath = "zerqon_premium_" .. _uid2 .. ".txt"
-    local _PREM_DUR = 7 * 24 * 3600  -- 7 días: alineado con el TTL del servidor
+    local _PREM_DUR = 7 * 24 * 3600  -- 7 d?as: alineado con el TTL del servidor
 
     pcall(function()
         if not readfile then return end
@@ -839,13 +839,13 @@ do
             _G._discordUsername        = (_uname and _uname ~= "") and _uname or "Usuario"
             _G._premiumSavedDiscordId  = _did
             _G._zerqonSessionToken     = (_tok and _tok ~= "") and _tok or nil
-            warn("[ZerqonHUB] Sesión guardada encontrada — " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
+            warn("[ZerqonHUB] Sesi?n guardada encontrada ? " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
         else
             -- Vencio: borrar
             pcall(function() if delfile   then delfile(_premPath)       end end)
             pcall(function() if writefile then writefile(_premPath, "") end end)
             _G._zerqonSessionToken = nil
-            warn("[ZerqonHUB] Sesión premium vencida. Se requiere re-verificación.")
+            warn("[ZerqonHUB] Sesi?n premium vencida. Se requiere re-verificaci?n.")
         end
     end)
 end
@@ -872,7 +872,7 @@ if false and _G._discordPremiumVerified then
         repeat task.wait(0.2); _waitTick += 1 until _G._hubReady or _waitTick > 100
 
         -- Recheck con sessionToken: el servidor valida que este Roblox
-        -- es exactamente el propietario legítimo de la sesión guardada.
+        -- es exactamente el propietario leg?timo de la sesi?n guardada.
         local ok, response = pcall(function()
             return request({
                 Url    = _BACKEND_URL .. "/api/recheck-premium?roblox_id=" .. _robloxId
@@ -918,11 +918,11 @@ if false and _G._discordPremiumVerified then
             end)
             if dok and data then
                 if data.hasPremium == true then
-                    -- Token válido y sigue con el rol ? restaurar sin login
+                    -- Token v?lido y sigue con el rol ? restaurar sin login
                     _G._discordPremiumVerified = true
                     _G._discordUsername  = data.username  or _G._discordUsername
                     _G._discordAvatarUrl = data.avatarUrl or _G._discordAvatarUrl or ""
-                    warn("[ZerqonHUB] Recheck OK — premium confirmado, RobloxId=" .. _robloxId)
+                    warn("[ZerqonHUB] Recheck OK ? premium confirmado, RobloxId=" .. _robloxId)
 
                     -- DESBLOQUEO EN CALIENTE del tab VIP
                     local _PIDX = 4
@@ -939,11 +939,11 @@ if false and _G._discordPremiumVerified then
                         end
                     end)
                 elseif data.needsLogin then
-                    -- Token inválido, sesión vencida o vínculo eliminado ? forzar re-login
-                    warn("[ZerqonHUB] Recheck: sesión inválida o vencida. Se requiere re-login.")
+                    -- Token inv?lido, sesi?n vencida o v?nculo eliminado ? forzar re-login
+                    warn("[ZerqonHUB] Recheck: sesi?n inv?lida o vencida. Se requiere re-login.")
                     _clearPremiumSession()
                 else
-                    -- Perdió el rol Discord ? limpiar
+                    -- Perdi? el rol Discord ? limpiar
                     warn("[ZerqonHUB] Recheck: premium revocado, RobloxId=" .. _robloxId)
                     _clearPremiumSession()
                 end
@@ -10486,8 +10486,8 @@ function CreateNebulaSelector(parent, titulo, opciones, default, callback)
     -- Colores vivos del hub (referencia global ThemeColors)
     local function C(key) return ThemeColors[key] end
 
-    -- SELECTOR REDISEÑADO: glassmorphism ultra-transparente, estilo USE
-    -- Cabecera: una sola fila horizontal con titulo + botón selector a la derecha
+    -- SELECTOR REDISE?ADO: glassmorphism ultra-transparente, estilo USE
+    -- Cabecera: una sola fila horizontal con titulo + bot?n selector a la derecha
     local masterFrame = Instance.new("Frame", parent)
     masterFrame.Name             = "NebulaSelector_" .. titulo
     masterFrame.Size             = UDim2.new(1, 0, 0, HEADER_H)
@@ -32274,7 +32274,7 @@ function CreateWorldUI_Emotes()
         local targetCol = (i % 2 == 1) and leftColumn or rightColumn
 
         -- ==============================================================
-        -- PANEL PREMIUM -- diseño visual mejorado con gradiente, icono de color y animaciones
+        -- PANEL PREMIUM -- dise?o visual mejorado con gradiente, icono de color y animaciones
         -- ==============================================================
         local emoteAccent = emote.accent or ThemeColors.Primary
         local emoteEmoji  = emote.emoji  or "[--]"
@@ -32376,7 +32376,7 @@ function CreateWorldUI_Emotes()
         titleLbl.TextStrokeTransparency = 0.5
         titleLbl.ZIndex               = 20
 
-        -- Tag "EMOTE" pequeño a la derecha del nombre
+        -- Tag "EMOTE" peque?o a la derecha del nombre
         local tagLbl = Instance.new("TextLabel", titleRow)
         tagLbl.Size = UDim2.new(0, 44, 0, 16)
         tagLbl.Position = UDim2.new(0, 46, 0.5, -8)
@@ -35738,17 +35738,17 @@ function CreateWorldUI_Performance()
                     end)
                 end
             end)
-            CreateCustomNotification("FPS BOOST", "ON — " .. n .. " partes optimizadas", 3)
+            CreateCustomNotification("FPS BOOST", "ON ? " .. n .. " partes optimizadas", 3)
         else
             _restoreFpsBoost()
-            CreateCustomNotification("FPS BOOST", "OFF — graficos restaurados", 2)
+            CreateCustomNotification("FPS BOOST", "OFF ? graficos restaurados", 2)
         end
     end, _fbs.enabled)
 
     -- Boton one-shot (para aplicar rapido sin toggle)
     _makeTPButton("FPS Boost (One-Shot)", function()
         local n = _applyFpsBoost()
-        CreateCustomNotification("FPS BOOST", "Aplicado — " .. n .. " partes", 3)
+        CreateCustomNotification("FPS BOOST", "Aplicado ? " .. n .. " partes", 3)
     end, sec)
 
     -- ================================================================
@@ -35882,10 +35882,10 @@ function CreateWorldUI_Performance()
                     end
                 end)
             end)
-            CreateCustomNotification("REMOVE BARRIERS", "ON — " .. removed .. " barreras eliminadas", 3)
+            CreateCustomNotification("REMOVE BARRIERS", "ON ? " .. removed .. " barreras eliminadas", 3)
         else
             _restoreBarriers()
-            CreateCustomNotification("REMOVE BARRIERS", "OFF — colisiones restauradas", 2)
+            CreateCustomNotification("REMOVE BARRIERS", "OFF ? colisiones restauradas", 2)
         end
     end, _rbs.enabled)
 
@@ -35945,10 +35945,10 @@ function CreateWorldUI_Performance()
         if not _ces.origClock  then _ces.origClock  = L.ClockTime  end
         if not _ces.origFog    then _ces.origFog    = L.FogEnd      end
 
-        -- Lighting limpio: mediodía suave, sin niebla cercana
+        -- Lighting limpio: mediod?a suave, sin niebla cercana
         pcall(function()
             L.Brightness  = math.min(L.Brightness + 0.5, 4)
-            L.ClockTime   = 14   -- mediodía (luz limpia y directa)
+            L.ClockTime   = 14   -- mediod?a (luz limpia y directa)
             L.FogEnd      = math.max(L.FogEnd, 100000)
         end)
 
@@ -36086,10 +36086,10 @@ function CreateWorldUI_Performance()
                     end
                 end)
             end)
-            CreateCustomNotification("CARTOON ENH", "ON — " .. n .. " partes mejoradas visualmente", 3)
+            CreateCustomNotification("CARTOON ENH", "ON ? " .. n .. " partes mejoradas visualmente", 3)
         else
             _restoreCartoonEnh()
-            CreateCustomNotification("CARTOON ENH", "OFF — apariencia original restaurada", 2)
+            CreateCustomNotification("CARTOON ENH", "OFF ? apariencia original restaurada", 2)
         end
     end, _ces.enabled)
 
@@ -40223,19 +40223,19 @@ function CreatePremiumTab()
     -- ================================================================
     -- == DISCORD PREMIUM LOCK v2 (Discord OAuth2 + Bio Roblox)
     -- FLUJO:
-    --   1ra vez : Login Discord ? verificar rol ? poner código en bio ? acceso
-    --   Próximas: recheck automático por RobloxUserId vinculado
+    --   1ra vez : Login Discord ? verificar rol ? poner c?digo en bio ? acceso
+    --   Pr?ximas: recheck autom?tico por RobloxUserId vinculado
     -- ================================================================
     local BACKEND_URL = "https://zerqonhub.onrender.com"
     local HttpService  = game:GetService("HttpService")
 
     -- FIX VIP VACIO: re-forzar bypass por si el recheck u otro proceso
-    -- revirtió el flag a false entre sesiones o al reconstruir el tab.
+    -- revirti? el flag a false entre sesiones o al reconstruir el tab.
     _G._discordPremiumVerified = true
 
     if not _G._discordPremiumVerified then
 
-        -- Generar un ID de sesión único para este intento de login
+        -- Generar un ID de sesi?n ?nico para este intento de login
         if not _G._hubSessionId then
             _G._hubSessionId = "HUB-" .. tostring(math.random(100000, 999999))
         end
@@ -40244,7 +40244,7 @@ function CreatePremiumTab()
         local robloxId  = tostring(game:GetService("Players").LocalPlayer.UserId)
 
         -- ============================================================
-        -- PANTALLA DE VERIFICACIÓN (Frame principal, ocupa el tab)
+        -- PANTALLA DE VERIFICACI?N (Frame principal, ocupa el tab)
         -- ============================================================
         local lockFrame = Instance.new("Frame", contentContainer)
         lockFrame.Name = "PremiumLockScreen"
@@ -40264,12 +40264,12 @@ function CreatePremiumTab()
         stroke.Thickness = 1.5
         stroke.Transparency = 0.3
 
-        -- Título
+        -- T?tulo
         local titleLbl = Instance.new("TextLabel", centerFrame)
         titleLbl.Size = UDim2.new(1, -20, 0, 26)
         titleLbl.Position = UDim2.new(0, 10, 0, 14)
         titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = "PREMIUM — VERIFICACIÓN"
+        titleLbl.Text = "PREMIUM ? VERIFICACI?N"
         titleLbl.TextSize = 14
         titleLbl.Font = Enum.Font.GothamBold
         titleLbl.TextXAlignment = Enum.TextXAlignment.Center
@@ -40280,7 +40280,7 @@ function CreatePremiumTab()
         statusLbl.Size = UDim2.new(1, -20, 0, 32)
         statusLbl.Position = UDim2.new(0, 10, 0, 44)
         statusLbl.BackgroundTransparency = 1
-        statusLbl.Text = "Paso 1: Loguéate con Discord"
+        statusLbl.Text = "Paso 1: Logu?ate con Discord"
         statusLbl.TextSize = 11
         statusLbl.Font = Enum.Font.Gotham
         statusLbl.TextWrapped = true
@@ -40294,7 +40294,7 @@ function CreatePremiumTab()
             end
         end
 
-        -- -- PASO 1: botón copiar link de login --
+        -- -- PASO 1: bot?n copiar link de login --
         local copyBtn = Instance.new("TextButton", centerFrame)
         copyBtn.Name = "CopyBtn"
         copyBtn.Size = UDim2.new(1, -40, 0, 36)
@@ -40328,13 +40328,13 @@ function CreatePremiumTab()
         sep.BorderSizePixel = 0
         sep.Visible = false  -- se muestra en paso 2
 
-        -- -- PASO 2: instrucción de bio --
+        -- -- PASO 2: instrucci?n de bio --
         local bioInstr = Instance.new("TextLabel", centerFrame)
         bioInstr.Name = "BioInstr"
         bioInstr.Size = UDim2.new(1, -20, 0, 38)
         bioInstr.Position = UDim2.new(0, 10, 0, 142)
         bioInstr.BackgroundTransparency = 1
-        bioInstr.Text = "Paso 2: Pegá este código en tu bio de Roblox"
+        bioInstr.Text = "Paso 2: Peg? este c?digo en tu bio de Roblox"
         bioInstr.TextSize = 11
         bioInstr.Font = Enum.Font.Gotham
         bioInstr.TextWrapped = true
@@ -40342,7 +40342,7 @@ function CreatePremiumTab()
         bioInstr.TextColor3 = Color3.fromRGB(160, 160, 180)
         bioInstr.Visible = false
 
-        -- Label del código de bio
+        -- Label del c?digo de bio
         local bioCodeLbl = Instance.new("TextLabel", centerFrame)
         bioCodeLbl.Name = "BioCodeLbl"
         bioCodeLbl.Size = UDim2.new(1, -40, 0, 34)
@@ -40362,13 +40362,13 @@ function CreatePremiumTab()
         bioCodeLbl.TextColor3 = Color3.fromRGB(87, 242, 135)
         bioCodeLbl.Visible = false
 
-        -- Botón copiar código de bio
+        -- Bot?n copiar c?digo de bio
         local copyCodeBtn = Instance.new("TextButton", centerFrame)
         copyCodeBtn.Name = "CopyCodeBtn"
         copyCodeBtn.Size = UDim2.new(1, -40, 0, 32)
         copyCodeBtn.Position = UDim2.new(0, 20, 0, 230)
         copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-        copyCodeBtn.Text = "??  Copiar código"
+        copyCodeBtn.Text = "??  Copiar c?digo"
         copyCodeBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
         copyCodeBtn.Font = Enum.Font.GothamBold
         copyCodeBtn.TextSize = 12
@@ -40376,7 +40376,7 @@ function CreatePremiumTab()
         Instance.new("UICorner", copyCodeBtn).CornerRadius = UDim.new(0, 8)
         copyCodeBtn.Visible = false
 
-        local _bioCode = ""  -- código que el backend manda para poner en la bio
+        local _bioCode = ""  -- c?digo que el backend manda para poner en la bio
 
         copyCodeBtn.Activated:Connect(function()
             pcall(function() setclipboard(_bioCode) end)
@@ -40384,14 +40384,14 @@ function CreatePremiumTab()
             copyCodeBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
             task.wait(2)
             if copyCodeBtn and copyCodeBtn.Parent then
-                copyCodeBtn.Text = "??  Copiar código"
+                copyCodeBtn.Text = "??  Copiar c?digo"
                 copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
             end
         end)
 
         -- ============================================================
         -- POLLING: espera login Discord ? acceso directo con rol premium
-        -- Sin paso de verificación de bio (eliminado).
+        -- Sin paso de verificaci?n de bio (eliminado).
         -- ============================================================
         local _pollingActive = true
         lockFrame.AncestryChanged:Connect(function() _pollingActive = false end)
@@ -40402,7 +40402,7 @@ function CreatePremiumTab()
             _G._discordAvatarUrl = avatarUrl    or ""
             _G._zerqonSessionToken = sessionToken or ""
             _G._hubSessionId = nil
-            -- AUTO-GUARDADO v2: incluye sessionToken para validación segura en reboots
+            -- AUTO-GUARDADO v2: incluye sessionToken para validaci?n segura en reboots
             pcall(function()
                 if not writefile then return end
                 local _lp3   = game:GetService("Players").LocalPlayer
@@ -40414,9 +40414,9 @@ function CreatePremiumTab()
                 local _now   = tostring(os.time())
                 -- formato v2: discordId|robloxId|username|savedAt|sessionToken
                 writefile(_pPath, _dId .. "|" .. _uid3 .. "|" .. _uname .. "|" .. _now .. "|" .. _tok)
-                warn("[ZerqonHUB] Sesión guardada en disco (válida 7 días).")
+                warn("[ZerqonHUB] Sesi?n guardada en disco (v?lida 7 d?as).")
             end)
-            setStatus("? ¡Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
+            setStatus("? ?Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
             task.wait(0.8)
             _pollingActive = false
             if not lockFrame or not lockFrame.Parent then return end
@@ -40454,12 +40454,12 @@ function CreatePremiumTab()
                         elseif data.status == "no_premium" or (data.status == "ok" and not data.hasPremium) then
                             -- Sin premium: mostrar error SIN detener el polling
                             -- El usuario puede comprar el rol y el hub lo detecta solo
-                            setStatus("? No tenés el rol PREMIUM en el servidor de Discord", Color3.fromRGB(237, 66, 69))
+                            setStatus("? No ten?s el rol PREMIUM en el servidor de Discord", Color3.fromRGB(237, 66, 69))
                             -- NO hacer return ni poner _pollingActive = false
-                            -- así puede reintentar cuando consiga el rol
+                            -- as? puede reintentar cuando consiga el rol
                         elseif data.status == "linked_other" then
-                            -- Vinculación conflictiva: tampoco detener el polling
-                            -- El server ya no borra el código, puede reintentar
+                            -- Vinculaci?n conflictiva: tampoco detener el polling
+                            -- El server ya no borra el c?digo, puede reintentar
                             setStatus("?? " .. (data.error or "Cuenta ya vinculada a otro usuario"), Color3.fromRGB(237, 150, 0))
                         else
                             setStatus("Esperando login Discord... [" .. tostring(data.status or "?") .. "]", Color3.fromRGB(107, 107, 138))
@@ -42359,7 +42359,7 @@ function CreateExclusiveTab()
         local _llPad = Instance.new("UIPadding", linkLbl)
         _llPad.PaddingLeft = UDim.new(0, 6)
 
-        -- -- Tarjeta de perfil Discord (dentro de la sección DISCORD) --
+        -- -- Tarjeta de perfil Discord (dentro de la secci?n DISCORD) --
         -- Solo visible si el usuario tiene premium verificado.
         -- La imagen se carga via proxy del propio servidor para evitar
         -- el bloqueo de URLs externas del CDN de Discord en el executor.
@@ -42452,7 +42452,7 @@ function CreateExclusiveTab()
 
             -- Cargar avatar via proxy y nombre via get-avatar
             task.spawn(function()
-                -- -- NOMBRE: pedir al backend si no está en global --------------
+                -- -- NOMBRE: pedir al backend si no est? en global --------------
                 if not (_G._discordUsername and _G._discordUsername ~= "") then
                     local _ok, _res = pcall(function()
                         return request({ Url = _BURL .. "/api/get-avatar?roblox_id=" .. _rId, Method = "GET" })
@@ -42477,11 +42477,11 @@ function CreateExclusiveTab()
                 pcall(function()
                     local _avatarUrl = _BURL .. "/api/discord-avatar?roblox_id=" .. _rId
                     -- Algunos executors soportan http directamente en Image si el dominio
-                    -- está en la whitelist del executor (no de Roblox)
+                    -- est? en la whitelist del executor (no de Roblox)
                     avImg.Image = _avatarUrl
-                    -- Esperar 1.5s para ver si cargó (el executor hace el request async)
+                    -- Esperar 1.5s para ver si carg? (el executor hace el request async)
                     task.wait(1.5)
-                    -- Si Image sigue siendo la URL (no fue remplazada por rbxasset://), asumimos que cargó
+                    -- Si Image sigue siendo la URL (no fue remplazada por rbxasset://), asumimos que carg?
                     if avImg.Image ~= "" and not avImg.Image:find("rbxasset") then
                         avEmoji.Visible = false
                         _avatarLoaded = true
@@ -42502,9 +42502,9 @@ function CreateExclusiveTab()
                             local ei = Instance.new("EditableImage")
                             ei.Size = Vector2.new(128, 128)
                             -- Algunos executors exponen writePixels desde body raw
-                            -- Método más compatible: usar ImageData si está disponible
+                            -- M?todo m?s compatible: usar ImageData si est? disponible
                             avImg.Image = ""
-                            -- Intentar Content.fromObject si está disponible (Roblox 2024+)
+                            -- Intentar Content.fromObject si est? disponible (Roblox 2024+)
                             local ok3 = pcall(function()
                                 ei:WritePixelsBuffer(0, 0, ei.Size, _res2.Body)
                                 avImg.ImageContent = Content.fromObject(ei)
@@ -42517,7 +42517,7 @@ function CreateExclusiveTab()
                     end)
                 end
 
-                -- Si ningún método funcionó, mostrar inicial del nombre como fallback
+                -- Si ning?n m?todo funcion?, mostrar inicial del nombre como fallback
                 if not _avatarLoaded then
                     local _uname = _G._discordUsername or "?"
                     local _initial = _uname:sub(1, 1):upper()
@@ -43831,17 +43831,19 @@ function CreateExclusiveTab()
 
     CreateAuroraToggle(hudSec, "Ocultar Crosshair Roblox", function(on)
         _hs().crosshairHidden = on
+        -- FIX MOBILE: NO usar CoreGuiType.All - destruye el TouchGui (boton salto + joystick) en celular
+        -- Solo ocultar el crosshair especifico; si el executor no lo soporta, no tocar nada mas
         pcall(function()
             local sg = game:GetService("StarterGui")
-            sg:SetCoreGuiEnabled(Enum.CoreGuiType.All, not on)
+            local _ok = pcall(function()
+                sg:SetCoreGuiEnabled(Enum.CoreGuiType.Crosshair, not on)
+            end)
+            -- Fallback para executors viejos que no tienen CoreGuiType.Crosshair:
+            -- NO llamar .All porque rompe el joystick y el boton de salto en mobile
         end)
-        -- Intentar con metodo CoreGui alternativo (Synapse/Wave)
+        -- Ocultar cursor del mouse en PC
         pcall(function()
-            if on then
-                game:GetService("UserInputService").MouseIconEnabled = false
-            else
-                game:GetService("UserInputService").MouseIconEnabled = true
-            end
+            game:GetService("UserInputService").MouseIconEnabled = not on
         end)
         CreateCustomNotification("SETTINGS", on and "Crosshair oculto" or "Crosshair visible", 1.5)
     end, HS.crosshairHidden)
@@ -46249,7 +46251,7 @@ function CreateCombatTab()
             local sc = Instance.new("UIScale", btnRoot)
             sc.Scale = 0
 
-            -- Botón principal: fondo degradado oscuro azul del hub + borde neon cian
+            -- Bot?n principal: fondo degradado oscuro azul del hub + borde neon cian
             local clickBtn = Instance.new("TextButton", btnRoot)
             clickBtn.Name                   = "ShootButton"
             clickBtn.Size                   = UDim2.new(1, 0, 1, 0)
@@ -54011,7 +54013,7 @@ function CreateCombatTab()
             local tTors = tChar:FindFirstChild("UpperTorso") or tChar:FindFirstChild("Torso")
             if not tHRP then return end
             local hitParts = {tHRP, tHead or tHRP, tTors or tHRP}
-            -- Calcular origen real del disparo (boca del cañón o HRP del jugador)
+            -- Calcular origen real del disparo (boca del ca??n o HRP del jugador)
             local barrelAtt = getGunAttachment and getGunAttachment(gun, myHRP)
             local _cam = workspace.CurrentCamera
             local baseOrigin = (barrelAtt and barrelAtt.WorldPosition)
@@ -58966,12 +58968,12 @@ mainFrame.ClipsDescendants = true
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================
--- == FONDO HUB v3 — Aurora Liquida + Particulas + Color Cycle
+-- == FONDO HUB v3 ? Aurora Liquida + Particulas + Color Cycle
 -- Capas:
 --   1. Imagen de fondo original (dock nocturno) con transparencia leve
 --   2. Aurora: 3 franjas de color que rotan y cambian de tono en ciclo
 --   3. Particulas: puntos de luz que suben y se desvanecen
---   4. Viñeta perimetral con pulso suave
+--   4. Vi?eta perimetral con pulso suave
 --   5. Shimmer diagonal que barre cada 8s
 -- ================================================================
 do
@@ -59025,7 +59027,7 @@ do
         end
     end)
 
-    -- -- CAPA 2: AURORA — 3 franjas de luz que se mueven y cambian de color --
+    -- -- CAPA 2: AURORA ? 3 franjas de luz que se mueven y cambian de color --
     -- Paleta de colores del ciclo aurora (HSV-friendly, 6 estados)
     local _auroraPalette = {
         { Color3.fromRGB(30,  0,  90), Color3.fromRGB( 80,  0, 180), Color3.fromRGB(  0, 60, 200) },  -- violeta profundo
@@ -59122,7 +59124,7 @@ do
         end
     end)
 
-    -- -- CAPA 3: PARTICULAS — puntos de luz que suben y se desvanecen --
+    -- -- CAPA 3: PARTICULAS ? puntos de luz que suben y se desvanecen --
     local _PARTICLE_COUNT = 22
     local _particles = {}
 
@@ -59201,7 +59203,7 @@ do
         end
     end)
 
-    -- -- CAPA 4: VIÑETA perimetral con pulso de color suave -----------
+    -- -- CAPA 4: VI?ETA perimetral con pulso de color suave -----------
     local _vigFrame = Instance.new("Frame", mainFrame)
     _vigFrame.Name = "HubVignette"
     _vigFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -59234,7 +59236,7 @@ do
         end
     end)
 
-    -- -- CAPA 5: SHIMMER diagonal — barre cada 8s ---------------------
+    -- -- CAPA 5: SHIMMER diagonal ? barre cada 8s ---------------------
     local _shimFrame = Instance.new("Frame", mainFrame)
     _shimFrame.Name = "HubShimmer"
     _shimFrame.Size = UDim2.new(0.32, 0, 1.4, 0)
@@ -59373,7 +59375,7 @@ _G._applyHubBackground = function(id)
 end
 _G._hubWaveContainer = nil
 
--- Borde del mainFrame activado (diseño arcoíris rapido)
+-- Borde del mainFrame activado (dise?o arco?ris rapido)
 glowBorder = Instance.new("UIStroke", mainFrame)
 glowBorder.Color = Color3.fromRGB(0, 200, 160)
 glowBorder.Thickness = 2.5
@@ -59395,7 +59397,7 @@ do
     _borderGrad.Rotation = 0
     _G._hubBorderGrad = _borderGrad
 
-    -- Animacion rapida: gira 360° en ~1.8 segundos (muy rapida y vistosa)
+    -- Animacion rapida: gira 360? en ~1.8 segundos (muy rapida y vistosa)
     local _borderHue = 0
     local _borderRotation = 0
     local _borderAnimRunning = true
@@ -60361,7 +60363,7 @@ particles = {}
         end)
     end -- cierra do drag
 
-    -- -- BOTON CERRAR (X imagen custom) — esquina superior derecha, fuera del header --
+    -- -- BOTON CERRAR (X imagen custom) ? esquina superior derecha, fuera del header --
     local arrowToggleBtn = Instance.new("TextButton", mainFrame)
     arrowToggleBtn.Name = "CloseHubBtn"
     arrowToggleBtn.Size = UDim2.new(0, 36, 0, 36)
@@ -61694,7 +61696,7 @@ particles = {}
             _origPos.Y.Scale - 0.06, _origPos.Y.Offset
         )
 
-        -- Fade-in del frame principal con caída suave
+        -- Fade-in del frame principal con ca?da suave
         TweenService:Create(mainFrame,
             TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
             {Position = _origPos, BackgroundTransparency = 0}
@@ -62323,12 +62325,12 @@ function CreateUpdateTab()
 end
 
 -- ================================================================
--- == EMOTES TAB v2 - Rediseño fachero + optimizaciones de perf
+-- == EMOTES TAB v2 - Redise?o fachero + optimizaciones de perf
 -- PERF: sin Heartbeat para detectar movimiento -> usa StateChanged
 --       + velocidad solo cuando el personaje se mueve de verdad.
 --       sin Tweens en hover en mobile (solo desktop).
 --       animaciones cacheadas por ID para evitar recargas.
--- DESIGN: estética neón/cyberpunk, cards con icono, grid limpio,
+-- DESIGN: est?tica ne?n/cyberpunk, cards con icono, grid limpio,
 --         barra de estado, controles compactos.
 -- ================================================================
 function CreateEmotesTab()
@@ -62367,13 +62369,13 @@ function CreateEmotesTab()
         { name = "Zerq 9",  id = "rbxassetid://14352340648",     icon = "??" },
     }
 
-    -- Colores neón del tema
+    -- Colores ne?n del tema
     local CLR_BG       = Color3.fromRGB(8, 10, 22)
     local CLR_CARD     = Color3.fromRGB(14, 18, 42)
-    local CLR_ACCENT   = Color3.fromRGB(0, 210, 255)    -- cyan neón
+    local CLR_ACCENT   = Color3.fromRGB(0, 210, 255)    -- cyan ne?n
     local CLR_ACCENT2  = Color3.fromRGB(180, 0, 255)    -- violeta
-    local CLR_GREEN    = Color3.fromRGB(0, 255, 160)    -- verde neón
-    local CLR_RED      = Color3.fromRGB(255, 50, 100)   -- rojo neón
+    local CLR_GREEN    = Color3.fromRGB(0, 255, 160)    -- verde ne?n
+    local CLR_RED      = Color3.fromRGB(255, 50, 100)   -- rojo ne?n
     local CLR_TEXT     = Color3.fromRGB(220, 240, 255)
     local CLR_MUTED    = Color3.fromRGB(120, 140, 180)
 
@@ -62392,7 +62394,7 @@ function CreateEmotesTab()
     end
 
     -- -- Referencia al label de estado (se actualiza en tiempo real) -------
-    local _statusLbl = nil  -- asignado más adelante
+    local _statusLbl = nil  -- asignado m?s adelante
 
     local function _setStatus(txt, color)
         if _statusLbl then
@@ -62542,7 +62544,7 @@ function CreateEmotesTab()
     _statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
     _statusLbl.ZIndex = 14
 
-    -- -- Sección CONTROLES -------------------------------------------------
+    -- -- Secci?n CONTROLES -------------------------------------------------
     local ctrlSec = CreateBorderedSectionGlobal(leftColumn, "?  CONTROLES")
 
     -- Toggle Loop
@@ -62597,7 +62599,7 @@ function CreateEmotesTab()
             end
         end
 
-        -- Botón –
+        -- Bot?n ?
         local btnM = Instance.new("TextButton", speedRow)
         btnM.Size = UDim2.new(0, 28, 0, 24)
         btnM.Position = UDim2.new(1, -64, 0.5, -12)
@@ -62614,7 +62616,7 @@ function CreateEmotesTab()
             if speedIdx > 1 then speedIdx = speedIdx - 1; _applySpeed() end
         end)
 
-        -- Botón +
+        -- Bot?n +
         local btnP = Instance.new("TextButton", speedRow)
         btnP.Size = UDim2.new(0, 28, 0, 24)
         btnP.Position = UDim2.new(1, -32, 0.5, -12)
@@ -62632,7 +62634,7 @@ function CreateEmotesTab()
         end)
     end
 
-    -- -- Botón STOP --------------------------------------------------------
+    -- -- Bot?n STOP --------------------------------------------------------
     do
         local stopBtn = Instance.new("TextButton", ctrlSec)
         stopBtn.Size = UDim2.new(1, -4, 0, 32)
@@ -62655,7 +62657,7 @@ function CreateEmotesTab()
         end)
     end
 
-    -- -- Sección CUSTOM EMOTE ID -------------------------------------------
+    -- -- Secci?n CUSTOM EMOTE ID -------------------------------------------
     local customSec = CreateBorderedSectionGlobal(leftColumn, "??  CUSTOM EMOTE (ID)")
     do
         local hintLbl = Instance.new("TextLabel", customSec)
@@ -62729,7 +62731,7 @@ function CreateEmotesTab()
     end
 
     -- ---------------------------------------------------------------------
-    -- COLUMNA DERECHA: Grid de emotes (rediseñado)
+    -- COLUMNA DERECHA: Grid de emotes (redise?ado)
     -- ---------------------------------------------------------------------
 
     -- Header decorativo
@@ -62759,19 +62761,19 @@ function CreateEmotesTab()
     local hdrLbl = Instance.new("TextLabel", hdrFrame)
     hdrLbl.Size = UDim2.new(1, 0, 1, 0)
     hdrLbl.BackgroundTransparency = 1
-    hdrLbl.Text = "??  EMOTES  ·  Zerqon Hub"
+    hdrLbl.Text = "??  EMOTES  ?  Zerqon Hub"
     hdrLbl.TextColor3 = CLR_TEXT
     hdrLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
     hdrLbl.TextSize = 13
     hdrLbl.ZIndex = 14
 
-    -- Sección grid
+    -- Secci?n grid
     local emoteSec = CreateBorderedSectionGlobal(rightColumn, "EMOTES")
 
     -- OPT: pre-alocar todos los TweenInfo fuera del loop
     local _tiHover = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    -- Grid 2 columnas con cards estilo neón
+    -- Grid 2 columnas con cards estilo ne?n
     local emoteGrid = Instance.new("Frame", emoteSec)
     emoteGrid.Name      = "EmoteGrid"
     emoteGrid.Size      = UDim2.new(1, -4, 0, 0)
@@ -62788,7 +62790,7 @@ function CreateEmotesTab()
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     gridLayout.SortOrder         = Enum.SortOrder.LayoutOrder
 
-    -- OPT: colores alternados precalculados (no crear tablas en cada iteración)
+    -- OPT: colores alternados precalculados (no crear tablas en cada iteraci?n)
     local CARD_COLORS = {
         Color3.fromRGB(14, 30, 70),
         Color3.fromRGB(28, 12, 60),
@@ -62833,7 +62835,7 @@ function CreateEmotesTab()
         nameLbl.TextWrapped = true
         nameLbl.ZIndex = 14
 
-        -- Botón transparente encima (cubre la card entera)
+        -- Bot?n transparente encima (cubre la card entera)
         local btn = Instance.new("TextButton", card)
         btn.Size = UDim2.new(1, 0, 1, 0)
         btn.BackgroundTransparency = 1
@@ -63866,7 +63868,7 @@ do
                     math.floor((_mem0Dur - _elapsed0) / 3600) .. "h restantes, plan " .. math.floor(_mem0Dur/3600) .. "h). Mostrando animacion y abriendo hub...")
                 -- FIX: NO abrir hub directamente. Dejar que la animacion del
                 -- checklist siempre se muestre; _openHub() es llamado por la animacion.
-                _G._keyPreValidated = true  -- señal para que el keyscreen sepa que ya hay key
+                _G._keyPreValidated = true  -- se?al para que el keyscreen sepa que ya hay key
                 return true
             else
                 -- Expiro: limpiar para que no interfiera con el resto del flujo
@@ -64009,7 +64011,7 @@ do
 
     do  -- bloque dummy para mantener la estructura del else original
 
-    -- Token fijo por UserID: "ZQuser{uid}" — no cambia nunca entre dias ni sesiones.
+    -- Token fijo por UserID: "ZQuser{uid}" ? no cambia nunca entre dias ni sesiones.
     -- Siempre es el mismo bin, la web siempre escribe ahi, el hub siempre lee de ahi.
     local function _getToken()
         if _G._zerqonToken then return _G._zerqonToken end
@@ -64112,7 +64114,7 @@ do
     end
 
     local _myToken = _getToken()
-    -- FIX: si _tryAutoExec ya encontró el binId en JSONBin, reutilizarlo
+    -- FIX: si _tryAutoExec ya encontr? el binId en JSONBin, reutilizarlo
     -- Esto evita que el polling tenga que buscarlo de nuevo con _findBin
     local _myBinId = _G._zerqonBinId or nil
 
@@ -64368,7 +64370,7 @@ do
         end
     end)
 
-    -- Forward declaration: _openHub se define más abajo pero el spinner la necesita
+    -- Forward declaration: _openHub se define m?s abajo pero el spinner la necesita
     local _openHub
     local _pollingActive = false
 
@@ -64388,10 +64390,10 @@ do
         _G._ksStartSpin = _startSpin
         _G._ksStopSpin  = _stopSpin
 
-        -- FIX: si ya hay key guardada (_keyPreValidated), mostrar "aprobado" rápido
+        -- FIX: si ya hay key guardada (_keyPreValidated), mostrar "aprobado" r?pido
         -- sin necesitar polling. El texto de Ready desaparece suavemente al final.
         if _G._keyPreValidated then
-            -- Comprobando key: check verde rápido (key ya validada)
+            -- Comprobando key: check verde r?pido (key ya validada)
             task.wait(0.8)
             _stopSpin(_row2, true)
             -- Cambiar texto de "Comprobando key" a "Key aprobada ?"
@@ -64417,7 +64419,7 @@ do
                     TweenService:Create(r.icon, _fadeInfo, {TextTransparency = 1}):Play()
                 end
             end
-            -- Llamar _openHub() que abre el hub con animación de entrada
+            -- Llamar _openHub() que abre el hub con animaci?n de entrada
             task.wait(0.6)
             _openHub()
             return
@@ -64589,7 +64591,7 @@ do
                     _scaleCreated = true
                 end
 
-                -- Estado inicial: invisible, ligeramente pequeño
+                -- Estado inicial: invisible, ligeramente peque?o
                 _mainF.BackgroundTransparency = 1
                 _uiScale.Scale = 0.92
 
@@ -64938,7 +64940,7 @@ do
                             _G._zerqonBinId = _myBinId
                             warn("[ZerqonHUB] Poll: bin encontrado por nombre = " .. _myBinId)
                         else
-                            -- JSONBin rechazo la busqueda por nombre — esto pasa si el bin
+                            -- JSONBin rechazo la busqueda por nombre ? esto pasa si el bin
                             -- fue creado pero la API no lo indexo aun. Esperar y reintentar.
                             warn("[ZerqonHUB] Poll: _findBin fallo, respuesta = " .. tostring(_res):sub(1,80))
                         end
@@ -65163,7 +65165,7 @@ do
             local _immediateStatus = _getStatus(_existingBin)
             warn("[ZerqonHUB] CHECK INMEDIATO: status = " .. tostring(_immediateStatus))
             if _immediateStatus == "verified" then
-                -- KEY YA VERIFICADA: usar animación siempre, señalar pre-validada
+                -- KEY YA VERIFICADA: usar animaci?n siempre, se?alar pre-validada
                 warn("[ZerqonHUB] AUTO-EXEC: Key ya verificada en JSONBin. Mostrando checklist animado...")
                 -- Leer timestamp original del bin para no resetear las 24h
                 pcall(function()
@@ -65186,7 +65188,7 @@ do
                         end
                     end
                 end)
-                -- NO llamar _openHub() directamente; la animación del spinner ya lo llama
+                -- NO llamar _openHub() directamente; la animaci?n del spinner ya lo llama
                 _G._keyPreValidated = true
                 return
             end
