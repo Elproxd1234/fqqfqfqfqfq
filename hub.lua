@@ -45642,11 +45642,11 @@ function CreateCombatTab()
         local function _createSASMButton()
             _destroySASMGui()
 
-            -- BOT?N PERSONALIZADO: transparente con borde oscuro y esquinas redondeadas
-            local BTN_W, BTN_H = 250, 180
+            -- BOT?N PERSONALIZADO: compacto con color del hub
+            local BTN_W, BTN_H = 120, 60
             local vp = workspace.CurrentCamera.ViewportSize
             local posX = math.clamp(vp.X * 0.5 - BTN_W / 2, 4, vp.X - BTN_W - 4)
-            local posY = math.clamp(vp.Y * 0.5 - BTN_H / 2, 4, vp.Y - BTN_H - 4)
+            local posY = math.clamp(vp.Y * 0.75 - BTN_H / 2, 4, vp.Y - BTN_H - 4)
 
             local sg = Instance.new("ScreenGui")
             sg.Name           = "SilentAimShootMurderGui"
@@ -45673,56 +45673,42 @@ function CreateCombatTab()
             local sc = Instance.new("UIScale", btnRoot)
             sc.Scale = 0
 
-            -- Bot?n principal: fondo degradado oscuro azul del hub + borde neon cian
+            -- Bot?n principal: color del hub (ThemeColors.Primary)
             local clickBtn = Instance.new("TextButton", btnRoot)
             clickBtn.Name                   = "ShootButton"
             clickBtn.Size                   = UDim2.new(1, 0, 1, 0)
             clickBtn.Position               = UDim2.new(0, 0, 0, 0)
             clickBtn.AnchorPoint            = Vector2.new(0.5, 0.5)
-            clickBtn.BackgroundColor3       = Color3.fromRGB(4, 10, 28)
-            clickBtn.BackgroundTransparency = 0.15
-            clickBtn.Text                   = "Shoot"
-            clickBtn.TextColor3             = Color3.fromRGB(0, 210, 240)
-            clickBtn.TextSize               = 24
-            clickBtn.Font                   = Enum.Font.GothamMedium
+            clickBtn.BackgroundColor3       = ThemeColors.Primary
+            clickBtn.BackgroundTransparency = 0.20
+            clickBtn.Text                   = "SHOOT"
+            clickBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+            clickBtn.TextSize               = 14
+            clickBtn.Font                   = Enum.Font.GothamBold
             clickBtn.AutoButtonColor        = false
             clickBtn.ZIndex                 = 210
 
-            -- Gradiente interno glassmorphism (igual que los botones del hub)
-            local _btnGrad = Instance.new("UIGradient", clickBtn)
-            _btnGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0,   Color3.fromRGB( 5, 20, 60)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB( 2, 10, 35)),
-                ColorSequenceKeypoint.new(1,   Color3.fromRGB( 5, 20, 60)),
-            })
-            _btnGrad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0,   0.30),
-                NumberSequenceKeypoint.new(0.5, 0.18),
-                NumberSequenceKeypoint.new(1,   0.30),
-            })
-            _btnGrad.Rotation = 90
-
-            -- Glow en el texto
+            -- Glow en el texto color del hub
             local _txtStroke = Instance.new("UIStroke", clickBtn)
-            _txtStroke.Color       = Color3.fromRGB(0, 210, 240)
-            _txtStroke.Thickness   = 0.9
-            _txtStroke.Transparency = 0.50
+            _txtStroke.Color       = ThemeColors.Primary
+            _txtStroke.Thickness   = 0.8
+            _txtStroke.Transparency = 0.40
             _txtStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 
             local uiCorner = Instance.new("UICorner", clickBtn)
-            uiCorner.CornerRadius = UDim.new(0, 20)
+            uiCorner.CornerRadius = UDim.new(0, 12)
 
-            -- Borde neon cian (igual que el hub)
+            -- Borde color del hub
             local uiStroke = Instance.new("UIStroke", clickBtn)
-            uiStroke.Color           = Color3.fromRGB(0, 200, 240)
-            uiStroke.Thickness       = 2.5
+            uiStroke.Color           = ThemeColors.Primary
+            uiStroke.Thickness       = 2.0
             uiStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            uiStroke.Transparency    = 0.10
+            uiStroke.Transparency    = 0.05
             local _strokeGrad = Instance.new("UIGradient", uiStroke)
             _strokeGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0,   Color3.fromRGB(0, 220, 255)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 100, 255)),
-                ColorSequenceKeypoint.new(1,   Color3.fromRGB(0, 220, 255)),
+                ColorSequenceKeypoint.new(0,   ThemeColors.Primary),
+                ColorSequenceKeypoint.new(0.5, ThemeColors.Accent),
+                ColorSequenceKeypoint.new(1,   ThemeColors.Primary),
             })
             _strokeGrad.Rotation = 90
 
@@ -45796,31 +45782,31 @@ function CreateCombatTab()
                 end)
             end
 
-            -- Hover
+            -- Hover (color del hub)
             clickBtn.MouseEnter:Connect(function()
-                TweenService:Create(uiStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(120, 240, 255), Thickness = 3.0, Transparency = 0}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.12), {Color = ThemeColors.Accent, Thickness = 2.5, Transparency = 0}):Play()
                 TweenService:Create(clickBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.05}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.12), {TextColor3 = Color3.fromRGB(180, 255, 255)}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.12), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end)
             clickBtn.MouseLeave:Connect(function()
-                TweenService:Create(uiStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(0, 200, 240), Thickness = 2.5, Transparency = 0.10}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(0, 210, 240)}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.15), {Color = ThemeColors.Primary, Thickness = 2.0, Transparency = 0.05}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.20}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end)
 
-            -- Press / Release
+            -- Press / Release (color del hub)
             local _lastClick = 0
             clickBtn.MouseButton1Down:Connect(function()
                 if _moved then return end
                 TweenService:Create(sc, TweenInfo.new(0.07), {Scale=0.94}):Play()
-                TweenService:Create(uiStroke, TweenInfo.new(0.07), {Thickness=1.5, Color=Color3.fromRGB(0,255,255)}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.07), {BackgroundColor3=Color3.fromRGB(0,30,60)}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.07), {Thickness=1.5, Color=ThemeColors.Accent}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.07), {BackgroundTransparency=0.0}):Play()
             end)
             clickBtn.MouseButton1Up:Connect(function()
                 if _moved then return end
                 TweenService:Create(sc, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
-                TweenService:Create(uiStroke, TweenInfo.new(0.18), {Thickness=2.5, Color=Color3.fromRGB(0,200,240)}):Play()
-                TweenService:Create(clickBtn, TweenInfo.new(0.18), {BackgroundColor3=Color3.fromRGB(4,10,28)}):Play()
+                TweenService:Create(uiStroke, TweenInfo.new(0.18), {Thickness=2.0, Color=ThemeColors.Primary}):Play()
+                TweenService:Create(clickBtn, TweenInfo.new(0.18), {BackgroundTransparency=0.20}):Play()
             end)
             clickBtn.Activated:Connect(function()
                 if _moved then return end
@@ -59108,10 +59094,10 @@ _getTargetScale = function()
     -- DEBUG: imprimir valores reales para diagnosticar
     warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
     if _isMobileNow then
-        -- Calcular escala exacta para que el frame 900x480 entre en pantalla con margen
-        local _scaleByW = (_vpNow.X - 24) / 900
-        local _scaleByH = (_vpNow.Y - 24) / 480
-        local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.30, 0.55)
+        -- MOBILE: escala reducida para ocupar menos pantalla (máx 42% del ancho)
+        local _scaleByW = (_vpNow.X - 16) / 900
+        local _scaleByH = (_vpNow.Y * 0.55) / 480
+        local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.26, 0.42)
         warn("[ZerqonHUB SCALE DEBUG] mobile -> final=" .. tostring(_final))
         return _final
     else
@@ -59879,6 +59865,14 @@ particles = {}
         -- Inicio de drag inmediato desde cualquier parte del mainFrame
         local function _startDrag(inputPos2D)
             if _G._hubSettings and _G._hubSettings.allowHubDrag == false then return end
+            -- MOBILE FIX: no mover el hub en celular
+            do
+                local _okM, _isMob = pcall(function()
+                    local _uis = game:GetService("UserInputService")
+                    return _uis.TouchEnabled and not _uis.KeyboardEnabled
+                end)
+                if _okM and _isMob then return end
+            end
             if _dragActive then return end  -- ya dragging, no re-iniciar
             -- Verificar que el click sea dentro del hub
             local fPos = mainFrame.AbsolutePosition
