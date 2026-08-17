@@ -22738,6 +22738,27 @@ function CreateMainTab()
         _gkContainer.BackgroundTransparency = 1
         _gkContainer.BorderSizePixel = 0
         _gkContainer.ZIndex = 12
+        -- VIP: ocultar el boton GET KEY y mostrar badge dorado en su lugar
+        if _G._discordPremiumVerified then
+            _gkContainer.Visible = false
+            local _vipBadge = Instance.new("TextLabel", rightColumn)
+            _vipBadge.Size = UDim2.new(1, -6, 0, 52)
+            _vipBadge.BackgroundColor3 = Color3.fromRGB(40, 30, 5)
+            _vipBadge.BackgroundTransparency = 0.2
+            _vipBadge.BorderSizePixel = 0
+            _vipBadge.ZIndex = 12
+            _vipBadge.Text = "\226\173\144 VIP — Sin key requerida"
+            _vipBadge.TextColor3 = Color3.fromRGB(255, 215, 0)
+            _vipBadge.Font = Enum.Font.GothamBold
+            _vipBadge.TextSize = 13
+            _vipBadge.TextXAlignment = Enum.TextXAlignment.Center
+            Instance.new("UICorner", _vipBadge).CornerRadius = UDim.new(0, 6)
+            local _vipStroke = Instance.new("UIStroke", _vipBadge)
+            _vipStroke.Color = Color3.fromRGB(255, 200, 0)
+            _vipStroke.Thickness = 1.8
+            _vipStroke.Transparency = 0.15
+            _vipStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        end
 
         local _gkBtn = Instance.new("TextButton", _gkContainer)
         _gkBtn.Size = UDim2.new(1, -6, 1, -6)
@@ -44130,8 +44151,11 @@ function CreateExclusiveTab()
 
     CreateAuroraToggle(hudSec, "Ocultar Crosshair Roblox", function(on)
         _hs().crosshairHidden = on
-        -- FIX MOBILE: NO usar CoreGuiType.All porque desactiva los controles tactiles
-        -- (joystick, boton de salto, etc.). Solo ocultamos el cursor con MouseIconEnabled.
+        pcall(function()
+            local sg = game:GetService("StarterGui")
+            sg:SetCoreGuiEnabled(Enum.CoreGuiType.All, not on)
+        end)
+        -- Intentar con metodo CoreGui alternativo (Synapse/Wave)
         pcall(function()
             if on then
                 game:GetService("UserInputService").MouseIconEnabled = false
@@ -60473,14 +60497,7 @@ particles = {}
     dragIcon.TextTransparency = 1
     dragIcon.ZIndex = 0  -- ZIndex bajo para no bloquear botones y sliders del hub
     dragIcon.AutoButtonColor = false
-    -- FIX MOBILE: Active=false para que el joystick y boton de salto de Roblox
-    -- reciban los touch events. El drag se maneja por UserInputService.InputBegan
-    -- (conectado mas abajo) que funciona igual en PC y mobile sin bloquear controles.
-    local _isMobileDrag = (function()
-        local ok, res = pcall(function() return game:GetService("UserInputService").TouchEnabled end)
-        return ok and res
-    end)()
-    dragIcon.Active = not _isMobileDrag  -- en PC: true (drag normal); en mobile: false (no bloquear controles)
+    dragIcon.Active = true
 
     do
         -- Estado de drag en upvalues locales (no closures anidadas)
@@ -60582,25 +60599,12 @@ particles = {}
         end
 
         -- InputBegan: activar drag inmediatamente al presionar
-        -- FIX MOBILE v2: verificar gameProcessed para NO interceptar touches del
-        -- joystick ni del boton de salto de Roblox. Sin este guard, en celular
-        -- el listener global roba TODOS los toques y el personaje queda sin controles.
-        _safeConnect(UserInputService.InputBegan, function(inp, gp)
-            if gp then return end  -- FIX MOBILE: si Roblox ya proceso el input (joystick/salto), ignorar
+        _safeConnect(UserInputService.InputBegan, function(inp)
             if inp.UserInputType == Enum.UserInputType.MouseButton1 then
                 local mp = UserInputService:GetMouseLocation()
                 _onHeaderPress(Vector2.new(mp.X, mp.Y))
             elseif inp.UserInputType == Enum.UserInputType.Touch then
-                -- FIX MOBILE v2: solo iniciar drag si el toque cae dentro del header (topbar),
-                -- no en cualquier parte de la pantalla, para no bloquear el joystick.
-                local touchPos = Vector2.new(inp.Position.X, inp.Position.Y)
-                local hPos  = header.AbsolutePosition
-                local hSize = header.AbsoluteSize
-                local inHeader = touchPos.X >= hPos.X and touchPos.X <= hPos.X + hSize.X
-                             and touchPos.Y >= hPos.Y and touchPos.Y <= hPos.Y + hSize.Y
-                if inHeader then
-                    _onHeaderPress(touchPos)
-                end
+                _onHeaderPress(Vector2.new(inp.Position.X, inp.Position.Y))
             end
         end)
 
@@ -64147,7 +64151,7 @@ function CreateUseTab()
 
     -- =====================================================================
     -- DETECT WHO SPECTATES YOU
-    -- Hookea SpectateService del juego para saber qu? jugadores te est?n
+    -- Hookea SpectateService del juego para saber qué jugadores te están
     -- spectateando. Usa SpectateStarted / SpectateTargetChanged para saber
     -- cuando alguien empieza, y SpectateCancelled para cuando para.
     -- =====================================================================
@@ -64158,9 +64162,9 @@ function CreateUseTab()
             enabled       = false,
             bindable      = false,
             connections   = {},          -- RBXScriptConnections activos
-            spectators    = {},          -- [player] = true (qui?nes spectating a LocalPlayer)
+            spectators    = {},          -- [player] = true (quiénes spectating a LocalPlayer)
             notifCooldown = {},          -- [player.Name] = tick() para no spamear notifs
-            bindableBtn   = nil,         -- GuiObject del bot?n en pantalla
+            bindableBtn   = nil,         -- GuiObject del botón en pantalla
         }
         local SW = _G._specWatchState
 
@@ -64186,7 +64190,7 @@ function CreateUseTab()
             end
         end
 
-        -- Contar cu?ntos jugadores nos spectean actualmente
+        -- Contar cuántos jugadores nos spectean actualmente
         local function _swCount()
             local n = 0
             for _ in pairs(SW.spectators) do n = n + 1 end
@@ -64198,10 +64202,10 @@ function CreateUseTab()
         -- Cuando otro jugador spectatea, el juego llama SpectateStarted
         -- y SpectateTargetChanged en el SpectateService de ESE jugador,
         -- pero eso es server-side. En client solo podemos detectarlo
-        -- monitoreando CameraSubject de la c?mara de cada Character.
+        -- monitoreando CameraSubject de la cámara de cada Character.
         -- Estrategia: RunService.Heartbeat revisa CurrentCamera.CameraSubject
         -- de workspace -> si CameraSubject apunta al Humanoid de LocalPlayer,
-        -- ESE jugador nos est? spectateando.
+        -- ESE jugador nos está spectateando.
         -- ----------------------------------------------------------------
         local function _swStart()
             _swCleanConns()
@@ -64228,7 +64232,7 @@ function CreateUseTab()
             end)
             local _serviceAvail = _ssOk and _ss ~= nil
 
-            -- M?todo principal: Heartbeat detecta CameraSubject de cada char
+            -- Método principal: Heartbeat detecta CameraSubject de cada char
             local _hbConn = RunService.Heartbeat:Connect(function()
                 if not SW.enabled then return end
                 local myChar = LocalPlayer.Character
@@ -64241,7 +64245,7 @@ function CreateUseTab()
                     if p == LocalPlayer then continue end
                     local pChar = p.Character
                     if not pChar then continue end
-                    -- Chequear si la c?mara del workspace apunta a nuestro humanoid
+                    -- Chequear si la cámara del workspace apunta a nuestro humanoid
                     -- (solo funciona con Camera.CameraSubject compartido en algunos modos)
                     -- Fallback: revisar CameraSubject via getCurrentCamera trick
                     local camOk = false
@@ -64252,7 +64256,7 @@ function CreateUseTab()
                             camOk = true
                         end
                     end)
-                    -- M?todo seguro: CurrentRoundClient.PlayerData + comparar targets
+                    -- Método seguro: CurrentRoundClient.PlayerData + comparar targets
                     if not camOk then
                         pcall(function()
                             local RC = require(game:GetService("ReplicatedStorage")
@@ -64286,28 +64290,28 @@ function CreateUseTab()
             end)
             table.insert(SW.connections, _hbConn)
 
-            -- M?todo secundario: hookear SpectateService v?a BindableEvents
+            -- Método secundario: hookear SpectateService vía BindableEvents
             -- SpectateStarted / SpectateTargetChanged / SpectateCancelled
             if _serviceAvail and _ss then
-                -- SpectateStarted: alguien inici? spectate
+                -- SpectateStarted: alguien inició spectate
                 local _ssStart = _ss.SpectateStarted
                 if _ssStart and _ssStart.Event then
                     local c1 = _ssStart.Event:Connect(function()
-                        -- No sabemos qui?n es todav?a; el SpectateTargetChanged lo confirma
+                        -- No sabemos quién es todavía; el SpectateTargetChanged lo confirma
                     end)
                     table.insert(SW.connections, c1)
                 end
 
-                -- SpectateTargetChanged: cambi? de target -> el target es LocalPlayer?
+                -- SpectateTargetChanged: cambió de target -> el target es LocalPlayer?
                 local _ssTarget = _ss.SpectateTargetChanged
                 if _ssTarget and _ssTarget.Event then
                     local c2 = _ssTarget.Event:Connect(function(targetPlayer)
                         if targetPlayer == LocalPlayer then
-                            -- Qui?n dispara este evento es el spectator
-                            -- Buscamos al jugador que activ? el spectate
+                            -- Quién dispara este evento es el spectator
+                            -- Buscamos al jugador que activó el spectate
                             for _, p in ipairs(game.Players:GetPlayers()) do
                                 if p ~= LocalPlayer and not SW.spectators[p] then
-                                    -- Heur?stica: jugador muerto m?s cercano que no tenemos a?n
+                                    -- Heurística: jugador muerto más cercano que no tenemos aún
                                     local pd = nil
                                     pcall(function()
                                         local RC = require(game:GetService("ReplicatedStorage")
@@ -64329,11 +64333,11 @@ function CreateUseTab()
                     table.insert(SW.connections, c2)
                 end
 
-                -- SpectateCancelled: alguien par? de spectate
+                -- SpectateCancelled: alguien paró de spectate
                 local _ssCancel = _ss.SpectateCancelled
                 if _ssCancel and _ssCancel.Event then
                     local c3 = _ssCancel.Event:Connect(function()
-                        -- Limpiar spectators que ya no est?n muertos
+                        -- Limpiar spectators que ya no están muertos
                         local toRemove = {}
                         for p in pairs(SW.spectators) do
                             local isDead = false
@@ -64388,12 +64392,12 @@ function CreateUseTab()
         end, false)
 
         -- ----------------------------------------------------------------
-        -- Bindable button: muestra en pantalla qui?n te spectea ahora mismo
+        -- Bindable button: muestra en pantalla quién te spectea ahora mismo
         -- ----------------------------------------------------------------
         CreateAuroraToggle(leftColumn, "Show Spectators Bindable Button", function(on)
             SW.bindable = on
 
-            -- Destruir bot?n previo si existe
+            -- Destruir botón previo si existe
             if SW.bindableBtn then
                 pcall(function() SW.bindableBtn:Destroy() end)
                 SW.bindableBtn = nil
@@ -64401,7 +64405,7 @@ function CreateUseTab()
 
             if not on then return end
 
-            -- Crear bot?n HUD
+            -- Crear botón HUD
             local _pg   = LocalPlayer:FindFirstChildOfClass("PlayerGui")
             local _cg   = game:GetService("CoreGui")
             local _root = (gethui and gethui()) or _pg or _cg
@@ -64439,7 +64443,7 @@ function CreateUseTab()
 
             SW.bindableBtn = screenGui
 
-            -- Update loop: refresca el texto del bot?n cada 0.5s
+            -- Update loop: refresca el texto del botón cada 0.5s
             task.spawn(function()
                 while SW.bindable and btn and btn.Parent do
                     task.wait(0.5)
@@ -64467,7 +64471,7 @@ function CreateUseTab()
                 end
             end)
 
-            -- Click en el bot?n: listar spectators en notif
+            -- Click en el botón: listar spectators en notif
             btn.Activated:Connect(function()
                 if not SW.enabled then
                     CreateCustomNotification("??? DETECT OFF", "Enable the main toggle first", 2.5)
@@ -64673,7 +64677,25 @@ do
     end
 
     -- Intentar auto-ejecucion antes de mostrar pantalla de key
-    _tryAutoExec()  -- setea _G._keyPreValidated = true si hay key valida; siempre se muestra la pantalla con animacion
+    -- ================================================================
+    -- == BYPASS DE KEY PARA USUARIOS VIP / PREMIUM
+    -- Si el usuario tiene premium verificado, no necesita key.
+    -- Se omite todo el flujo de verificacion y se abre el hub directo.
+    -- ================================================================
+    if _G._discordPremiumVerified then
+        warn("[ZerqonHUB] Usuario VIP/Premium detectado — omitiendo verificacion de key.")
+        _G._keyPreValidated = true  -- reutiliza la animacion del checklist normal
+        -- Timer ficticio para que Settings no explote sin keyStartTime
+        if not _G._keyStartTime then
+            _G._keyStartTime      = os.time()
+            _G._zerqonKeyDuration = 999 * 3600  -- "sin limite" para VIP
+        end
+    else
+        _tryAutoExec()  -- setea _G._keyPreValidated = true si hay key valida
+    end
+    -- ================================================================
+    -- == FIN BYPASS VIP
+    -- ================================================================
 
     do  -- bloque dummy para mantener la estructura del else original
 
@@ -64816,11 +64838,6 @@ do
     _bg.BackgroundTransparency = 1  -- FIX: transparente para no tapar el gameplay
     _bg.BorderSizePixel = 0
     _bg.ZIndex = 2
-    -- FIX MOBILE v1: deshabilitar interaccion del fondo para que los touches
-    -- del joystick y boton de salto NO sean interceptados por este frame invisible.
-    -- Sin esto, en celular el frame cubre toda la pantalla y come los inputs del gameplay.
-    _bg.Active = false
-    pcall(function() _bg.Interactable = false end)
 
     -- Panel principal -- colores del hub (Neon Green theme)
     local _panel = Instance.new("Frame", _bg)
@@ -64831,9 +64848,6 @@ do
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 3
     _panel.ClipsDescendants = false  -- FIX: no cortar el errorPanel que sale abajo
-    -- FIX MOBILE v1: el panel no captura touches fuera de sus botones.
-    -- Los botones internos (Activated) siguen funcionando normalmente.
-    _panel.Active = false
     Instance.new("UICorner", _panel).CornerRadius = UDim.new(0, 10)
 
     -- Imagen de fondo centrada DENTRO del panel (ScaleType.Crop centrado en el rectangulo)
@@ -64945,7 +64959,7 @@ do
 
     -- Las 3 filas
     local _row1 = _makeRow(52,  "Login MM2")
-    local _row2 = _makeRow(102, "Comprobando key")
+    local _row2 = _makeRow(102, _G._discordPremiumVerified and "Acceso VIP \226\173\144" or "Comprobando key")
     local _row3 = _makeRow(152, "Ready")
 
     -- ================================================================
@@ -65050,11 +65064,6 @@ do
     -- Forward declaration: _openHub se define m?s abajo pero el spinner la necesita
     local _openHub
     local _pollingActive = false
-    -- FIX MOBILE v3: forward-declarar _startPolling para que el task.spawn de abajo
-    -- no crashee con "attempt to call a nil value" en ejecutores moviles (Delta, Arceus X).
-    -- En mobile, task.spawn puede reanudar la coroutine ANTES de que el resto del
-    -- script termine de ejecutarse, dejando _startPolling como nil al momento del call.
-    local _startPolling
 
     -- Iniciar spinners de las 3 filas inmediatamente
     task.spawn(function()
@@ -65078,11 +65087,16 @@ do
             -- Comprobando key: check verde r?pido (key ya validada)
             task.wait(0.8)
             _stopSpin(_row2, true)
-            -- Cambiar texto de "Comprobando key" a "Key aprobada ?"
+            -- Cambiar texto segun si es VIP o key normal
             if _row2.label then
                 TweenService:Create(_row2.label, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
                 task.wait(0.35)
-                _row2.label.Text = "Key aprobada ?"
+                if _G._discordPremiumVerified then
+                    _row2.label.Text = "\226\173\144 Acceso VIP — sin key requerida"
+                    _row2.label.TextColor3 = Color3.fromRGB(255, 215, 0)  -- dorado para VIP
+                else
+                    _row2.label.Text = "Key aprobada \226\156\147"
+                end
                 TweenService:Create(_row2.label, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
             end
             task.wait(0.5)
@@ -65580,9 +65594,7 @@ do
         end)
     end
 
-    -- FIX MOBILE v3: asignar a la variable forward-declarada arriba (no re-declarar con "local")
-    -- para que el task.spawn que llama _startPolling() encuentre la funcion correcta.
-    _startPolling = function()
+    local function _startPolling()
         if _pollingActive then return end
         if _ksExiting then return end
         _pollingActive = true
