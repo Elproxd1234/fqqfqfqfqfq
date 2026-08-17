@@ -60473,7 +60473,14 @@ particles = {}
     dragIcon.TextTransparency = 1
     dragIcon.ZIndex = 0  -- ZIndex bajo para no bloquear botones y sliders del hub
     dragIcon.AutoButtonColor = false
-    dragIcon.Active = true
+    -- FIX MOBILE: Active=false para que el joystick y boton de salto de Roblox
+    -- reciban los touch events. El drag se maneja por UserInputService.InputBegan
+    -- (conectado mas abajo) que funciona igual en PC y mobile sin bloquear controles.
+    local _isMobileDrag = (function()
+        local ok, res = pcall(function() return game:GetService("UserInputService").TouchEnabled end)
+        return ok and res
+    end)()
+    dragIcon.Active = not _isMobileDrag  -- en PC: true (drag normal); en mobile: false (no bloquear controles)
 
     do
         -- Estado de drag en upvalues locales (no closures anidadas)
