@@ -389,6 +389,16 @@ end
     [OK] FIX FLING NUEVO SHERIFF: al detectar un nuevo sheriff despues de muerte del
          anterior, se lanza el fling inmediatamente (task.spawn) en vez de esperar
          la proxima iteracion del loop (que tenia task.wait(0.8) de delay).
+    [OK] FIX STEAL GUN FLING HEROE: _sgFlingPlayer ya no redirige el fling al sheriff
+         del cache cuando el TargetPlayer (heroe/nuevo portador) ya tiene la gun en mano
+         o backpack. Antes, al llamar _sgFlingPlayer(newSheriff) con el heroe como target,
+         si el cache aun tenia otro sheriff registrado, se flingeaba al incorrecto y el
+         heroe nunca era afectado.
+    [OK] FIX ROL INOCENTE SHERIFF MUERTO: en el handler KnifeKill, al morir el sheriff,
+         se registra su UserId en _deadSheriffIds como true (marcado como muerto) en vez
+         de nil (que lo borraba). Tambien se mantiene SheriffDeadBlock apuntando al muerto
+         en lugar de limpiarlo. Antes, borrarlo de _deadSheriffIds hacia que el sistema
+         de roles lo tratara como inocente, limpiando visualmente su color a verde.
     [OK] FIX DUAL GUN / DUAL KNIFE: al cambiar de pesta?a y volver, los toggles
          quedaban visualmente ON pero sin conexiones activas (steppedConn/renderConn/
          inputConn apuntaban a closures muertos). Ahora _dualStartArm limpia
@@ -2715,12 +2725,19 @@ task.spawn(function()
                 pcall(function() _sheriffDeathConn:Disconnect() end)
                 _sheriffDeathConn = nil
             end
+            -- FIX ROL INOCENTE: mantener SheriffDeadBlock apuntando al sheriff muerto
+            -- para que StartSheriffDeathMonitor y el sistema de chams lo reconozcan como muerto.
+            -- Antes se limpiaba a nil aqui, haciendo que el sheriff muerto perdiera su rol
+            -- y apareciera como inocente (verde) en los chams y en GetPlayerRole.
             if SheriffDeadBlock then
-                SheriffDeadBlock.isDeadSheriffID = nil
-                SheriffDeadBlock.deadSheriffName = nil
+                SheriffDeadBlock.isDeadSheriffID = sheriff.UserId
+                SheriffDeadBlock.deadSheriffName = sheriff.Name
             end
+            -- FIX ROL INOCENTE: marcar al sheriff como muerto (= true), NO borrarlo (= nil).
+            -- Poner nil lo eliminaba de la tabla -> el sistema dejaba de reconocerlo como sheriff muerto
+            -- y lo trataba como inocente en _refreshRoleCache / StartSheriffDeathMonitor.
             if _G._deadSheriffIds and sheriff.UserId then
-                _G._deadSheriffIds[sheriff.UserId] = nil
+                _G._deadSheriffIds[sheriff.UserId] = true
             end
             if StealGunSystem then
                 StealGunSystem.sheriffDeadDetected = true
@@ -39398,7 +39415,16 @@ local function _sgFlingPlayer(TargetPlayer)
         end
     end
 
-    if currentSheriff and currentSheriff ~= TargetPlayer and currentSheriff.Character then
+    -- FIX HERO FLING: solo redirigir al sheriff del cache si el TargetPlayer NO tiene la gun.
+    -- Si TargetPlayer ya tiene la gun (es el heroe/nuevo portador), el debe ser el objetivo.
+    -- Antes, cuando se llamaba _sgFlingPlayer(newSheriff) con el heroe como target,
+    -- currentSheriff podia apuntar al sheriff viejo o a otro jugador, causando que
+    -- el heroe nunca fuera flingeado.
+    local targetAlreadyHasGun = _findGunIn and (
+        (_findGunIn(TargetPlayer.Character) ~= nil) or
+        (TargetPlayer:FindFirstChildOfClass("Backpack") and _findGunIn(TargetPlayer:FindFirstChildOfClass("Backpack")) ~= nil)
+    )
+    if not targetAlreadyHasGun and currentSheriff and currentSheriff ~= TargetPlayer and currentSheriff.Character then
         CreateCustomNotification("STEAL GUN", "Sheriff cambiado -> " .. currentSheriff.Name, 2.5)
         TargetPlayer = currentSheriff
         StealGunSystem.sheriffOriginalFound = currentSheriff
@@ -63423,7 +63449,7 @@ local function _ZerqonLoadingScreen(onComplete)
     -- ============================================================
     rect.Position = UDim2.new(0.5, -210, 0.5, -90)  -- empieza un poco mas abajo
     local uiScale = Instance.new("UIScale", rect)
-    uiScale.Scale = 0.7  -- empieza pequeño
+    uiScale.Scale = 0.7  -- empieza peque?o
 
     task.spawn(function()
         -- Fade in del backdrop
