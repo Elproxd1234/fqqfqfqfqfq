@@ -60582,12 +60582,25 @@ particles = {}
         end
 
         -- InputBegan: activar drag inmediatamente al presionar
-        _safeConnect(UserInputService.InputBegan, function(inp)
+        -- FIX MOBILE v2: verificar gameProcessed para NO interceptar touches del
+        -- joystick ni del boton de salto de Roblox. Sin este guard, en celular
+        -- el listener global roba TODOS los toques y el personaje queda sin controles.
+        _safeConnect(UserInputService.InputBegan, function(inp, gp)
+            if gp then return end  -- FIX MOBILE: si Roblox ya proceso el input (joystick/salto), ignorar
             if inp.UserInputType == Enum.UserInputType.MouseButton1 then
                 local mp = UserInputService:GetMouseLocation()
                 _onHeaderPress(Vector2.new(mp.X, mp.Y))
             elseif inp.UserInputType == Enum.UserInputType.Touch then
-                _onHeaderPress(Vector2.new(inp.Position.X, inp.Position.Y))
+                -- FIX MOBILE v2: solo iniciar drag si el toque cae dentro del header (topbar),
+                -- no en cualquier parte de la pantalla, para no bloquear el joystick.
+                local touchPos = Vector2.new(inp.Position.X, inp.Position.Y)
+                local hPos  = header.AbsolutePosition
+                local hSize = header.AbsoluteSize
+                local inHeader = touchPos.X >= hPos.X and touchPos.X <= hPos.X + hSize.X
+                             and touchPos.Y >= hPos.Y and touchPos.Y <= hPos.Y + hSize.Y
+                if inHeader then
+                    _onHeaderPress(touchPos)
+                end
             end
         end)
 
@@ -64803,6 +64816,11 @@ do
     _bg.BackgroundTransparency = 1  -- FIX: transparente para no tapar el gameplay
     _bg.BorderSizePixel = 0
     _bg.ZIndex = 2
+    -- FIX MOBILE v1: deshabilitar interaccion del fondo para que los touches
+    -- del joystick y boton de salto NO sean interceptados por este frame invisible.
+    -- Sin esto, en celular el frame cubre toda la pantalla y come los inputs del gameplay.
+    _bg.Active = false
+    pcall(function() _bg.Interactable = false end)
 
     -- Panel principal -- colores del hub (Neon Green theme)
     local _panel = Instance.new("Frame", _bg)
@@ -64813,6 +64831,9 @@ do
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 3
     _panel.ClipsDescendants = false  -- FIX: no cortar el errorPanel que sale abajo
+    -- FIX MOBILE v1: el panel no captura touches fuera de sus botones.
+    -- Los botones internos (Activated) siguen funcionando normalmente.
+    _panel.Active = false
     Instance.new("UICorner", _panel).CornerRadius = UDim.new(0, 10)
 
     -- Imagen de fondo centrada DENTRO del panel (ScaleType.Crop centrado en el rectangulo)
