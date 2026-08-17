@@ -31732,6 +31732,80 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                 or _ln_pre:find("^xray") or _ln_pre:find("scope names") or _ln_pre:find("scopenames")
             -- Capturar nombre para usar en closure (evitar referencia a upvalue externa)
             local _nombreCapture = nombre
+            -- FIX TODAS LAS TABS: detectar a que tab pertenece este toggle no-fisico
+            -- para esperar a que ESE tab especifico este construido antes de disparar
+            -- el callback. Antes solo se esperaba al tab Visuals (3); los toggles de
+            -- Settings (5), Combat (6), Use (7), Emotes (8), Update (9) y Premium (4)
+            -- disparaban su callback con upvalues nil porque su tab aun no existia.
+            local _ln_tab = _ln_pre  -- ya es nombre:lower() capturado antes
+            local _targetTabIdx_nonPhys = nil
+            if _isVisualToggle_pre then
+                _targetTabIdx_nonPhys = 3  -- CreateVisualsTab
+            elseif _ln_tab:find("silenciar notif") or _ln_tab:find("ocultar crosshair")
+                or _ln_tab:find("ocultar hud") or _ln_tab:find("ocultar chat")
+                or _ln_tab:find("low render quality") or _ln_tab:find("disable shadows")
+                or _ln_tab:find("fullbright") or _ln_tab:find("no particles")
+                or _ln_tab:find("no decals") or _ln_tab:find("no beams") or _ln_tab:find("no trails")
+                or _ln_tab:find("silenciar sonidos") or _ln_tab:find("no post%-fx")
+                or _ln_tab:find("no billboardguis") or _ln_tab:find("freeze npcs")
+                or _ln_tab:find("pause npc") or _ln_tab:find("no dynamic lights")
+                or _ln_tab:find("auto save") then
+                _targetTabIdx_nonPhys = 5  -- CreateExclusiveTab (Settings)
+            elseif _ln_tab:find("gold bomb") or _ln_tab:find("fake lag") or _ln_tab:find("stretch screen")
+                or _ln_tab:find("gun aura") or _ln_tab:find("auto spectate") or _ln_tab:find("auto announce")
+                or _ln_tab:find("auto reset") or _ln_tab:find("information murder")
+                or _ln_tab:find("information sheriff") or _ln_tab:find("information personal")
+                or _ln_tab:find("information muertos") or _ln_tab:find("knife dodge")
+                or _ln_tab:find("auto tp a spots") then
+                _targetTabIdx_nonPhys = 2  -- CreateWorldTab (manejado por su propio restore, pero por si acaso)
+            elseif _ln_tab:find("auto stab") or _ln_tab:find("auto slash") or _ln_tab:find("fast slash")
+                or _ln_tab:find("auto throw") or _ln_tab:find("fast throw") or _ln_tab:find("instant throw")
+                or _ln_tab:find("knife silent") or _ln_tab:find("throwing knife")
+                or _ln_tab:find("bullet tracer") or _ln_tab:find("prediction tracer")
+                or _ln_tab:find("velocity prediction") or _ln_tab:find("strafe prediction")
+                or _ln_tab:find("tianca prediction") or _ln_tab:find("pierce bullet")
+                or _ln_tab:find("shooper") or _ln_tab:find("shoot spam")
+                or _ln_tab:find("silent aim") or _ln_tab:find("aimlock")
+                or _ln_tab:find("auto shoot") or _ln_tab:find("shoot pick")
+                or _ln_tab:find("wall check") or _ln_tab:find("auto ping")
+                or _ln_tab:find("lead time") or _ln_tab:find("jump prediction")
+                or _ln_tab:find("lag compensation") or _ln_tab:find("shoot studs")
+                or _ln_tab:find("shoot view") or _ln_tab:find("trajectory")
+                or _ln_tab:find("dual knife") or _ln_tab:find("dual gun")
+                or _ln_tab:find("shoot murder") or _ln_tab:find("shoot camuflado")
+                or _ln_tab:find("shoot condition") or _ln_tab:find("spoof method")
+                or _ln_tab:find("ping boost") or _ln_tab:find("own ping")
+                or _ln_tab:find("ping mode") or _ln_tab:find("spoof") then
+                _targetTabIdx_nonPhys = 6  -- CreateCombatTab
+            elseif _ln_tab:find("fly") or _ln_tab:find("noclip") or _ln_tab:find("walkspeed")
+                or _ln_tab:find("speed glitch") or _ln_tab:find("power jump")
+                or _ln_tab:find("infinite jump") or _ln_tab:find("infinity jump")
+                or _ln_tab:find("auto jump") or _ln_tab:find("wall hop")
+                or _ln_tab:find("click tp") or _ln_tab:find("tp low map")
+                or _ln_tab:find("orbit") or _ln_tab:find("second life")
+                or _ln_tab:find("trap immune") or _ln_tab:find("bug tramp")
+                or _ln_tab:find("skip death") or _ln_tab:find("auto farm")
+                or _ln_tab:find("auto prestige") or _ln_tab:find("auto grab")
+                or _ln_tab:find("auto equip") or _ln_tab:find("coin aura")
+                or _ln_tab:find("auto remove") or _ln_tab:find("auto esquivar")
+                or _ln_tab:find("auto reset") or _ln_tab:find("ping boost")
+                or _ln_tab:find("own ping") or _ln_tab:find("secure auto")
+                or _ln_tab:find("booster") or _ln_tab:find("bindable boton")
+                or _ln_tab:find("show bindable") or _ln_tab:find("spin")
+                or _ln_tab:find("auto click") or _ln_tab:find("auto touch")
+                or _ln_tab:find("fling") or _ln_tab:find("hitbox")
+                or _ln_tab:find("kill aura") or _ln_tab:find("kill all")
+                or _ln_tab:find("goto ") or _ln_tab:find("expose")
+                or _ln_tab:find("tp to") or _ln_tab:find("secure tp")
+                or _ln_tab:find("bindable button") or _ln_tab:find("anti bang")
+                or _ln_tab:find("bang murder") or _ln_tab:find("instant interact")
+                or _ln_tab:find("interactions distance") then
+                _targetTabIdx_nonPhys = 7  -- CreateUseTab
+            elseif _ln_tab:find("emote") or _ln_tab:find("dance") or _ln_tab:find("animation") then
+                _targetTabIdx_nonPhys = 8  -- CreateEmotesTab
+            end
+            -- Si no se detecto ningun tab especifico, esperar simplemente a que el
+            -- callback quede registrado (puede venir de cualquier tab ya construido)
             task.spawn(function()
                 -- Esperar el delay escalonado inicial
                 task.wait(_myDelay)
@@ -31739,15 +31813,13 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                 if _isVisualToggle_pre then
                     warn("[ZerqonHUB-DEBUG] AUTO-RESTORE visual iniciado: " .. tostring(_nombreCapture))
                 end
-                -- FIX ESP AUTO-RESTORE: si es toggle visual, esperar a que el tab de
-                -- Visuals (idx 3) este construido Y que su callback este registrado.
-                -- Sin este wait, el callback corre con upvalues nil (instanceLoop, etc.)
-                -- porque CreateVisualsTab no fue llamada aun (se buildea a los 4s).
-                if _isVisualToggle_pre then
+                -- FIX TODAS LAS TABS: esperar al tab correcto antes de disparar el callback.
+                -- Antes solo se esperaba al tab Visuals (3); ahora se espera al tab que
+                -- corresponda segun la deteccion de nombre hecha arriba.
+                if _targetTabIdx_nonPhys then
                     local _wt = 0
                     while _wt < 200 do  -- max 20s
-                        -- Esperar hasta que el tab este construido Y el callback registrado
-                        if _G._tabBuilt and _G._tabBuilt[3]
+                        if _G._tabBuilt and _G._tabBuilt[_targetTabIdx_nonPhys]
                         and _G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] then
                             break
                         end
@@ -31756,11 +31828,22 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                     end
                     task.wait(0.1)  -- margen extra para que las upvalues locales queden listas
                     -- DEBUG
-                    warn("[ZerqonHUB-DEBUG] while terminado para: " .. tostring(_nombreCapture) 
-                        .. " | tabBuilt[3]=" .. tostring(_G._tabBuilt and _G._tabBuilt[3])
-                        .. " | cbRegistrado=" .. tostring(_G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] ~= nil)
-                        .. " | vc.everyone=" .. tostring(VisualState and VisualState.cham and VisualState.cham.everyone)
-                    )
+                    if _isVisualToggle_pre then
+                        warn("[ZerqonHUB-DEBUG] while terminado para: " .. tostring(_nombreCapture) 
+                            .. " | tabBuilt[" .. tostring(_targetTabIdx_nonPhys) .. "]=" .. tostring(_G._tabBuilt and _G._tabBuilt[_targetTabIdx_nonPhys])
+                            .. " | cbRegistrado=" .. tostring(_G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] ~= nil)
+                            .. " | vc.everyone=" .. tostring(VisualState and VisualState.cham and VisualState.cham.everyone)
+                        )
+                    end
+                else
+                    -- Sin tab especifico detectado: esperar solo a que el callback quede registrado
+                    -- (cubre toggles del Main tab o de tabs que ya estaban construidos)
+                    local _wt2 = 0
+                    while _wt2 < 100 do  -- max 10s
+                        if _G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] then break end
+                        task.wait(0.1)
+                        _wt2 = _wt2 + 1
+                    end
                 end
                 -- Usar _G._toggleCallbacks que apunta al callback mas reciente
                 -- (el registrado despues de que el tab fue construido, con upvalues validas)
