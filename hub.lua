@@ -63210,10 +63210,369 @@ _G._ItemsFakeState = _ItemsFakeState
 end -- cierra abrirHub
 
 
+
 -- ================================================================
--- == KEY SYSTEM REMOVIDO - HUB ABRE DIRECTO
+-- == PANTALLA DE CARGA ZERQON HUB (v2 - FACHERA EDITION)
+-- == Mas grande, colores del hub, delays de 3s, animaciones epicas
 -- ================================================================
-abrirHub()
+local function _ZerqonLoadingScreen(onComplete)
+    local TweenService = game:GetService("TweenService")
+    local Players      = game:GetService("Players")
+    local lp           = Players.LocalPlayer
+
+    -- Colores del hub (teal/cyan oscuro igual que la UI principal)
+    local C_BG_DARK   = Color3.fromRGB( 10,  20,  60)   -- fondo oscuro del hub
+    local C_BG_MID    = Color3.fromRGB( 15,  35, 100)   -- azul medio hub
+    local C_ACCENT    = Color3.fromRGB(  0, 200, 255)   -- cyan/teal del hub
+    local C_CHECK     = Color3.fromRGB( 57, 255, 154)   -- verde check
+    local C_WHITE     = Color3.fromRGB(255, 255, 255)
+    local C_DIM       = Color3.fromRGB(130, 190, 220)   -- texto apagado
+    local C_GLOW      = Color3.fromRGB(  0, 255, 220)   -- brillo teal
+
+    -- ScreenGui
+    local sg = Instance.new("ScreenGui")
+    sg.Name           = "ZerqonLoadScreen"
+    sg.ResetOnSpawn   = false
+    sg.DisplayOrder   = 99999
+    sg.IgnoreGuiInset = true
+    pcall(function()
+        if gethui then sg.Parent = gethui()
+        else            sg.Parent = game:GetService("CoreGui") end
+    end)
+    if not sg.Parent then sg.Parent = lp.PlayerGui end
+
+    -- Fondo oscuro semitransparente (backdrop)
+    local backdrop = Instance.new("Frame", sg)
+    backdrop.Name                 = "Backdrop"
+    backdrop.Size                 = UDim2.new(1, 0, 1, 0)
+    backdrop.Position             = UDim2.new(0, 0, 0, 0)
+    backdrop.BackgroundColor3     = Color3.fromRGB(0, 0, 0)
+    backdrop.BackgroundTransparency = 1  -- empieza invisible, fade in
+    backdrop.BorderSizePixel      = 0
+    backdrop.ZIndex               = 8
+
+    -- Contenedor principal (MAS GRANDE: 420x220)
+    local rect = Instance.new("Frame", sg)
+    rect.Name                 = "LoadRect"
+    rect.Size                 = UDim2.new(0, 420, 0, 220)
+    rect.Position             = UDim2.new(0.5, -210, 0.5, -110)
+    rect.BackgroundColor3     = C_BG_DARK
+    rect.BackgroundTransparency = 1  -- empieza invisible para animacion de entrada
+    rect.BorderSizePixel      = 0
+    rect.ZIndex               = 10
+
+    -- Esquinas redondeadas
+    local corner = Instance.new("UICorner", rect)
+    corner.CornerRadius = UDim.new(0, 12)
+
+    -- Borde brillante (stroke teal)
+    local stroke = Instance.new("UIStroke", rect)
+    stroke.Color       = C_ACCENT
+    stroke.Thickness   = 2
+    stroke.Transparency = 1  -- empieza invisible
+
+    -- Gradiente de fondo del rect
+    local grad = Instance.new("UIGradient", rect)
+    grad.Color    = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, C_BG_DARK),
+        ColorSequenceKeypoint.new(1, C_BG_MID),
+    })
+    grad.Rotation = 135
+
+    -- Header: nombre del hub con icono
+    local headerLbl = Instance.new("TextLabel", rect)
+    headerLbl.Name               = "Header"
+    headerLbl.Size               = UDim2.new(1, -20, 0, 36)
+    headerLbl.Position           = UDim2.new(0, 10, 0, 10)
+    headerLbl.BackgroundTransparency = 1
+    headerLbl.Text               = "? ZERQON HUB"
+    headerLbl.TextColor3         = C_ACCENT
+    headerLbl.Font               = Enum.Font.GothamBold
+    headerLbl.TextSize           = 22
+    headerLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    headerLbl.TextTransparency   = 1
+    headerLbl.ZIndex             = 13
+
+    -- Linea separadora debajo del header
+    local divider = Instance.new("Frame", rect)
+    divider.Name                 = "Divider"
+    divider.Size                 = UDim2.new(1, -20, 0, 1)
+    divider.Position             = UDim2.new(0, 10, 0, 50)
+    divider.BackgroundColor3     = C_ACCENT
+    divider.BackgroundTransparency = 0.5
+    divider.BorderSizePixel      = 0
+    divider.ZIndex               = 12
+
+    -- Textos de carga (loading) y OK para cada paso
+    local loadingTexts = {
+        "Conectando...",
+        "Autenticando...",
+        "Cargando hub...",
+    }
+    local okTexts = {
+        "Connected to Server",
+        "No Key  -  Free Script  xD",
+        "Ready",
+    }
+
+    local rows = {}
+    for i = 1, 3 do
+        local row = Instance.new("Frame", rect)
+        row.Name                 = "Row" .. i
+        row.Size                 = UDim2.new(1, -24, 0, 36)
+        row.Position             = UDim2.new(0, 12, 0, 58 + (i-1) * 44)
+        row.BackgroundTransparency = 1
+        row.BorderSizePixel      = 0
+        row.ZIndex               = 11
+
+        -- Bolita indicadora izquierda
+        local dot = Instance.new("Frame", row)
+        dot.Name                 = "Dot"
+        dot.Size                 = UDim2.new(0, 10, 0, 10)
+        dot.Position             = UDim2.new(0, 2, 0.5, -5)
+        dot.BackgroundColor3     = C_DIM
+        dot.BorderSizePixel      = 0
+        dot.ZIndex               = 13
+        local dotCorner = Instance.new("UICorner", dot)
+        dotCorner.CornerRadius = UDim.new(1, 0)
+
+        -- Check mark (inicialmente invisible)
+        local check = Instance.new("TextLabel", row)
+        check.Name               = "Check"
+        check.Size               = UDim2.new(0, 28, 1, 0)
+        check.Position           = UDim2.new(0, 18, 0, 0)
+        check.BackgroundTransparency = 1
+        check.Text               = "?"
+        check.TextColor3         = C_CHECK
+        check.Font               = Enum.Font.GothamBold
+        check.TextSize           = 20
+        check.TextXAlignment     = Enum.TextXAlignment.Center
+        check.TextTransparency   = 1
+        check.ZIndex             = 12
+
+        -- Texto del estado (MAS GRANDE: 16px)
+        local txt = Instance.new("TextLabel", row)
+        txt.Name                 = "Txt"
+        txt.Size                 = UDim2.new(1, -52, 1, 0)
+        txt.Position             = UDim2.new(0, 50, 0, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text                 = loadingTexts[i]
+        txt.TextColor3           = C_DIM
+        txt.Font                 = Enum.Font.GothamBold
+        txt.TextSize             = 16
+        txt.TextXAlignment       = Enum.TextXAlignment.Left
+        txt.TextTransparency     = 1  -- empieza invisible, fade in con la carta
+        txt.ZIndex               = 12
+
+        -- Spinner animado solo para "Cargando hub..." (fila 3)
+        local spinner = nil
+        if i == 3 then
+            spinner = Instance.new("TextLabel", row)
+            spinner.Name               = "Spinner"
+            spinner.Size               = UDim2.new(0, 28, 1, 0)
+            spinner.Position           = UDim2.new(1, -30, 0, 0)
+            spinner.BackgroundTransparency = 1
+            spinner.Text               = "?"
+            spinner.TextColor3         = C_ACCENT
+            spinner.Font               = Enum.Font.GothamBold
+            spinner.TextSize           = 18
+            spinner.TextXAlignment     = Enum.TextXAlignment.Center
+            spinner.TextTransparency   = 1
+            spinner.ZIndex             = 13
+        end
+
+        rows[i] = {check=check, txt=txt, dot=dot, spinner=spinner}
+    end
+
+    -- Barra de progreso inferior
+    local progressBg = Instance.new("Frame", rect)
+    progressBg.Name              = "ProgressBg"
+    progressBg.Size              = UDim2.new(1, -24, 0, 6)
+    progressBg.Position          = UDim2.new(0, 12, 1, -22)
+    progressBg.BackgroundColor3  = C_BG_MID
+    progressBg.BorderSizePixel   = 0
+    progressBg.ZIndex            = 11
+    local pbCorner = Instance.new("UICorner", progressBg)
+    pbCorner.CornerRadius = UDim.new(1, 0)
+
+    local progressBar = Instance.new("Frame", progressBg)
+    progressBar.Name             = "ProgressFill"
+    progressBar.Size             = UDim2.new(0, 0, 1, 0)
+    progressBar.Position         = UDim2.new(0, 0, 0, 0)
+    progressBar.BackgroundColor3 = C_ACCENT
+    progressBar.BorderSizePixel  = 0
+    progressBar.ZIndex           = 12
+    local pfCorner = Instance.new("UICorner", progressBar)
+    pfCorner.CornerRadius = UDim.new(1, 0)
+
+    -- Texto "Copy Whitelist" debajo
+    local copyLbl = Instance.new("TextLabel", rect)
+    copyLbl.Size               = UDim2.new(1, 0, 0, 18)
+    copyLbl.Position           = UDim2.new(0, 0, 1, -40)
+    copyLbl.BackgroundTransparency = 1
+    copyLbl.Text               = "?  Copy Whitelist  ?"
+    copyLbl.TextColor3         = C_GLOW
+    copyLbl.Font               = Enum.Font.Gotham
+    copyLbl.TextSize           = 13
+    copyLbl.TextXAlignment     = Enum.TextXAlignment.Center
+    copyLbl.TextTransparency   = 1
+    copyLbl.ZIndex             = 12
+
+    -- ============================================================
+    -- ANIMACION DE ENTRADA FACHERA: escala + fade in + slide up
+    -- ============================================================
+    rect.Position = UDim2.new(0.5, -210, 0.5, -90)  -- empieza un poco mas abajo
+    local uiScale = Instance.new("UIScale", rect)
+    uiScale.Scale = 0.7  -- empieza pequeño
+
+    task.spawn(function()
+        -- Fade in del backdrop
+        TweenService:Create(backdrop, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.55}):Play()
+        task.wait(0.15)
+
+        -- El rect aparece con: escala 0.7->1, posicion slide up, fade in, borde brilla
+        TweenService:Create(uiScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(rect, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0.08,
+            Position = UDim2.new(0.5, -210, 0.5, -110),
+        }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {Transparency = 0.3}):Play()
+
+        -- Header y texto aparecen en cascada
+        task.wait(0.25)
+        TweenService:Create(headerLbl, TweenInfo.new(0.35, Enum.EasingStyle.Sine), {TextTransparency = 0}):Play()
+        task.wait(0.1)
+        TweenService:Create(copyLbl, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {TextTransparency = 0.3}):Play()
+
+        -- Los textos de filas aparecen en cascada
+        for i = 1, 3 do
+            task.wait(0.08)
+            TweenService:Create(rows[i].txt, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {TextTransparency = 0}):Play()
+        end
+
+        task.wait(0.3)
+
+        -- ============================================================
+        -- SECUENCIA DE CHECKS con delay de 3 segundos cada uno
+        -- ============================================================
+
+        -- Paso 1: Conectando (3s delay)
+        task.wait(3)
+        local r1 = rows[1]
+        r1.dot.BackgroundColor3 = C_CHECK
+        TweenService:Create(r1.check, TweenInfo.new(0.15), {TextTransparency = 0}):Play()
+        r1.txt.Text       = okTexts[1]
+        r1.txt.TextColor3 = C_CHECK
+        task.spawn(function()
+            TweenService:Create(r1.check, TweenInfo.new(0.1), {TextColor3 = C_WHITE}):Play()
+            task.wait(0.1)
+            TweenService:Create(r1.check, TweenInfo.new(0.25), {TextColor3 = C_CHECK}):Play()
+        end)
+        TweenService:Create(progressBar, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0.33, 0, 1, 0)}):Play()
+
+        -- Paso 2: Autenticando (3s delay)
+        task.wait(0.5)
+        rows[2].txt.Text = "Verificando licencia..."
+        task.wait(3)
+        local r2 = rows[2]
+        r2.dot.BackgroundColor3 = C_CHECK
+        TweenService:Create(r2.check, TweenInfo.new(0.15), {TextTransparency = 0}):Play()
+        r2.txt.Text       = okTexts[2]
+        r2.txt.TextColor3 = C_CHECK
+        task.spawn(function()
+            TweenService:Create(r2.check, TweenInfo.new(0.1), {TextColor3 = C_WHITE}):Play()
+            task.wait(0.1)
+            TweenService:Create(r2.check, TweenInfo.new(0.25), {TextColor3 = C_CHECK}):Play()
+        end)
+        TweenService:Create(progressBar, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0.66, 0, 1, 0)}):Play()
+
+        -- Paso 3: Cargando hub... con SPINNER animado (3s delay)
+        task.wait(0.5)
+        rows[3].txt.Text = "Iniciando hub..."
+
+        -- Mostrar y animar el spinner mientras espera
+        local r3 = rows[3]
+        if r3.spinner then
+            TweenService:Create(r3.spinner, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+            -- Animar spinner: rotar simbolos
+            local spinFrames = {"?","?","?","?","?","?","?","?"}
+            local spinActive = true
+            task.spawn(function()
+                local sf = 1
+                while spinActive do
+                    r3.spinner.Text = spinFrames[sf]
+                    sf = (sf % #spinFrames) + 1
+                    -- Pulso de color en el spinner
+                    TweenService:Create(r3.spinner, TweenInfo.new(0.18, Enum.EasingStyle.Sine),
+                        {TextColor3 = C_GLOW}):Play()
+                    task.wait(0.18)
+                    TweenService:Create(r3.spinner, TweenInfo.new(0.18, Enum.EasingStyle.Sine),
+                        {TextColor3 = C_ACCENT}):Play()
+                    task.wait(0.18)
+                end
+                -- Ocultar spinner al terminar
+                if r3.spinner and r3.spinner.Parent then
+                    TweenService:Create(r3.spinner, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+                end
+            end)
+
+            task.wait(3)
+            spinActive = false
+        else
+            task.wait(3)
+        end
+
+        r3.dot.BackgroundColor3 = C_CHECK
+        TweenService:Create(r3.check, TweenInfo.new(0.15), {TextTransparency = 0}):Play()
+        r3.txt.Text       = okTexts[3]
+        r3.txt.TextColor3 = C_CHECK
+        task.spawn(function()
+            TweenService:Create(r3.check, TweenInfo.new(0.1), {TextColor3 = C_WHITE}):Play()
+            task.wait(0.1)
+            TweenService:Create(r3.check, TweenInfo.new(0.25), {TextColor3 = C_CHECK}):Play()
+        end)
+        TweenService:Create(progressBar, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {Size = UDim2.new(1, 0, 1, 0)}):Play()
+        -- Borde brilla intenso al completar
+        TweenService:Create(stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Transparency = 0, Color = C_CHECK}):Play()
+
+        task.wait(0.7)
+
+        -- ============================================================
+        -- ANIMACION DE SALIDA FACHERA: escala up + fade out + slide up
+        -- ============================================================
+        TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 1.08}):Play()
+        task.wait(0.15)
+        TweenService:Create(uiScale, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.6}):Play()
+        TweenService:Create(rect, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0.5, -210, 0.5, -160),
+        }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
+        TweenService:Create(backdrop, TweenInfo.new(0.35, Enum.EasingStyle.Sine), {BackgroundTransparency = 1}):Play()
+        for _, r in ipairs(rows) do
+            TweenService:Create(r.check, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+            TweenService:Create(r.txt,   TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        end
+        TweenService:Create(headerLbl, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        TweenService:Create(copyLbl,   TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+
+        task.wait(0.45)
+
+        pcall(function() sg:Destroy() end)
+        if type(onComplete) == "function" then
+            onComplete()
+        end
+    end)
+end
+
+_ZerqonLoadingScreen(function()
+    abrirHub()
+end)
+
+
 -- == FIX TEXTO OSCURO: asegurar visibilidad en labels de AuroraToggle sin pisar el gradiente cyan ==
 task.spawn(function()
     repeat task.wait(0.1) until _G._hubReady
