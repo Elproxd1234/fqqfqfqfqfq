@@ -95,27 +95,13 @@ _G._hubScriptExecuted = true
 -- y el usuario tenia que ir al navegador cada vez que ejecutaba.
 -- ================================================================
 -- ================================================================
--- == BORRADO FORZADO DE KEY (v1) - Elimina key guardada al arrancar
--- El usuario puede ejecutar esto para resetear su key y volver a verificar.
+-- == BORRADO FORZADO DE KEY (v1) -- DESACTIVADO
+-- Este bloque borraba la key guardada ANTES de que el validador v2
+-- pudiera leerla, haciendo que el usuario tuviera que verificar
+-- cada vez que ejecutaba el hub. Se comenta para que el bloque
+-- "LIMPIEZA DE KEY ANTIGUA v2" pueda reutilizar la key valida.
 -- ================================================================
-do
-    local _fcLp  = game:GetService("Players").LocalPlayer
-    local _fcUid = tostring(_fcLp and _fcLp.UserId or "0")
-    local _fcPath = "zerqon_key_" .. _fcUid .. ".txt"
-    -- Borrar archivo local
-    pcall(function() if delfile   then delfile(_fcPath)       end end)
-    pcall(function() if writefile then writefile(_fcPath, "") end end)
-    -- Limpiar globals de session
-    _G._zerqonToken          = nil
-    _G._keyStartTime         = nil
-    _G._zerqonBinId          = nil
-    _G._zerqonSessionSeed    = nil
-    _G._zerqonKeyDuration    = nil
-    _G._keyPreValidated      = nil
-    _G._keyExpiredKickTriggered = nil
-    _G._keyTimerLastSec      = nil
-    warn("[ZerqonHUB] Key anterior eliminada. Se requiere nueva verificacion.")
-end
+-- [BLOQUE ELIMINADO -- ver LIMPIEZA DE KEY ANTIGUA v2 abajo]
 -- ================================================================
 -- == FIN BORRADO FORZADO DE KEY
 -- ================================================================
@@ -1596,6 +1582,9 @@ local _autoRestoreOnReexec = {
     ["Rotate Crosshair"]                     = true,
     ["Ocultar Crosshair Roblox"]             = true,
     ["No BillboardGuis (draw calls --)"]     = true,
+    -- Spectate Detector (Use Tab)
+    ["Detect Who Spectates You"]             = true,
+    ["Show Spectators Bindable Button"]      = true,
 }
 
 -- Cargar configuracion guardada ANTES de crear la UI
@@ -31650,7 +31639,8 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                     or _lower:find("auto esquivar") or _lower:find("auto spectate") or _lower:find("auto announce")
                     or _lower:find("auto reset") or _lower:find("ping boost") or _lower:find("own ping")
                     or _lower:find("secure auto") or _lower:find("booster") or _lower:find("bindable boton")
-                    or _lower:find("show bindable") then
+                    or _lower:find("show bindable")
+                    or _lower:find("detect who spectates") or _lower:find("show spectators") then
                         _targetTabIdx = 7  -- CreateUseTab
                     end
                     -- Esperar a que el tab est? construido (max 15s)
@@ -31799,7 +31789,8 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                 or _ln_tab:find("tp to") or _ln_tab:find("secure tp")
                 or _ln_tab:find("bindable button") or _ln_tab:find("anti bang")
                 or _ln_tab:find("bang murder") or _ln_tab:find("instant interact")
-                or _ln_tab:find("interactions distance") then
+                or _ln_tab:find("interactions distance")
+                or _ln_tab:find("detect who spectates") or _ln_tab:find("show spectators") then
                 _targetTabIdx_nonPhys = 7  -- CreateUseTab
             elseif _ln_tab:find("emote") or _ln_tab:find("dance") or _ln_tab:find("animation") then
                 _targetTabIdx_nonPhys = 8  -- CreateEmotesTab
@@ -64136,6 +64127,346 @@ function CreateUseTab()
             CreateCustomNotification("RESTAURADO", "Tema original del hub", 2)
         end)
     end
+
+    -- =====================================================================
+    -- DETECT WHO SPECTATES YOU
+    -- Hookea SpectateService del juego para saber qué jugadores te están
+    -- spectateando. Usa SpectateStarted / SpectateTargetChanged para saber
+    -- cuando alguien empieza, y SpectateCancelled para cuando para.
+    -- =====================================================================
+    do
+        local _specSec = CreateBorderedSectionGlobal(leftColumn, "???  DETECT WHO SPECTATES YOU")
+
+        _G._specWatchState = _G._specWatchState or {
+            enabled       = false,
+            bindable      = false,
+            connections   = {},          -- RBXScriptConnections activos
+            spectators    = {},          -- [player] = true (quiénes spectating a LocalPlayer)
+            notifCooldown = {},          -- [player.Name] = tick() para no spamear notifs
+            bindableBtn   = nil,         -- GuiObject del botón en pantalla
+        }
+        local SW = _G._specWatchState
+
+        -- ----------------------------------------------------------------
+        -- Helpers internos
+        -- ----------------------------------------------------------------
+        local function _swCleanConns()
+            for _, c in ipairs(SW.connections) do
+                pcall(function() c:Disconnect() end)
+            end
+            SW.connections = {}
+        end
+
+        local function _swNotify(playerName, isNew)
+            local now = tick()
+            local last = SW.notifCooldown[playerName] or 0
+            if now - last < 4 then return end  -- cooldown 4s por jugador
+            SW.notifCooldown[playerName] = now
+            if isNew then
+                CreateCustomNotification("??? SPECTATING", playerName .. " is watching you", 3.5)
+            else
+                CreateCustomNotification("??? STOPPED", playerName .. " stopped spectating", 2.5)
+            end
+        end
+
+        -- Contar cuántos jugadores nos spectean actualmente
+        local function _swCount()
+            local n = 0
+            for _ in pairs(SW.spectators) do n = n + 1 end
+            return n
+        end
+
+        -- ----------------------------------------------------------------
+        -- Core: hookear SpectateService de cada jugador
+        -- Cuando otro jugador spectatea, el juego llama SpectateStarted
+        -- y SpectateTargetChanged en el SpectateService de ESE jugador,
+        -- pero eso es server-side. En client solo podemos detectarlo
+        -- monitoreando CameraSubject de la cámara de cada Character.
+        -- Estrategia: RunService.Heartbeat revisa CurrentCamera.CameraSubject
+        -- de workspace -> si CameraSubject apunta al Humanoid de LocalPlayer,
+        -- ESE jugador nos está spectateando.
+        -- ----------------------------------------------------------------
+        local function _swStart()
+            _swCleanConns()
+            SW.spectators    = {}
+            SW.notifCooldown = {}
+
+            -- Intentar usar SpectateService directamente si es accesible
+            local _ssOk, _ss = pcall(function()
+                local RS = game:GetService("ReplicatedStorage")
+                local mods = RS:FindFirstChild("Modules")
+                if mods then
+                    local ss = mods:FindFirstChild("SpectateService")
+                        or mods:FindFirstChild("SpectateService1")
+                    if ss then return require(ss) end
+                end
+                -- Fallback: buscar en PlayerScripts
+                local ps = LocalPlayer:FindFirstChild("PlayerScripts")
+                if ps then
+                    local ss = ps:FindFirstChild("SpectateService")
+                        or ps:FindFirstChild("SpectateService1")
+                    if ss then return require(ss) end
+                end
+                return nil
+            end)
+            local _serviceAvail = _ssOk and _ss ~= nil
+
+            -- Método principal: Heartbeat detecta CameraSubject de cada char
+            local _hbConn = RunService.Heartbeat:Connect(function()
+                if not SW.enabled then return end
+                local myChar = LocalPlayer.Character
+                local myHum  = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                if not myHum then return end
+
+                local nowSpectating = {}
+
+                for _, p in ipairs(game.Players:GetPlayers()) do
+                    if p == LocalPlayer then continue end
+                    local pChar = p.Character
+                    if not pChar then continue end
+                    -- Chequear si la cámara del workspace apunta a nuestro humanoid
+                    -- (solo funciona con Camera.CameraSubject compartido en algunos modos)
+                    -- Fallback: revisar CameraSubject via getCurrentCamera trick
+                    local camOk = false
+                    pcall(function()
+                        -- Leer atributo especial que algunos games exponen
+                        local spectateVal = pChar:FindFirstChild("_Spectating")
+                        if spectateVal and spectateVal.Value == LocalPlayer.Name then
+                            camOk = true
+                        end
+                    end)
+                    -- Método seguro: CurrentRoundClient.PlayerData + comparar targets
+                    if not camOk then
+                        pcall(function()
+                            local RC = require(game:GetService("ReplicatedStorage")
+                                :WaitForChild("Modules", 2)
+                                :WaitForChild("CurrentRoundClient", 2))
+                            local pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
+                            if pd and pd.SpectateTarget == LocalPlayer.Name then
+                                camOk = true
+                            end
+                        end)
+                    end
+                    if camOk then
+                        nowSpectating[p] = true
+                    end
+                end
+
+                -- Detectar nuevos spectators
+                for p in pairs(nowSpectating) do
+                    if not SW.spectators[p] then
+                        SW.spectators[p] = true
+                        _swNotify(p.Name, true)
+                    end
+                end
+                -- Detectar los que pararon
+                for p in pairs(SW.spectators) do
+                    if not nowSpectating[p] then
+                        SW.spectators[p] = nil
+                        _swNotify(p.Name, false)
+                    end
+                end
+            end)
+            table.insert(SW.connections, _hbConn)
+
+            -- Método secundario: hookear SpectateService vía BindableEvents
+            -- SpectateStarted / SpectateTargetChanged / SpectateCancelled
+            if _serviceAvail and _ss then
+                -- SpectateStarted: alguien inició spectate
+                local _ssStart = _ss.SpectateStarted
+                if _ssStart and _ssStart.Event then
+                    local c1 = _ssStart.Event:Connect(function()
+                        -- No sabemos quién es todavía; el SpectateTargetChanged lo confirma
+                    end)
+                    table.insert(SW.connections, c1)
+                end
+
+                -- SpectateTargetChanged: cambió de target -> el target es LocalPlayer?
+                local _ssTarget = _ss.SpectateTargetChanged
+                if _ssTarget and _ssTarget.Event then
+                    local c2 = _ssTarget.Event:Connect(function(targetPlayer)
+                        if targetPlayer == LocalPlayer then
+                            -- Quién dispara este evento es el spectator
+                            -- Buscamos al jugador que activó el spectate
+                            for _, p in ipairs(game.Players:GetPlayers()) do
+                                if p ~= LocalPlayer and not SW.spectators[p] then
+                                    -- Heurística: jugador muerto más cercano que no tenemos aún
+                                    local pd = nil
+                                    pcall(function()
+                                        local RC = require(game:GetService("ReplicatedStorage")
+                                            :WaitForChild("Modules", 1)
+                                            :WaitForChild("CurrentRoundClient", 1))
+                                        pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
+                                    end)
+                                    if pd and pd.Dead == true then
+                                        if not SW.spectators[p] then
+                                            SW.spectators[p] = true
+                                            _swNotify(p.Name, true)
+                                        end
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    table.insert(SW.connections, c2)
+                end
+
+                -- SpectateCancelled: alguien paró de spectate
+                local _ssCancel = _ss.SpectateCancelled
+                if _ssCancel and _ssCancel.Event then
+                    local c3 = _ssCancel.Event:Connect(function()
+                        -- Limpiar spectators que ya no están muertos
+                        local toRemove = {}
+                        for p in pairs(SW.spectators) do
+                            local isDead = false
+                            pcall(function()
+                                local RC = require(game:GetService("ReplicatedStorage")
+                                    :WaitForChild("Modules", 1)
+                                    :WaitForChild("CurrentRoundClient", 1))
+                                local pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
+                                isDead = pd and pd.Dead == true
+                            end)
+                            if not isDead then
+                                table.insert(toRemove, p)
+                            end
+                        end
+                        for _, p in ipairs(toRemove) do
+                            SW.spectators[p] = nil
+                            _swNotify(p.Name, false)
+                        end
+                    end)
+                    table.insert(SW.connections, c3)
+                end
+            end
+
+            -- PlayerRemoving: limpiar spectator si sale del juego
+            local _prConn = game.Players.PlayerRemoving:Connect(function(p)
+                if SW.spectators[p] then
+                    SW.spectators[p] = nil
+                end
+            end)
+            table.insert(SW.connections, _prConn)
+
+            CreateCustomNotification("??? SPECTATE DETECT", "Monitoring who watches you", 2.5)
+        end
+
+        local function _swStop()
+            _swCleanConns()
+            SW.spectators    = {}
+            SW.notifCooldown = {}
+        end
+
+        -- ----------------------------------------------------------------
+        -- Toggle principal: Detect Who Spectates You
+        -- ----------------------------------------------------------------
+        CreateAuroraToggle(leftColumn, "Detect Who Spectates You", function(on)
+            SW.enabled = on
+            if on then
+                _swStart()
+            else
+                _swStop()
+                CreateCustomNotification("??? SPECTATE DETECT", "Detection stopped", 2)
+            end
+        end, false)
+
+        -- ----------------------------------------------------------------
+        -- Bindable button: muestra en pantalla quién te spectea ahora mismo
+        -- ----------------------------------------------------------------
+        CreateAuroraToggle(leftColumn, "Show Spectators Bindable Button", function(on)
+            SW.bindable = on
+
+            -- Destruir botón previo si existe
+            if SW.bindableBtn then
+                pcall(function() SW.bindableBtn:Destroy() end)
+                SW.bindableBtn = nil
+            end
+
+            if not on then return end
+
+            -- Crear botón HUD
+            local _pg   = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            local _cg   = game:GetService("CoreGui")
+            local _root = (gethui and gethui()) or _pg or _cg
+            if not _root then return end
+
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Name            = "ZerqonSpecDetectGui"
+            screenGui.ResetOnSpawn    = false
+            screenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+            screenGui.IgnoreGuiInset  = true
+            screenGui.DisplayOrder    = 50
+            screenGui.Parent          = _root
+
+            local btn = Instance.new("TextButton", screenGui)
+            btn.Name                   = "SpecDetectBtn"
+            btn.Size                   = UDim2.new(0, 220, 0, 36)
+            btn.Position               = UDim2.new(0.5, -110, 0, 120)
+            btn.AnchorPoint            = Vector2.new(0, 0)
+            btn.BackgroundColor3       = Color3.fromRGB(5, 15, 40)
+            btn.BackgroundTransparency = 0.25
+            btn.BorderSizePixel        = 0
+            btn.Text                   = "??? Spectators: none"
+            btn.TextSize               = 13
+            btn.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
+            btn.TextColor3             = Color3.fromRGB(80, 220, 255)
+            btn.AutoButtonColor        = false
+            btn.Active                 = true
+            btn.Draggable              = true
+            Instance.new("UICorner",  btn).CornerRadius  = UDim.new(0, 8)
+            local stroke = Instance.new("UIStroke", btn)
+            stroke.Color           = Color3.fromRGB(50, 180, 255)
+            stroke.Thickness       = 1
+            stroke.Transparency    = 0.3
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            SW.bindableBtn = screenGui
+
+            -- Update loop: refresca el texto del botón cada 0.5s
+            task.spawn(function()
+                while SW.bindable and btn and btn.Parent do
+                    task.wait(0.5)
+                    local count = _swCount()
+                    if count == 0 then
+                        btn.Text       = "??? Spectators: none"
+                        btn.TextColor3 = Color3.fromRGB(100, 200, 255)
+                        stroke.Color   = Color3.fromRGB(50, 180, 255)
+                    else
+                        -- Listar nombres
+                        local names = {}
+                        for p in pairs(SW.spectators) do
+                            table.insert(names, p.Name)
+                        end
+                        local listStr = table.concat(names, ", ")
+                        if #listStr > 28 then listStr = listStr:sub(1, 25) .. "..." end
+                        btn.Text       = "??? " .. tostring(count) .. " watching: " .. listStr
+                        btn.TextColor3 = Color3.fromRGB(255, 90, 90)
+                        stroke.Color   = Color3.fromRGB(255, 60, 60)
+                        -- Pulse rojo
+                        TweenService:Create(stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true), {
+                            Transparency = 0.7
+                        }):Play()
+                    end
+                end
+            end)
+
+            -- Click en el botón: listar spectators en notif
+            btn.Activated:Connect(function()
+                if not SW.enabled then
+                    CreateCustomNotification("??? DETECT OFF", "Enable the main toggle first", 2.5)
+                    return
+                end
+                local count = _swCount()
+                if count == 0 then
+                    CreateCustomNotification("??? SPECTATE DETECT", "Nobody is watching you right now", 2.5)
+                else
+                    local names = {}
+                    for p in pairs(SW.spectators) do table.insert(names, p.Name) end
+                    CreateCustomNotification("??? WATCHING YOU (" .. count .. ")", table.concat(names, ", "), 4)
+                end
+            end)
+        end, false)
+    end  -- end DETECT WHO SPECTATES YOU
 
 end -- cierra CreateUseTab
 
