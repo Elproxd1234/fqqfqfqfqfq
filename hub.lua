@@ -94,17 +94,6 @@ _G._hubScriptExecuted = true
 -- Antes borraba siempre -> el hub nunca detectaba la key guardada
 -- y el usuario tenia que ir al navegador cada vez que ejecutaba.
 -- ================================================================
--- ================================================================
--- == BORRADO FORZADO DE KEY (v1) -- DESACTIVADO
--- Este bloque borraba la key guardada ANTES de que el validador v2
--- pudiera leerla, haciendo que el usuario tuviera que verificar
--- cada vez que ejecutaba el hub. Se comenta para que el bloque
--- "LIMPIEZA DE KEY ANTIGUA v2" pueda reutilizar la key valida.
--- ================================================================
--- [BLOQUE ELIMINADO -- ver LIMPIEZA DE KEY ANTIGUA v2 abajo]
--- ================================================================
--- == FIN BORRADO FORZADO DE KEY
--- ================================================================
 do
     local _lp  = game:GetService("Players").LocalPlayer
     local _uid = tostring(_lp and _lp.UserId or "0")
@@ -819,7 +808,7 @@ _G._discordAvatarUrl       = _G._discordAvatarUrl or ""
 -- ================================================================
 -- == AUTO-GUARDADO PREMIUM v1
 -- Lee el archivo de sesion premium guardado localmente.
--- Si el v?nculo sigue siendo reciente (< 24h), restaura el acceso
+-- Si el vínculo sigue siendo reciente (< 24h), restaura el acceso
 -- sin que el usuario tenga que abrir el navegador de nuevo.
 -- El recheck que viene despues igual valida contra el backend.
 -- ================================================================
@@ -827,7 +816,7 @@ do
     local _lp2   = game:GetService("Players").LocalPlayer
     local _uid2  = tostring(_lp2 and _lp2.UserId or "0")
     local _premPath = "zerqon_premium_" .. _uid2 .. ".txt"
-    local _PREM_DUR = 7 * 24 * 3600  -- 7 d?as: alineado con el TTL del servidor
+    local _PREM_DUR = 7 * 24 * 3600  -- 7 días: alineado con el TTL del servidor
 
     pcall(function()
         if not readfile then return end
@@ -850,13 +839,13 @@ do
             _G._discordUsername        = (_uname and _uname ~= "") and _uname or "Usuario"
             _G._premiumSavedDiscordId  = _did
             _G._zerqonSessionToken     = (_tok and _tok ~= "") and _tok or nil
-            warn("[ZerqonHUB] Sesi?n guardada encontrada ? " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
+            warn("[ZerqonHUB] Sesión guardada encontrada — " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
         else
             -- Vencio: borrar
             pcall(function() if delfile   then delfile(_premPath)       end end)
             pcall(function() if writefile then writefile(_premPath, "") end end)
             _G._zerqonSessionToken = nil
-            warn("[ZerqonHUB] Sesi?n premium vencida. Se requiere re-verificaci?n.")
+            warn("[ZerqonHUB] Sesión premium vencida. Se requiere re-verificación.")
         end
     end)
 end
@@ -883,7 +872,7 @@ if false and _G._discordPremiumVerified then
         repeat task.wait(0.2); _waitTick += 1 until _G._hubReady or _waitTick > 100
 
         -- Recheck con sessionToken: el servidor valida que este Roblox
-        -- es exactamente el propietario leg?timo de la sesi?n guardada.
+        -- es exactamente el propietario legítimo de la sesión guardada.
         local ok, response = pcall(function()
             return request({
                 Url    = _BACKEND_URL .. "/api/recheck-premium?roblox_id=" .. _robloxId
@@ -929,11 +918,11 @@ if false and _G._discordPremiumVerified then
             end)
             if dok and data then
                 if data.hasPremium == true then
-                    -- Token v?lido y sigue con el rol ? restaurar sin login
+                    -- Token válido y sigue con el rol ? restaurar sin login
                     _G._discordPremiumVerified = true
                     _G._discordUsername  = data.username  or _G._discordUsername
                     _G._discordAvatarUrl = data.avatarUrl or _G._discordAvatarUrl or ""
-                    warn("[ZerqonHUB] Recheck OK ? premium confirmado, RobloxId=" .. _robloxId)
+                    warn("[ZerqonHUB] Recheck OK — premium confirmado, RobloxId=" .. _robloxId)
 
                     -- DESBLOQUEO EN CALIENTE del tab VIP
                     local _PIDX = 4
@@ -950,11 +939,11 @@ if false and _G._discordPremiumVerified then
                         end
                     end)
                 elseif data.needsLogin then
-                    -- Token inv?lido, sesi?n vencida o v?nculo eliminado ? forzar re-login
-                    warn("[ZerqonHUB] Recheck: sesi?n inv?lida o vencida. Se requiere re-login.")
+                    -- Token inválido, sesión vencida o vínculo eliminado ? forzar re-login
+                    warn("[ZerqonHUB] Recheck: sesión inválida o vencida. Se requiere re-login.")
                     _clearPremiumSession()
                 else
-                    -- Perdi? el rol Discord ? limpiar
+                    -- Perdió el rol Discord ? limpiar
                     warn("[ZerqonHUB] Recheck: premium revocado, RobloxId=" .. _robloxId)
                     _clearPremiumSession()
                 end
@@ -1510,81 +1499,6 @@ local _autoRestoreOnReexec = {
     ["Show Bindable Button (Speed Glitch)"]  = true,
     -- FIX: Grab Gun bindable debe respetar el estado guardado al re-ejecutar
     ["Grab Gun Bindable Button"]             = true,
-    -- FIX VISUALS AUTO-RESTORE: todos los toggles del tab Visuals para que
-    -- su callback se dispare correctamente al re-ejecutar el hub.
-    ["ESP Everyone"]                         = true,
-    ["ESP Murderer Only"]                    = true,
-    ["ESP Sheriff Only"]                     = true,
-    ["ESP Hero Only"]                        = true,
-    ["ESP Assassin Only"]                    = true,
-    ["ESP Survivor Only"]                    = true,
-    ["ESP Zombie Only"]                      = true,
-    ["ESP Dropped Gun"]                      = true,
-    ["ESP ThrowingKnife"]                    = true,
-    ["ESP Display Distance"]                 = true,
-    ["ESP Coins"]                            = true,
-    ["Cham Everyone"]                        = true,
-    ["Cham Murderer Only"]                   = true,
-    ["Cham Sheriff Only"]                    = true,
-    ["Cham Hero Only"]                       = true,
-    ["Cham Assassin Only"]                   = true,
-    ["Cham Dead Only"]                       = true,
-    ["Cham Survivor Only"]                   = true,
-    ["Cham Coins"]                           = true,
-    ["Cham Gun (GunDrop)"]                   = true,
-    ["Cham ThrowingKnife"]                   = true,
-    ["Highlight Everyone"]                   = true,
-    ["Highlight Murderer Only"]              = true,
-    ["Highlight Sheriff Only"]               = true,
-    ["Highlight Hero Only"]                  = true,
-    ["Highlight Assassin Only"]              = true,
-    ["Highlight Innocent Only"]              = true,
-    ["Highlight Survivor Only"]              = true,
-    ["Highlight Zombie Only"]                = true,
-    ["Highlight Dropped Gun"]                = true,
-    ["Highlight Throwing Knives"]            = true,
-    ["Outline Everyone"]                     = true,
-    ["Outline Murderer Only"]                = true,
-    ["Outline Sheriff Only"]                 = true,
-    ["Outline Hero Only"]                    = true,
-    ["Outline Assassin Only"]                = true,
-    ["Outline Survivor Only"]                = true,
-    ["Outline Zombie Only"]                  = true,
-    ["Outline ThrowingKnife"]                = true,
-    ["Box Everyone"]                         = true,
-    ["Box Murderer Only"]                    = true,
-    ["Box Sheriff Only"]                     = true,
-    ["Box Hero Only"]                        = true,
-    ["Box Assassin Only"]                    = true,
-    ["Box ThrowingKnife"]                    = true,
-    ["Tracer Everyone"]                      = true,
-    ["Tracer Murderer Only"]                 = true,
-    ["Tracer Sheriff Only"]                  = true,
-    ["Tracer Hero Only"]                     = true,
-    ["Tracer Assassin Only"]                 = true,
-    ["Tracer Dead Only"]                     = true,
-    ["Tracer Survivor Only"]                 = true,
-    ["Tracer Zombie Only"]                   = true,
-    ["Tracer ThrowingKnife"]                 = true,
-    ["Skeleton Everyone"]                    = true,
-    ["Skeleton Murderer Only"]               = true,
-    ["Skeleton Sheriff Only"]                = true,
-    ["Skeleton Hero Only"]                   = true,
-    ["Skeleton Assassin Only"]               = true,
-    ["Skeleton Dead Only"]                   = true,
-    ["Skeleton Survivor Only"]               = true,
-    ["Skeleton Zombie Only"]                 = true,
-    ["XRay"]                                 = true,
-    ["View Trap ESP"]                        = true,
-    ["Cartoon Visual Enhance"]               = true,
-    ["Fullbright (max Brightness)"]          = true,
-    ["Custom Crosshair"]                     = true,
-    ["Rotate Crosshair"]                     = true,
-    ["Ocultar Crosshair Roblox"]             = true,
-    ["No BillboardGuis (draw calls --)"]     = true,
-    -- Spectate Detector (Use Tab)
-    ["Detect Who Spectates You"]             = true,
-    ["Show Spectators Bindable Button"]      = true,
 }
 
 -- Cargar configuracion guardada ANTES de crear la UI
@@ -10572,8 +10486,8 @@ function CreateNebulaSelector(parent, titulo, opciones, default, callback)
     -- Colores vivos del hub (referencia global ThemeColors)
     local function C(key) return ThemeColors[key] end
 
-    -- SELECTOR REDISE?ADO: glassmorphism ultra-transparente, estilo USE
-    -- Cabecera: una sola fila horizontal con titulo + bot?n selector a la derecha
+    -- SELECTOR REDISEÑADO: glassmorphism ultra-transparente, estilo USE
+    -- Cabecera: una sola fila horizontal con titulo + botón selector a la derecha
     local masterFrame = Instance.new("Frame", parent)
     masterFrame.Name             = "NebulaSelector_" .. titulo
     masterFrame.Size             = UDim2.new(1, 0, 0, HEADER_H)
@@ -22718,7 +22632,7 @@ function CreateMainTab()
         -- Antes este boton usaba "_zqGetToken()" con formato "ZQT{uid}D{day}", un
         -- token DIFERENTE -> la web hacia auto-sync al bin equivocado y el hub nunca
         -- detectaba la verificacion. Ahora usamos SIEMPRE el mismo token del key system.
-        local KEY_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
+        local KEY_PAGE_URL = "https://zerqon-key.netlify.app/zerqon-key.html"
         local KEY_SALT     = "ZERQON2025"
 
         -- Reutilizar el mismo token que el key system (formato S), o generarlo si aun no existe
@@ -22738,27 +22652,6 @@ function CreateMainTab()
         _gkContainer.BackgroundTransparency = 1
         _gkContainer.BorderSizePixel = 0
         _gkContainer.ZIndex = 12
-        -- VIP: ocultar el boton GET KEY y mostrar badge dorado en su lugar
-        if _G._discordPremiumVerified then
-            _gkContainer.Visible = false
-            local _vipBadge = Instance.new("TextLabel", rightColumn)
-            _vipBadge.Size = UDim2.new(1, -6, 0, 52)
-            _vipBadge.BackgroundColor3 = Color3.fromRGB(40, 30, 5)
-            _vipBadge.BackgroundTransparency = 0.2
-            _vipBadge.BorderSizePixel = 0
-            _vipBadge.ZIndex = 12
-            _vipBadge.Text = "\226\173\144 VIP — Sin key requerida"
-            _vipBadge.TextColor3 = Color3.fromRGB(255, 215, 0)
-            _vipBadge.Font = Enum.Font.GothamBold
-            _vipBadge.TextSize = 13
-            _vipBadge.TextXAlignment = Enum.TextXAlignment.Center
-            Instance.new("UICorner", _vipBadge).CornerRadius = UDim.new(0, 6)
-            local _vipStroke = Instance.new("UIStroke", _vipBadge)
-            _vipStroke.Color = Color3.fromRGB(255, 200, 0)
-            _vipStroke.Thickness = 1.8
-            _vipStroke.Transparency = 0.15
-            _vipStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        end
 
         local _gkBtn = Instance.new("TextButton", _gkContainer)
         _gkBtn.Size = UDim2.new(1, -6, 1, -6)
@@ -31616,13 +31509,6 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
             -- este construido Y el personaje este listo antes de disparar el callback.
             -- FIX: sin este wait el callback se ejecuta mientras las upvalues del tab
             -- (ej: _saSMState, findMurderer en CreateCombatTab) aun son nil ? falla silencioso.
-            -- FIX DOBLE ACTIVACION FISICA: marcar como activado ANTES del spawn para que
-            -- si CreateAuroraToggle se llama de nuevo (tab rebuild rapido), no se duplique.
-            _G._activatedToggles = _G._activatedToggles or {}
-            if _G._activatedToggles[nombre] then
-                -- ya esta corriendo el spawn de este toggle, no lanzar otro
-            else
-            _G._activatedToggles[nombre] = true
             task.spawn(function()
                 -- Primero esperar al personaje (0.3s minimo, igual que antes)
                 task.wait(0.3)
@@ -31646,258 +31532,73 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
                     or _lower:find("shoot studs") or _lower:find("shoot view") or _lower:find("trajectory")
                     or _lower:find("dual knife") or _lower:find("dual gun") or _lower:find("auto shoot") then
                         _targetTabIdx = 6  -- CreateCombatTab
-                    -- FIX: toggles fisicos del tab Visuals (idx 3): invisible, xray
-                    elseif _lower:find("invisible") or _lower:find("xray") or _lower:find("x%-ray") then
-                        _targetTabIdx = 3  -- CreateVisualsTab
                     elseif _lower:find("fly") or _lower:find("noclip") or _lower:find("walkspeed")
                     or _lower:find("speed glitch") or _lower:find("power jump") or _lower:find("infinite jump")
                     or _lower:find("infinity jump") or _lower:find("auto jump") or _lower:find("wall hop")
                     or _lower:find("spin") or _lower:find("click tp") or _lower:find("tp low map")
-                    or _lower:find("orbit") or _lower:find("second life")
+                    or _lower:find("orbit") or _lower:find("invisible") or _lower:find("second life")
                     or _lower:find("trap immune") or _lower:find("bug tramp") or _lower:find("skip death")
                     or _lower:find("auto farm") or _lower:find("auto prestige") or _lower:find("auto grab")
                     or _lower:find("auto equip") or _lower:find("coin aura") or _lower:find("auto remove")
                     or _lower:find("auto esquivar") or _lower:find("auto spectate") or _lower:find("auto announce")
                     or _lower:find("auto reset") or _lower:find("ping boost") or _lower:find("own ping")
                     or _lower:find("secure auto") or _lower:find("booster") or _lower:find("bindable boton")
-                    or _lower:find("show bindable")
-                    or _lower:find("detect who spectates") or _lower:find("show spectators") then
+                    or _lower:find("show bindable") then
                         _targetTabIdx = 7  -- CreateUseTab
                     end
                     -- Esperar a que el tab est? construido (max 15s)
                     if _targetTabIdx then
                         -- FIX AUTO-SAFE: si el tab ya fue buildeado antes de que este
                         -- closure lo chequee (ej: re-ejecucion rapida), salir inmediatamente.
-                        -- Esperar a que el tab este construido Y su callback registrado (max 20s)
-                        while not ((_G._tabBuilt and _G._tabBuilt[_targetTabIdx])
-                               and (_G._toggleCallbacks and _G._toggleCallbacks[nombre])) and _waitTick < 200 do
+                        -- Si _G._tabBuilt cambio (nuevo hub), esperar con timeout de seguridad.
+                        local _waitStart = tick()
+                        while not (_G._tabBuilt and _G._tabBuilt[_targetTabIdx]) and _waitTick < 150 do
                             task.wait(0.1)
                             _waitTick = _waitTick + 1
+                            -- FIX: si hay callback registrado en _G._toggleCallbacks, el tab ya fue construido
+                            if _G._toggleCallbacks and _G._toggleCallbacks[nombre] then
+                                break
+                            end
                         end
                         -- Peque?o delay extra para que las upvalues locales del tab queden listas
                         task.wait(0.05)
                     end
                 end
-                -- Usar _G._toggleCallbacks para tener la closure mas reciente con upvalues validas
-                local _cb = (_G._toggleCallbacks and _G._toggleCallbacks[nombre]) or callback
                 local _orig = CreateCustomNotification
                 CreateCustomNotification = function() end
-                pcall(_cb, true)
+                pcall(callback, true)
                 CreateCustomNotification = _orig
                 -- FIX VISUAL TOGGLE ON RESTORE: actualizar knob a ON despues de activar la feature
                 pcall(function() ApplyState(true, true) end)
             end)
-            end  -- cierra el else del guard de doble activacion fisica
         elseif not isPhysical then
             -- FIX LAG: escalonar auto-activaciones para no explotar N callbacks en el mismo frame.
             -- Usamos un contador global que aumenta con cada toggle activo y lo multiplicamos
             -- por un delay minimo, distribuyendo la carga a lo largo de varios frames.
-            -- FIX DOBLE ACTIVACION NO-FISICA: marcar ANTES del delay para que si el toggle
-            -- se recrea (tab rebuild) durante el delay no se encole un segundo callback.
-            _G._activatedToggles = _G._activatedToggles or {}
-            if _G._activatedToggles[nombre] then
-                -- ya encolado, no duplicar
-            else
-            _G._activatedToggles[nombre] = true
             _G._autoActivateCount = (_G._autoActivateCount or 0) + 1
             local _myDelay = (_G._autoActivateCount - 1) * 0.02  -- 20ms entre cada toggle
-            local _ln_pre = nombre:lower()
-            -- FIX ESP AUTO-RESTORE: ampliar deteccion para cubrir TODOS los toggles del tab Visuals.
-            -- Antes solo detectaba patrones con prefijo exacto (^esp , ^cham , etc.) y faltaban:
-            --   "Cham Everyone/Murderer/Sheriff/Dead/Coins/Gun/ThrowingKnife"  -> ^cham  OK
-            --   "Highlight Everyone/Murderer/..."                              -> ^highlight  OK
-            --   "Tracer Everyone/..."                                          -> ^tracer  OK
-            --   "Skeleton Everyone/..."                                        -> ^skeleton  OK
-            -- PERO tambien faltaban los que NO tienen prefijo reconocido:
-            --   "ESP Dropped Gun", "ESP ThrowingKnife", "ESP Display Distance" -> cubiertas abajo
-            --   "View Trap ESP", "ESP Coins"                                   -> cubiertas abajo
-            -- La nueva regla: cualquier toggle cuyo nombre coincida con los que
-            -- CreateVisualsTab registra -> esperar al tab 3.
-            local _isVisualToggle_pre = _ln_pre:find("^esp ") or _ln_pre:find("^cham ") or _ln_pre:find("^box esp")
-                or _ln_pre:find("^outline ") or _ln_pre:find("^skeleton ") or _ln_pre:find("^tracer ")
-                or _ln_pre:find("^highlight ") or _ln_pre:find("^view trap") or _ln_pre:find("esp display")
-                or _ln_pre:find("esp dropped") or _ln_pre:find("esp gun") or _ln_pre:find("esp knife")
-                or _ln_pre:find("coin.*esp") or _ln_pre:find("esp.*coin")
-                -- FIX: patrones adicionales del tab Visuals que antes no matcheaban:
-                or _ln_pre:find("esp everyone") or _ln_pre:find("esp murderer") or _ln_pre:find("esp sheriff")
-                or _ln_pre:find("esp hero") or _ln_pre:find("esp assassin") or _ln_pre:find("esp survivor")
-                or _ln_pre:find("esp zombie") or _ln_pre:find("esp throwing") or _ln_pre:find("esp coins")
-                or _ln_pre:find("cham everyone") or _ln_pre:find("cham murderer") or _ln_pre:find("cham sheriff")
-                or _ln_pre:find("cham hero") or _ln_pre:find("cham assassin") or _ln_pre:find("cham survivor")
-                or _ln_pre:find("cham dead") or _ln_pre:find("cham coins") or _ln_pre:find("cham gun")
-                or _ln_pre:find("cham throwing") or _ln_pre:find("cham zombie")
-                or _ln_pre:find("highlight everyone") or _ln_pre:find("highlight murderer") or _ln_pre:find("highlight sheriff")
-                or _ln_pre:find("highlight hero") or _ln_pre:find("highlight assassin") or _ln_pre:find("highlight innocent")
-                or _ln_pre:find("highlight survivor") or _ln_pre:find("highlight zombie")
-                or _ln_pre:find("highlight dropped") or _ln_pre:find("highlight throwing")
-                or _ln_pre:find("tracer everyone") or _ln_pre:find("tracer murderer") or _ln_pre:find("tracer sheriff")
-                or _ln_pre:find("tracer hero") or _ln_pre:find("tracer assassin") or _ln_pre:find("tracer dead")
-                or _ln_pre:find("tracer survivor") or _ln_pre:find("tracer zombie") or _ln_pre:find("tracer top")
-                or _ln_pre:find("tracer throwing") or _ln_pre:find("tracer tk")
-                or _ln_pre:find("skeleton everyone") or _ln_pre:find("skeleton murderer") or _ln_pre:find("skeleton sheriff")
-                or _ln_pre:find("skeleton hero") or _ln_pre:find("skeleton assassin") or _ln_pre:find("skeleton dead")
-                or _ln_pre:find("skeleton survivor") or _ln_pre:find("skeleton zombie")
-                or _ln_pre:find("outline everyone") or _ln_pre:find("outline murderer") or _ln_pre:find("outline sheriff")
-                or _ln_pre:find("outline hero") or _ln_pre:find("outline assassin") or _ln_pre:find("outline survivor")
-                or _ln_pre:find("outline zombie") or _ln_pre:find("outline throwing") or _ln_pre:find("outline tk")
-                or _ln_pre:find("^xray") or _ln_pre:find("scope names") or _ln_pre:find("scopenames")
-            -- Capturar nombre para usar en closure (evitar referencia a upvalue externa)
-            local _nombreCapture = nombre
-            -- FIX TODAS LAS TABS: detectar a que tab pertenece este toggle no-fisico
-            -- para esperar a que ESE tab especifico este construido antes de disparar
-            -- el callback. Antes solo se esperaba al tab Visuals (3); los toggles de
-            -- Settings (5), Combat (6), Use (7), Emotes (8), Update (9) y Premium (4)
-            -- disparaban su callback con upvalues nil porque su tab aun no existia.
-            local _ln_tab = _ln_pre  -- ya es nombre:lower() capturado antes
-            local _targetTabIdx_nonPhys = nil
-            if _isVisualToggle_pre then
-                _targetTabIdx_nonPhys = 3  -- CreateVisualsTab
-            elseif _ln_tab:find("silenciar notif") or _ln_tab:find("ocultar crosshair")
-                or _ln_tab:find("ocultar hud") or _ln_tab:find("ocultar chat")
-                or _ln_tab:find("low render quality") or _ln_tab:find("disable shadows")
-                or _ln_tab:find("fullbright") or _ln_tab:find("no particles")
-                or _ln_tab:find("no decals") or _ln_tab:find("no beams") or _ln_tab:find("no trails")
-                or _ln_tab:find("silenciar sonidos") or _ln_tab:find("no post%-fx")
-                or _ln_tab:find("no billboardguis") or _ln_tab:find("freeze npcs")
-                or _ln_tab:find("pause npc") or _ln_tab:find("no dynamic lights")
-                or _ln_tab:find("auto save") then
-                _targetTabIdx_nonPhys = 5  -- CreateExclusiveTab (Settings)
-            elseif _ln_tab:find("gold bomb") or _ln_tab:find("fake lag") or _ln_tab:find("stretch screen")
-                or _ln_tab:find("gun aura") or _ln_tab:find("auto spectate") or _ln_tab:find("auto announce")
-                or _ln_tab:find("auto reset") or _ln_tab:find("information murder")
-                or _ln_tab:find("information sheriff") or _ln_tab:find("information personal")
-                or _ln_tab:find("information muertos") or _ln_tab:find("knife dodge")
-                or _ln_tab:find("auto tp a spots") then
-                _targetTabIdx_nonPhys = 2  -- CreateWorldTab (manejado por su propio restore, pero por si acaso)
-            elseif _ln_tab:find("auto stab") or _ln_tab:find("auto slash") or _ln_tab:find("fast slash")
-                or _ln_tab:find("auto throw") or _ln_tab:find("fast throw") or _ln_tab:find("instant throw")
-                or _ln_tab:find("knife silent") or _ln_tab:find("throwing knife")
-                or _ln_tab:find("bullet tracer") or _ln_tab:find("prediction tracer")
-                or _ln_tab:find("velocity prediction") or _ln_tab:find("strafe prediction")
-                or _ln_tab:find("tianca prediction") or _ln_tab:find("pierce bullet")
-                or _ln_tab:find("shooper") or _ln_tab:find("shoot spam")
-                or _ln_tab:find("silent aim") or _ln_tab:find("aimlock")
-                or _ln_tab:find("auto shoot") or _ln_tab:find("shoot pick")
-                or _ln_tab:find("wall check") or _ln_tab:find("auto ping")
-                or _ln_tab:find("lead time") or _ln_tab:find("jump prediction")
-                or _ln_tab:find("lag compensation") or _ln_tab:find("shoot studs")
-                or _ln_tab:find("shoot view") or _ln_tab:find("trajectory")
-                or _ln_tab:find("dual knife") or _ln_tab:find("dual gun")
-                or _ln_tab:find("shoot murder") or _ln_tab:find("shoot camuflado")
-                or _ln_tab:find("shoot condition") or _ln_tab:find("spoof method")
-                or _ln_tab:find("ping boost") or _ln_tab:find("own ping")
-                or _ln_tab:find("ping mode") or _ln_tab:find("spoof") then
-                _targetTabIdx_nonPhys = 6  -- CreateCombatTab
-            elseif _ln_tab:find("fly") or _ln_tab:find("noclip") or _ln_tab:find("walkspeed")
-                or _ln_tab:find("speed glitch") or _ln_tab:find("power jump")
-                or _ln_tab:find("infinite jump") or _ln_tab:find("infinity jump")
-                or _ln_tab:find("auto jump") or _ln_tab:find("wall hop")
-                or _ln_tab:find("click tp") or _ln_tab:find("tp low map")
-                or _ln_tab:find("orbit") or _ln_tab:find("second life")
-                or _ln_tab:find("trap immune") or _ln_tab:find("bug tramp")
-                or _ln_tab:find("skip death") or _ln_tab:find("auto farm")
-                or _ln_tab:find("auto prestige") or _ln_tab:find("auto grab")
-                or _ln_tab:find("auto equip") or _ln_tab:find("coin aura")
-                or _ln_tab:find("auto remove") or _ln_tab:find("auto esquivar")
-                or _ln_tab:find("auto reset") or _ln_tab:find("ping boost")
-                or _ln_tab:find("own ping") or _ln_tab:find("secure auto")
-                or _ln_tab:find("booster") or _ln_tab:find("bindable boton")
-                or _ln_tab:find("show bindable") or _ln_tab:find("spin")
-                or _ln_tab:find("auto click") or _ln_tab:find("auto touch")
-                or _ln_tab:find("fling") or _ln_tab:find("hitbox")
-                or _ln_tab:find("kill aura") or _ln_tab:find("kill all")
-                or _ln_tab:find("goto ") or _ln_tab:find("expose")
-                or _ln_tab:find("tp to") or _ln_tab:find("secure tp")
-                or _ln_tab:find("bindable button") or _ln_tab:find("anti bang")
-                or _ln_tab:find("bang murder") or _ln_tab:find("instant interact")
-                or _ln_tab:find("interactions distance")
-                or _ln_tab:find("detect who spectates") or _ln_tab:find("show spectators") then
-                _targetTabIdx_nonPhys = 7  -- CreateUseTab
-            elseif _ln_tab:find("emote") or _ln_tab:find("dance") or _ln_tab:find("animation") then
-                _targetTabIdx_nonPhys = 8  -- CreateEmotesTab
-            end
-            -- Si no se detecto ningun tab especifico, esperar simplemente a que el
-            -- callback quede registrado (puede venir de cualquier tab ya construido)
-            task.spawn(function()
-                -- Esperar el delay escalonado inicial
-                task.wait(_myDelay)
-                -- DEBUG: trazar ejecucion del auto-restore visual
-                if _isVisualToggle_pre then
-                    warn("[ZerqonHUB-DEBUG] AUTO-RESTORE visual iniciado: " .. tostring(_nombreCapture))
-                end
-                -- FIX TODAS LAS TABS: esperar al tab correcto antes de disparar el callback.
-                -- Antes solo se esperaba al tab Visuals (3); ahora se espera al tab que
-                -- corresponda segun la deteccion de nombre hecha arriba.
-                if _targetTabIdx_nonPhys then
-                    local _wt = 0
-                    while _wt < 200 do  -- max 20s
-                        if _G._tabBuilt and _G._tabBuilt[_targetTabIdx_nonPhys]
-                        and _G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] then
-                            break
-                        end
-                        task.wait(0.1)
-                        _wt = _wt + 1
-                    end
-                    task.wait(0.1)  -- margen extra para que las upvalues locales queden listas
-                    -- DEBUG
-                    if _isVisualToggle_pre then
-                        warn("[ZerqonHUB-DEBUG] while terminado para: " .. tostring(_nombreCapture) 
-                            .. " | tabBuilt[" .. tostring(_targetTabIdx_nonPhys) .. "]=" .. tostring(_G._tabBuilt and _G._tabBuilt[_targetTabIdx_nonPhys])
-                            .. " | cbRegistrado=" .. tostring(_G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] ~= nil)
-                            .. " | vc.everyone=" .. tostring(VisualState and VisualState.cham and VisualState.cham.everyone)
-                        )
-                    end
-                else
-                    -- Sin tab especifico detectado: esperar solo a que el callback quede registrado
-                    -- (cubre toggles del Main tab o de tabs que ya estaban construidos)
-                    local _wt2 = 0
-                    while _wt2 < 100 do  -- max 10s
-                        if _G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture] then break end
-                        task.wait(0.1)
-                        _wt2 = _wt2 + 1
-                    end
-                end
-                -- Usar _G._toggleCallbacks que apunta al callback mas reciente
-                -- (el registrado despues de que el tab fue construido, con upvalues validas)
-                local _cb = (_G._toggleCallbacks and _G._toggleCallbacks[_nombreCapture]) or callback
+            task.delay(_myDelay, function()
                 local _orig = CreateCustomNotification
                 CreateCustomNotification = function() end
-                pcall(_cb, true)
+                pcall(callback, true)
                 CreateCustomNotification = _orig
-                -- DEBUG
-                if _isVisualToggle_pre then
-                    warn("[ZerqonHUB-DEBUG] callback ejecutado: " .. tostring(_nombreCapture)
-                        .. " | vc.everyone=" .. tostring(VisualState and VisualState.cham and VisualState.cham.everyone)
-                        .. " | betweenRounds=" .. tostring(_G._betweenRounds)
-                        .. " | cacheReady=" .. tostring(_G._rolesCacheReady)
-                    )
-                end
                 -- FIX VISUAL TOGGLE ON RESTORE: actualizar knob a ON despues de activar la feature
                 pcall(function() ApplyState(true, false) end)
-                -- FIX VISUALS AUTO-RESTORE: forzar repintado de ESP/Cham tras activar.
-                -- Esperar a que el cache de roles este listo y no estemos entre rondas,
-                -- para que updateCham/updateBoard no sean bloqueados inmediatamente.
-                if _isVisualToggle_pre then
+                -- FIX VISUALS AUTO-RESTORE: toggles visuales
+                local _ln = nombre:lower()
+                local _isVisualToggle = _ln:find("^esp ") or _ln:find("^cham ") or _ln:find("^box esp")
+                    or _ln:find("^outline ") or _ln:find("^skeleton ") or _ln:find("^tracer ")
+                    or _ln:find("^highlight ") or _ln:find("^view trap") or _ln:find("esp display")
+                    or _ln:find("esp dropped") or _ln:find("esp gun") or _ln:find("esp knife")
+                    or _ln:find("coin.*esp") or _ln:find("esp.*coin")
+                if _isVisualToggle then
                     _G._forceInstanceTick = true
-                    task.spawn(function()
-                        -- Esperar hasta que el cache de roles este listo (max 8s)
-                        local _wv = 0
-                        while _wv < 80 do
-                            if _G._rolesCacheReady ~= false and not _G._betweenRounds then break end
-                            task.wait(0.1)
-                            _wv = _wv + 1
-                        end
-                        task.wait(0.05)
-                        if _vcRefreshAll then pcall(_vcRefreshAll) end
-                        -- Segundo repintado medio segundo despues para cubrir el caso
-                        -- en que el instanceLoop no tomo el primer tick
-                        task.wait(0.5)
-                        _G._forceInstanceTick = true
+                    task.defer(function()
+                        task.wait(0.12)
                         if _vcRefreshAll then pcall(_vcRefreshAll) end
                     end)
                 end
             end)
-            end  -- cierra el else del guard de doble activacion no-fisica
         end
     end
 
@@ -32573,7 +32274,7 @@ function CreateWorldUI_Emotes()
         local targetCol = (i % 2 == 1) and leftColumn or rightColumn
 
         -- ==============================================================
-        -- PANEL PREMIUM -- dise?o visual mejorado con gradiente, icono de color y animaciones
+        -- PANEL PREMIUM -- diseño visual mejorado con gradiente, icono de color y animaciones
         -- ==============================================================
         local emoteAccent = emote.accent or ThemeColors.Primary
         local emoteEmoji  = emote.emoji  or "[--]"
@@ -32675,7 +32376,7 @@ function CreateWorldUI_Emotes()
         titleLbl.TextStrokeTransparency = 0.5
         titleLbl.ZIndex               = 20
 
-        -- Tag "EMOTE" peque?o a la derecha del nombre
+        -- Tag "EMOTE" pequeño a la derecha del nombre
         local tagLbl = Instance.new("TextLabel", titleRow)
         tagLbl.Size = UDim2.new(0, 44, 0, 16)
         tagLbl.Position = UDim2.new(0, 46, 0.5, -8)
@@ -33971,17 +33672,8 @@ function CreateWorldUI_QuickFlingButtons()
                 pcall(function() sg.Parent = game:GetService("CoreGui") end)
                 if not sg.Parent then sg.Parent = LocalPlayer.PlayerGui end
                 _sgBind.gui = sg
-                -- FIX BINDABLE: inicializar _G._qfStateRef si todavia no existe
-                -- (puede ser nil si el World tab nunca fue abierto antes de usar el bindable)
-                if not _G._qfStateRef then
-                    _G._qfStateRef = { stealGunActive = false, flingAllActive = false,
-                                       flingMurderActive = false }
-                end
-                -- FIX BINDABLE: usar leftColumn como parent (NO el ScreenGui sg)
-                -- Cuando el frame es hijo del ScreenGui, AncestryChanged nunca dispara
-                -- porque el ScreenGui siempre tiene padre (CoreGui). Usando leftColumn
-                -- el frame se destruye correctamente al cerrar el tab y el boton queda activo.
-                local _sgFrame = MakeCapyBindableFrame(leftColumn, "STEAL\nGUN", function()
+                -- FIX: capturar frame para SetActiveState
+                local _sgFrame = MakeCapyBindableFrame(sg, "STEAL\nGUN", function()
                     -- FIX BINDABLE: usar _G._qfStateRef en vez del _qfState local del closure
                     -- El closure captura el _qfState de la instancia de CreateWorldUI_QuickFlingButtons
                     -- que creo este toggle. Si el World tab se reconstruye, se crea un nuevo _qfState
@@ -36046,17 +35738,17 @@ function CreateWorldUI_Performance()
                     end)
                 end
             end)
-            CreateCustomNotification("FPS BOOST", "ON ? " .. n .. " partes optimizadas", 3)
+            CreateCustomNotification("FPS BOOST", "ON — " .. n .. " partes optimizadas", 3)
         else
             _restoreFpsBoost()
-            CreateCustomNotification("FPS BOOST", "OFF ? graficos restaurados", 2)
+            CreateCustomNotification("FPS BOOST", "OFF — graficos restaurados", 2)
         end
     end, _fbs.enabled)
 
     -- Boton one-shot (para aplicar rapido sin toggle)
     _makeTPButton("FPS Boost (One-Shot)", function()
         local n = _applyFpsBoost()
-        CreateCustomNotification("FPS BOOST", "Aplicado ? " .. n .. " partes", 3)
+        CreateCustomNotification("FPS BOOST", "Aplicado — " .. n .. " partes", 3)
     end, sec)
 
     -- ================================================================
@@ -36190,10 +35882,10 @@ function CreateWorldUI_Performance()
                     end
                 end)
             end)
-            CreateCustomNotification("REMOVE BARRIERS", "ON ? " .. removed .. " barreras eliminadas", 3)
+            CreateCustomNotification("REMOVE BARRIERS", "ON — " .. removed .. " barreras eliminadas", 3)
         else
             _restoreBarriers()
-            CreateCustomNotification("REMOVE BARRIERS", "OFF ? colisiones restauradas", 2)
+            CreateCustomNotification("REMOVE BARRIERS", "OFF — colisiones restauradas", 2)
         end
     end, _rbs.enabled)
 
@@ -36253,10 +35945,10 @@ function CreateWorldUI_Performance()
         if not _ces.origClock  then _ces.origClock  = L.ClockTime  end
         if not _ces.origFog    then _ces.origFog    = L.FogEnd      end
 
-        -- Lighting limpio: mediod?a suave, sin niebla cercana
+        -- Lighting limpio: mediodía suave, sin niebla cercana
         pcall(function()
             L.Brightness  = math.min(L.Brightness + 0.5, 4)
-            L.ClockTime   = 14   -- mediod?a (luz limpia y directa)
+            L.ClockTime   = 14   -- mediodía (luz limpia y directa)
             L.FogEnd      = math.max(L.FogEnd, 100000)
         end)
 
@@ -36394,10 +36086,10 @@ function CreateWorldUI_Performance()
                     end
                 end)
             end)
-            CreateCustomNotification("CARTOON ENH", "ON ? " .. n .. " partes mejoradas visualmente", 3)
+            CreateCustomNotification("CARTOON ENH", "ON — " .. n .. " partes mejoradas visualmente", 3)
         else
             _restoreCartoonEnh()
-            CreateCustomNotification("CARTOON ENH", "OFF ? apariencia original restaurada", 2)
+            CreateCustomNotification("CARTOON ENH", "OFF — apariencia original restaurada", 2)
         end
     end, _ces.enabled)
 
@@ -39945,19 +39637,7 @@ local function _sgFlingPlayer(TargetPlayer)
     _refreshRoleCache()
     local currentSheriff = _roleCache and _roleCache.sheriff
 
-    -- FIX HERO: si el sheriff viejo murio y el hero tiene la gun ahora, usar el hero
-    -- El cache puede devolver sheriff=nil pero hero=nuevo portador de la gun
-    if not currentSheriff and _roleCache and _roleCache.hero then
-        local heroPlayer = _roleCache.hero
-        local hHum = heroPlayer.Character and heroPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hHum and hHum.Health > 0 then
-            currentSheriff = heroPlayer
-            _roleCache.sheriff = heroPlayer
-            _roleCache.hero    = nil
-        end
-    end
-
-    -- FIX FALLBACK VISUAL: si GetPlayerData no devolvio sheriff ni hero, buscar visualmente
+    -- FIX FALLBACK VISUAL: si GetPlayerData no devolvio sheriff, buscar visualmente
     if not currentSheriff and _findGunIn then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
@@ -40543,19 +40223,19 @@ function CreatePremiumTab()
     -- ================================================================
     -- == DISCORD PREMIUM LOCK v2 (Discord OAuth2 + Bio Roblox)
     -- FLUJO:
-    --   1ra vez : Login Discord ? verificar rol ? poner c?digo en bio ? acceso
-    --   Pr?ximas: recheck autom?tico por RobloxUserId vinculado
+    --   1ra vez : Login Discord ? verificar rol ? poner código en bio ? acceso
+    --   Próximas: recheck automático por RobloxUserId vinculado
     -- ================================================================
     local BACKEND_URL = "https://zerqonhub.onrender.com"
     local HttpService  = game:GetService("HttpService")
 
     -- FIX VIP VACIO: re-forzar bypass por si el recheck u otro proceso
-    -- revirti? el flag a false entre sesiones o al reconstruir el tab.
+    -- revirtió el flag a false entre sesiones o al reconstruir el tab.
     _G._discordPremiumVerified = true
 
     if not _G._discordPremiumVerified then
 
-        -- Generar un ID de sesi?n ?nico para este intento de login
+        -- Generar un ID de sesión único para este intento de login
         if not _G._hubSessionId then
             _G._hubSessionId = "HUB-" .. tostring(math.random(100000, 999999))
         end
@@ -40564,7 +40244,7 @@ function CreatePremiumTab()
         local robloxId  = tostring(game:GetService("Players").LocalPlayer.UserId)
 
         -- ============================================================
-        -- PANTALLA DE VERIFICACI?N (Frame principal, ocupa el tab)
+        -- PANTALLA DE VERIFICACIÓN (Frame principal, ocupa el tab)
         -- ============================================================
         local lockFrame = Instance.new("Frame", contentContainer)
         lockFrame.Name = "PremiumLockScreen"
@@ -40584,12 +40264,12 @@ function CreatePremiumTab()
         stroke.Thickness = 1.5
         stroke.Transparency = 0.3
 
-        -- T?tulo
+        -- Título
         local titleLbl = Instance.new("TextLabel", centerFrame)
         titleLbl.Size = UDim2.new(1, -20, 0, 26)
         titleLbl.Position = UDim2.new(0, 10, 0, 14)
         titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = "PREMIUM ? VERIFICACI?N"
+        titleLbl.Text = "PREMIUM — VERIFICACIÓN"
         titleLbl.TextSize = 14
         titleLbl.Font = Enum.Font.GothamBold
         titleLbl.TextXAlignment = Enum.TextXAlignment.Center
@@ -40600,7 +40280,7 @@ function CreatePremiumTab()
         statusLbl.Size = UDim2.new(1, -20, 0, 32)
         statusLbl.Position = UDim2.new(0, 10, 0, 44)
         statusLbl.BackgroundTransparency = 1
-        statusLbl.Text = "Paso 1: Logu?ate con Discord"
+        statusLbl.Text = "Paso 1: Loguéate con Discord"
         statusLbl.TextSize = 11
         statusLbl.Font = Enum.Font.Gotham
         statusLbl.TextWrapped = true
@@ -40614,7 +40294,7 @@ function CreatePremiumTab()
             end
         end
 
-        -- -- PASO 1: bot?n copiar link de login --
+        -- -- PASO 1: botón copiar link de login --
         local copyBtn = Instance.new("TextButton", centerFrame)
         copyBtn.Name = "CopyBtn"
         copyBtn.Size = UDim2.new(1, -40, 0, 36)
@@ -40648,13 +40328,13 @@ function CreatePremiumTab()
         sep.BorderSizePixel = 0
         sep.Visible = false  -- se muestra en paso 2
 
-        -- -- PASO 2: instrucci?n de bio --
+        -- -- PASO 2: instrucción de bio --
         local bioInstr = Instance.new("TextLabel", centerFrame)
         bioInstr.Name = "BioInstr"
         bioInstr.Size = UDim2.new(1, -20, 0, 38)
         bioInstr.Position = UDim2.new(0, 10, 0, 142)
         bioInstr.BackgroundTransparency = 1
-        bioInstr.Text = "Paso 2: Peg? este c?digo en tu bio de Roblox"
+        bioInstr.Text = "Paso 2: Pegá este código en tu bio de Roblox"
         bioInstr.TextSize = 11
         bioInstr.Font = Enum.Font.Gotham
         bioInstr.TextWrapped = true
@@ -40662,7 +40342,7 @@ function CreatePremiumTab()
         bioInstr.TextColor3 = Color3.fromRGB(160, 160, 180)
         bioInstr.Visible = false
 
-        -- Label del c?digo de bio
+        -- Label del código de bio
         local bioCodeLbl = Instance.new("TextLabel", centerFrame)
         bioCodeLbl.Name = "BioCodeLbl"
         bioCodeLbl.Size = UDim2.new(1, -40, 0, 34)
@@ -40682,13 +40362,13 @@ function CreatePremiumTab()
         bioCodeLbl.TextColor3 = Color3.fromRGB(87, 242, 135)
         bioCodeLbl.Visible = false
 
-        -- Bot?n copiar c?digo de bio
+        -- Botón copiar código de bio
         local copyCodeBtn = Instance.new("TextButton", centerFrame)
         copyCodeBtn.Name = "CopyCodeBtn"
         copyCodeBtn.Size = UDim2.new(1, -40, 0, 32)
         copyCodeBtn.Position = UDim2.new(0, 20, 0, 230)
         copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-        copyCodeBtn.Text = "??  Copiar c?digo"
+        copyCodeBtn.Text = "??  Copiar código"
         copyCodeBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
         copyCodeBtn.Font = Enum.Font.GothamBold
         copyCodeBtn.TextSize = 12
@@ -40696,7 +40376,7 @@ function CreatePremiumTab()
         Instance.new("UICorner", copyCodeBtn).CornerRadius = UDim.new(0, 8)
         copyCodeBtn.Visible = false
 
-        local _bioCode = ""  -- c?digo que el backend manda para poner en la bio
+        local _bioCode = ""  -- código que el backend manda para poner en la bio
 
         copyCodeBtn.Activated:Connect(function()
             pcall(function() setclipboard(_bioCode) end)
@@ -40704,14 +40384,14 @@ function CreatePremiumTab()
             copyCodeBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
             task.wait(2)
             if copyCodeBtn and copyCodeBtn.Parent then
-                copyCodeBtn.Text = "??  Copiar c?digo"
+                copyCodeBtn.Text = "??  Copiar código"
                 copyCodeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
             end
         end)
 
         -- ============================================================
         -- POLLING: espera login Discord ? acceso directo con rol premium
-        -- Sin paso de verificaci?n de bio (eliminado).
+        -- Sin paso de verificación de bio (eliminado).
         -- ============================================================
         local _pollingActive = true
         lockFrame.AncestryChanged:Connect(function() _pollingActive = false end)
@@ -40722,7 +40402,7 @@ function CreatePremiumTab()
             _G._discordAvatarUrl = avatarUrl    or ""
             _G._zerqonSessionToken = sessionToken or ""
             _G._hubSessionId = nil
-            -- AUTO-GUARDADO v2: incluye sessionToken para validaci?n segura en reboots
+            -- AUTO-GUARDADO v2: incluye sessionToken para validación segura en reboots
             pcall(function()
                 if not writefile then return end
                 local _lp3   = game:GetService("Players").LocalPlayer
@@ -40734,9 +40414,9 @@ function CreatePremiumTab()
                 local _now   = tostring(os.time())
                 -- formato v2: discordId|robloxId|username|savedAt|sessionToken
                 writefile(_pPath, _dId .. "|" .. _uid3 .. "|" .. _uname .. "|" .. _now .. "|" .. _tok)
-                warn("[ZerqonHUB] Sesi?n guardada en disco (v?lida 7 d?as).")
+                warn("[ZerqonHUB] Sesión guardada en disco (válida 7 días).")
             end)
-            setStatus("? ?Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
+            setStatus("? ¡Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
             task.wait(0.8)
             _pollingActive = false
             if not lockFrame or not lockFrame.Parent then return end
@@ -40774,12 +40454,12 @@ function CreatePremiumTab()
                         elseif data.status == "no_premium" or (data.status == "ok" and not data.hasPremium) then
                             -- Sin premium: mostrar error SIN detener el polling
                             -- El usuario puede comprar el rol y el hub lo detecta solo
-                            setStatus("? No ten?s el rol PREMIUM en el servidor de Discord", Color3.fromRGB(237, 66, 69))
+                            setStatus("? No tenés el rol PREMIUM en el servidor de Discord", Color3.fromRGB(237, 66, 69))
                             -- NO hacer return ni poner _pollingActive = false
-                            -- as? puede reintentar cuando consiga el rol
+                            -- así puede reintentar cuando consiga el rol
                         elseif data.status == "linked_other" then
-                            -- Vinculaci?n conflictiva: tampoco detener el polling
-                            -- El server ya no borra el c?digo, puede reintentar
+                            -- Vinculación conflictiva: tampoco detener el polling
+                            -- El server ya no borra el código, puede reintentar
                             setStatus("?? " .. (data.error or "Cuenta ya vinculada a otro usuario"), Color3.fromRGB(237, 150, 0))
                         else
                             setStatus("Esperando login Discord... [" .. tostring(data.status or "?") .. "]", Color3.fromRGB(107, 107, 138))
@@ -42679,7 +42359,7 @@ function CreateExclusiveTab()
         local _llPad = Instance.new("UIPadding", linkLbl)
         _llPad.PaddingLeft = UDim.new(0, 6)
 
-        -- -- Tarjeta de perfil Discord (dentro de la secci?n DISCORD) --
+        -- -- Tarjeta de perfil Discord (dentro de la sección DISCORD) --
         -- Solo visible si el usuario tiene premium verificado.
         -- La imagen se carga via proxy del propio servidor para evitar
         -- el bloqueo de URLs externas del CDN de Discord en el executor.
@@ -42772,7 +42452,7 @@ function CreateExclusiveTab()
 
             -- Cargar avatar via proxy y nombre via get-avatar
             task.spawn(function()
-                -- -- NOMBRE: pedir al backend si no est? en global --------------
+                -- -- NOMBRE: pedir al backend si no está en global --------------
                 if not (_G._discordUsername and _G._discordUsername ~= "") then
                     local _ok, _res = pcall(function()
                         return request({ Url = _BURL .. "/api/get-avatar?roblox_id=" .. _rId, Method = "GET" })
@@ -42797,11 +42477,11 @@ function CreateExclusiveTab()
                 pcall(function()
                     local _avatarUrl = _BURL .. "/api/discord-avatar?roblox_id=" .. _rId
                     -- Algunos executors soportan http directamente en Image si el dominio
-                    -- est? en la whitelist del executor (no de Roblox)
+                    -- está en la whitelist del executor (no de Roblox)
                     avImg.Image = _avatarUrl
-                    -- Esperar 1.5s para ver si carg? (el executor hace el request async)
+                    -- Esperar 1.5s para ver si cargó (el executor hace el request async)
                     task.wait(1.5)
-                    -- Si Image sigue siendo la URL (no fue remplazada por rbxasset://), asumimos que carg?
+                    -- Si Image sigue siendo la URL (no fue remplazada por rbxasset://), asumimos que cargó
                     if avImg.Image ~= "" and not avImg.Image:find("rbxasset") then
                         avEmoji.Visible = false
                         _avatarLoaded = true
@@ -42822,9 +42502,9 @@ function CreateExclusiveTab()
                             local ei = Instance.new("EditableImage")
                             ei.Size = Vector2.new(128, 128)
                             -- Algunos executors exponen writePixels desde body raw
-                            -- M?todo m?s compatible: usar ImageData si est? disponible
+                            -- Método más compatible: usar ImageData si está disponible
                             avImg.Image = ""
-                            -- Intentar Content.fromObject si est? disponible (Roblox 2024+)
+                            -- Intentar Content.fromObject si está disponible (Roblox 2024+)
                             local ok3 = pcall(function()
                                 ei:WritePixelsBuffer(0, 0, ei.Size, _res2.Body)
                                 avImg.ImageContent = Content.fromObject(ei)
@@ -42837,7 +42517,7 @@ function CreateExclusiveTab()
                     end)
                 end
 
-                -- Si ning?n m?todo funcion?, mostrar inicial del nombre como fallback
+                -- Si ningún método funcionó, mostrar inicial del nombre como fallback
                 if not _avatarLoaded then
                     local _uname = _G._discordUsername or "?"
                     local _initial = _uname:sub(1, 1):upper()
@@ -46569,7 +46249,7 @@ function CreateCombatTab()
             local sc = Instance.new("UIScale", btnRoot)
             sc.Scale = 0
 
-            -- Bot?n principal: fondo degradado oscuro azul del hub + borde neon cian
+            -- Botón principal: fondo degradado oscuro azul del hub + borde neon cian
             local clickBtn = Instance.new("TextButton", btnRoot)
             clickBtn.Name                   = "ShootButton"
             clickBtn.Size                   = UDim2.new(1, 0, 1, 0)
@@ -54331,7 +54011,7 @@ function CreateCombatTab()
             local tTors = tChar:FindFirstChild("UpperTorso") or tChar:FindFirstChild("Torso")
             if not tHRP then return end
             local hitParts = {tHRP, tHead or tHRP, tTors or tHRP}
-            -- Calcular origen real del disparo (boca del ca??n o HRP del jugador)
+            -- Calcular origen real del disparo (boca del cañón o HRP del jugador)
             local barrelAtt = getGunAttachment and getGunAttachment(gun, myHRP)
             local _cam = workspace.CurrentCamera
             local baseOrigin = (barrelAtt and barrelAtt.WorldPosition)
@@ -59286,12 +58966,12 @@ mainFrame.ClipsDescendants = true
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================
--- == FONDO HUB v3 ? Aurora Liquida + Particulas + Color Cycle
+-- == FONDO HUB v3 — Aurora Liquida + Particulas + Color Cycle
 -- Capas:
 --   1. Imagen de fondo original (dock nocturno) con transparencia leve
 --   2. Aurora: 3 franjas de color que rotan y cambian de tono en ciclo
 --   3. Particulas: puntos de luz que suben y se desvanecen
---   4. Vi?eta perimetral con pulso suave
+--   4. Viñeta perimetral con pulso suave
 --   5. Shimmer diagonal que barre cada 8s
 -- ================================================================
 do
@@ -59345,7 +59025,7 @@ do
         end
     end)
 
-    -- -- CAPA 2: AURORA ? 3 franjas de luz que se mueven y cambian de color --
+    -- -- CAPA 2: AURORA — 3 franjas de luz que se mueven y cambian de color --
     -- Paleta de colores del ciclo aurora (HSV-friendly, 6 estados)
     local _auroraPalette = {
         { Color3.fromRGB(30,  0,  90), Color3.fromRGB( 80,  0, 180), Color3.fromRGB(  0, 60, 200) },  -- violeta profundo
@@ -59442,7 +59122,7 @@ do
         end
     end)
 
-    -- -- CAPA 3: PARTICULAS ? puntos de luz que suben y se desvanecen --
+    -- -- CAPA 3: PARTICULAS — puntos de luz que suben y se desvanecen --
     local _PARTICLE_COUNT = 22
     local _particles = {}
 
@@ -59521,7 +59201,7 @@ do
         end
     end)
 
-    -- -- CAPA 4: VI?ETA perimetral con pulso de color suave -----------
+    -- -- CAPA 4: VIÑETA perimetral con pulso de color suave -----------
     local _vigFrame = Instance.new("Frame", mainFrame)
     _vigFrame.Name = "HubVignette"
     _vigFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -59554,7 +59234,7 @@ do
         end
     end)
 
-    -- -- CAPA 5: SHIMMER diagonal ? barre cada 8s ---------------------
+    -- -- CAPA 5: SHIMMER diagonal — barre cada 8s ---------------------
     local _shimFrame = Instance.new("Frame", mainFrame)
     _shimFrame.Name = "HubShimmer"
     _shimFrame.Size = UDim2.new(0.32, 0, 1.4, 0)
@@ -59693,7 +59373,7 @@ _G._applyHubBackground = function(id)
 end
 _G._hubWaveContainer = nil
 
--- Borde del mainFrame activado (dise?o arco?ris rapido)
+-- Borde del mainFrame activado (diseño arcoíris rapido)
 glowBorder = Instance.new("UIStroke", mainFrame)
 glowBorder.Color = Color3.fromRGB(0, 200, 160)
 glowBorder.Thickness = 2.5
@@ -59715,7 +59395,7 @@ do
     _borderGrad.Rotation = 0
     _G._hubBorderGrad = _borderGrad
 
-    -- Animacion rapida: gira 360? en ~1.8 segundos (muy rapida y vistosa)
+    -- Animacion rapida: gira 360° en ~1.8 segundos (muy rapida y vistosa)
     local _borderHue = 0
     local _borderRotation = 0
     local _borderAnimRunning = true
@@ -60681,7 +60361,7 @@ particles = {}
         end)
     end -- cierra do drag
 
-    -- -- BOTON CERRAR (X imagen custom) ? esquina superior derecha, fuera del header --
+    -- -- BOTON CERRAR (X imagen custom) — esquina superior derecha, fuera del header --
     local arrowToggleBtn = Instance.new("TextButton", mainFrame)
     arrowToggleBtn.Name = "CloseHubBtn"
     arrowToggleBtn.Size = UDim2.new(0, 36, 0, 36)
@@ -60898,33 +60578,21 @@ particles = {}
     local _buildQueue    = {}      -- { idx, callback } pendientes
     _G._tabBuilding      = {}      -- [idx] = true mientras ese tab se construye
 
-    local _tabInProgress = {}  -- [idx]=true mientras el tab se esta construyendo (aun no _tabBuilt)
     local function _buildTabCached(idx, _onDone)
         -- Ya construido: llamar callback inmediatamente y salir
         if _tabBuilt[idx] then
             if _onDone then _onDone() end
             return
         end
-        -- Si el tab ya esta en construccion (en progreso pero aun no _tabBuilt), encolar solo el callback
-        if _tabInProgress[idx] then
-            if _onDone then table.insert(_buildQueue, { idx = idx, cb = _onDone }) end
-            return
-        end
-        -- Si hay otro tab diferente construyendose, encolar
+        -- Si hay otro build corriendo, encolar
         if _buildMutex then
             table.insert(_buildQueue, { idx = idx, cb = _onDone })
             return
         end
         -- Tomar el mutex
         _buildMutex          = true
-        _tabInProgress[idx]  = true  -- marcar en progreso (antes de _tabBuilt, que va al final)
         _G._tabBuilding[idx] = true
-        -- FIX RACE CONDITION: NO marcar _tabBuilt[idx]=true aqui.
-        -- Si lo marcamos antes de llamar tabFunctions[idx], el auto-restore de visuals
-        -- ve _tabBuilt[3]=true y sale del while, pero los _toggleCallbacks aun no
-        -- fueron registrados (CreateVisualsTab no termino). Resultado: pcall(callback, true)
-        -- corre con upvalues nil y el ESP no se activa aunque el toggle quede encendido.
-        -- La marca se pone al FINAL, despues de pcall(tabFunctions[idx]).
+        _tabBuilt[idx]       = true
         local tabFrame = Instance.new("Frame")
         tabFrame.Name                   = "TabCache_" .. tostring(idx)
         tabFrame.Size                   = UDim2.new(1, 0, 1, 0)
@@ -60944,13 +60612,6 @@ particles = {}
         pcall(tabFunctions[idx])
         _G._currentBuildingTabIdx = nil
         contentContainer = _real
-        -- FIX RACE CONDITION (cont.): marcar el tab como construido AQUI, despues de
-        -- que tabFunctions[idx] corrio y registro todos los _toggleCallbacks.
-        -- El auto-restore de visuals espera: _tabBuilt[3]=true AND _toggleCallbacks[nombre]~=nil.
-        -- Si _tabBuilt se ponia antes, el auto-restore salia del while pero el callback
-        -- aun era nil -> pcall(callback, true) con la closure vieja (upvalues nil) -> ESP no corria.
-        _tabBuilt[idx]       = true   -- FIX RACE: se pone DESPUES de tabFunctions[idx] (ver arriba)
-        _tabInProgress[idx]  = nil    -- limpiar flag de en-progreso
         -- OPT: cachear ScrollingFrames del tab recien construido (evita GetDescendants en cada switch)
         -- FIX LAG: resetear contador de auto-activaciones al terminar el build del tab
         _G._autoActivateCount = 0
@@ -62033,7 +61694,7 @@ particles = {}
             _origPos.Y.Scale - 0.06, _origPos.Y.Offset
         )
 
-        -- Fade-in del frame principal con ca?da suave
+        -- Fade-in del frame principal con caída suave
         TweenService:Create(mainFrame,
             TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
             {Position = _origPos, BackgroundTransparency = 0}
@@ -62662,12 +62323,12 @@ function CreateUpdateTab()
 end
 
 -- ================================================================
--- == EMOTES TAB v2 - Redise?o fachero + optimizaciones de perf
+-- == EMOTES TAB v2 - Rediseño fachero + optimizaciones de perf
 -- PERF: sin Heartbeat para detectar movimiento -> usa StateChanged
 --       + velocidad solo cuando el personaje se mueve de verdad.
 --       sin Tweens en hover en mobile (solo desktop).
 --       animaciones cacheadas por ID para evitar recargas.
--- DESIGN: est?tica ne?n/cyberpunk, cards con icono, grid limpio,
+-- DESIGN: estética neón/cyberpunk, cards con icono, grid limpio,
 --         barra de estado, controles compactos.
 -- ================================================================
 function CreateEmotesTab()
@@ -62695,24 +62356,24 @@ function CreateEmotesTab()
 
     -- -- Datos de emotes con icono emoji ----------------------------------
     local EMOTES = {
-        { name = "Zerq 1",  id = "rbxassetid://92587731065850",  icon = "[1]" },
-        { name = "Zerq 2",  id = "rbxassetid://10714061912",     icon = "[2]" },
-        { name = "Zerq 3",  id = "rbxassetid://76510079095692",  icon = "[3]" },
-        { name = "Zerq 4",  id = "rbxassetid://10714347256",     icon = "[4]" },
-        { name = "Zerq 5",  id = "rbxassetid://10714352626",     icon = "[5]" },
-        { name = "Zerq 6",  id = "rbxassetid://10921258489",     icon = "[6]" },
-        { name = "Zerq 7",  id = "rbxassetid://10214314957",     icon = "[7]" },
-        { name = "Zerq 8",  id = "rbxassetid://10713981723",     icon = "[8]" },
-        { name = "Zerq 9",  id = "rbxassetid://14352340648",     icon = "[9]" },
+        { name = "Zerq 1",  id = "rbxassetid://92587731065850",  icon = "??" },
+        { name = "Zerq 2",  id = "rbxassetid://10714061912",     icon = "??" },
+        { name = "Zerq 3",  id = "rbxassetid://76510079095692",  icon = "??" },
+        { name = "Zerq 4",  id = "rbxassetid://10714347256",     icon = "?" },
+        { name = "Zerq 5",  id = "rbxassetid://10714352626",     icon = "?" },
+        { name = "Zerq 6",  id = "rbxassetid://10921258489",     icon = "??" },
+        { name = "Zerq 7",  id = "rbxassetid://10214314957",     icon = "??" },
+        { name = "Zerq 8",  id = "rbxassetid://10713981723",     icon = "??" },
+        { name = "Zerq 9",  id = "rbxassetid://14352340648",     icon = "??" },
     }
 
-    -- Colores ne?n del tema
+    -- Colores neón del tema
     local CLR_BG       = Color3.fromRGB(8, 10, 22)
     local CLR_CARD     = Color3.fromRGB(14, 18, 42)
-    local CLR_ACCENT   = Color3.fromRGB(0, 210, 255)    -- cyan ne?n
+    local CLR_ACCENT   = Color3.fromRGB(0, 210, 255)    -- cyan neón
     local CLR_ACCENT2  = Color3.fromRGB(180, 0, 255)    -- violeta
-    local CLR_GREEN    = Color3.fromRGB(0, 255, 160)    -- verde ne?n
-    local CLR_RED      = Color3.fromRGB(255, 50, 100)   -- rojo ne?n
+    local CLR_GREEN    = Color3.fromRGB(0, 255, 160)    -- verde neón
+    local CLR_RED      = Color3.fromRGB(255, 50, 100)   -- rojo neón
     local CLR_TEXT     = Color3.fromRGB(220, 240, 255)
     local CLR_MUTED    = Color3.fromRGB(120, 140, 180)
 
@@ -62731,7 +62392,7 @@ function CreateEmotesTab()
     end
 
     -- -- Referencia al label de estado (se actualiza en tiempo real) -------
-    local _statusLbl = nil  -- asignado m?s adelante
+    local _statusLbl = nil  -- asignado más adelante
 
     local function _setStatus(txt, color)
         if _statusLbl then
@@ -62790,7 +62451,7 @@ function CreateEmotesTab()
         ES.loopActive   = loop
 
         local animName = animId:match("%d+$") or animId
-        _setStatus(loop and ("Loop: " .. animName) or ("Playing: " .. animName), CLR_GREEN)
+        _setStatus(loop and ("?? Loop: " .. animName) or ("? Playing: " .. animName), CLR_GREEN)
 
         -- Re-loop manual si looped=false pero loopActive=true (compatibilidad)
         if loop then
@@ -62861,10 +62522,17 @@ function CreateEmotesTab()
     sfPad.PaddingLeft = UDim.new(0, 10)
     sfPad.PaddingRight = UDim.new(0, 6)
     -- Icono
-    -- Label de estado (sin icono emoji)
+    local sfIcon = Instance.new("TextLabel", statusFrame)
+    sfIcon.Size = UDim2.new(0, 22, 1, 0)
+    sfIcon.BackgroundTransparency = 1
+    sfIcon.Text = "??"
+    sfIcon.TextSize = 16
+    sfIcon.ZIndex = 14
+    sfIcon.Font = Enum.Font.GothamBold
+    -- Label de estado
     _statusLbl = Instance.new("TextLabel", statusFrame)
-    _statusLbl.Size = UDim2.new(1, -8, 1, 0)
-    _statusLbl.Position = UDim2.new(0, 4, 0, 0)
+    _statusLbl.Size = UDim2.new(1, -28, 1, 0)
+    _statusLbl.Position = UDim2.new(0, 26, 0, 0)
     _statusLbl.BackgroundTransparency = 1
     _statusLbl.Text = "Sin emote activo"
     _statusLbl.TextColor3 = CLR_MUTED
@@ -62874,11 +62542,11 @@ function CreateEmotesTab()
     _statusLbl.TextTruncate = Enum.TextTruncate.AtEnd
     _statusLbl.ZIndex = 14
 
-    -- -- Secci?n CONTROLES -------------------------------------------------
-    local ctrlSec = CreateBorderedSectionGlobal(leftColumn, "CONTROLES")
+    -- -- Sección CONTROLES -------------------------------------------------
+    local ctrlSec = CreateBorderedSectionGlobal(leftColumn, "?  CONTROLES")
 
     -- Toggle Loop
-    CreateAuroraToggle(ctrlSec, "Loop (repite automaticamente)", function(on)
+    CreateAuroraToggle(ctrlSec, "??  Loop (repite automaticamente)", function(on)
         ES.loopActive = on
         if on then
             if ES.currentTrack and ES.currentTrack.IsPlaying and ES.activeAnimId then
@@ -62911,7 +62579,7 @@ function CreateEmotesTab()
         speedLbl.Size = UDim2.new(0.5, 0, 1, 0)
         speedLbl.Position = UDim2.new(0, 10, 0, 0)
         speedLbl.BackgroundTransparency = 1
-        speedLbl.Text = "Speed: 1.0x"
+        speedLbl.Text = "? Speed: 1.0x"
         speedLbl.TextColor3 = CLR_TEXT
         speedLbl.FontFace = Font.fromEnum(Enum.Font.GothamMedium)
         speedLbl.TextSize = 11
@@ -62923,13 +62591,13 @@ function CreateEmotesTab()
 
         local function _applySpeed()
             ES.loopSpeed = speeds[speedIdx]
-            speedLbl.Text = "Speed: " .. tostring(speeds[speedIdx]) .. "x"
+            speedLbl.Text = "? Speed: " .. tostring(speeds[speedIdx]) .. "x"
             if ES.currentTrack and ES.currentTrack.IsPlaying then
                 pcall(function() ES.currentTrack:AdjustSpeed(ES.loopSpeed) end)
             end
         end
 
-        -- Bot?n ?
+        -- Botón –
         local btnM = Instance.new("TextButton", speedRow)
         btnM.Size = UDim2.new(0, 28, 0, 24)
         btnM.Position = UDim2.new(1, -64, 0.5, -12)
@@ -62946,7 +62614,7 @@ function CreateEmotesTab()
             if speedIdx > 1 then speedIdx = speedIdx - 1; _applySpeed() end
         end)
 
-        -- Bot?n +
+        -- Botón +
         local btnP = Instance.new("TextButton", speedRow)
         btnP.Size = UDim2.new(0, 28, 0, 24)
         btnP.Position = UDim2.new(1, -32, 0.5, -12)
@@ -62964,14 +62632,14 @@ function CreateEmotesTab()
         end)
     end
 
-    -- -- Bot?n STOP --------------------------------------------------------
+    -- -- Botón STOP --------------------------------------------------------
     do
         local stopBtn = Instance.new("TextButton", ctrlSec)
         stopBtn.Size = UDim2.new(1, -4, 0, 32)
         stopBtn.BackgroundColor3 = CLR_RED
         stopBtn.BackgroundTransparency = 0.25
         stopBtn.BorderSizePixel = 0
-        stopBtn.Text = "DETENER EMOTE"
+        stopBtn.Text = "?  DETENER EMOTE"
         stopBtn.TextColor3 = Color3.fromRGB(255, 220, 230)
         stopBtn.FontFace = Font.fromEnum(Enum.Font.GothamBold)
         stopBtn.TextSize = 13
@@ -62987,8 +62655,8 @@ function CreateEmotesTab()
         end)
     end
 
-    -- -- Secci?n CUSTOM EMOTE ID -------------------------------------------
-    local customSec = CreateBorderedSectionGlobal(leftColumn, "CUSTOM EMOTE (ID)")
+    -- -- Sección CUSTOM EMOTE ID -------------------------------------------
+    local customSec = CreateBorderedSectionGlobal(leftColumn, "??  CUSTOM EMOTE (ID)")
     do
         local hintLbl = Instance.new("TextLabel", customSec)
         hintLbl.Size = UDim2.new(1, -8, 0, 16)
@@ -63031,7 +62699,7 @@ function CreateEmotesTab()
         playBtn.BackgroundColor3 = CLR_GREEN
         playBtn.BackgroundTransparency = 0.2
         playBtn.BorderSizePixel = 0
-        playBtn.Text = "Reproducir Custom"
+        playBtn.Text = "?  Reproducir Custom"
         playBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
         playBtn.FontFace = Font.fromEnum(Enum.Font.GothamBold)
         playBtn.TextSize = 12
@@ -63056,12 +62724,12 @@ function CreateEmotesTab()
                 finalId = "rbxassetid://" .. num
             end
             _playEmote(finalId, ES.loopActive)
-            CreateCustomNotification("EMOTES", "Custom: " .. finalId:match("%d+$"), 2)
+            CreateCustomNotification("EMOTES", "? Custom: " .. finalId:match("%d+$"), 2)
         end)
     end
 
     -- ---------------------------------------------------------------------
-    -- COLUMNA DERECHA: Grid de emotes (redise?ado)
+    -- COLUMNA DERECHA: Grid de emotes (rediseñado)
     -- ---------------------------------------------------------------------
 
     -- Header decorativo
@@ -63091,19 +62759,19 @@ function CreateEmotesTab()
     local hdrLbl = Instance.new("TextLabel", hdrFrame)
     hdrLbl.Size = UDim2.new(1, 0, 1, 0)
     hdrLbl.BackgroundTransparency = 1
-    hdrLbl.Text = "EMOTES  ?  Zerqon Hub"
+    hdrLbl.Text = "??  EMOTES  ·  Zerqon Hub"
     hdrLbl.TextColor3 = CLR_TEXT
     hdrLbl.FontFace = Font.fromEnum(Enum.Font.GothamBold)
     hdrLbl.TextSize = 13
     hdrLbl.ZIndex = 14
 
-    -- Secci?n grid
+    -- Sección grid
     local emoteSec = CreateBorderedSectionGlobal(rightColumn, "EMOTES")
 
     -- OPT: pre-alocar todos los TweenInfo fuera del loop
     local _tiHover = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    -- Grid 2 columnas con cards estilo ne?n
+    -- Grid 2 columnas con cards estilo neón
     local emoteGrid = Instance.new("Frame", emoteSec)
     emoteGrid.Name      = "EmoteGrid"
     emoteGrid.Size      = UDim2.new(1, -4, 0, 0)
@@ -63120,7 +62788,7 @@ function CreateEmotesTab()
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     gridLayout.SortOrder         = Enum.SortOrder.LayoutOrder
 
-    -- OPT: colores alternados precalculados (no crear tablas en cada iteraci?n)
+    -- OPT: colores alternados precalculados (no crear tablas en cada iteración)
     local CARD_COLORS = {
         Color3.fromRGB(14, 30, 70),
         Color3.fromRGB(28, 12, 60),
@@ -63165,7 +62833,7 @@ function CreateEmotesTab()
         nameLbl.TextWrapped = true
         nameLbl.ZIndex = 14
 
-        -- Bot?n transparente encima (cubre la card entera)
+        -- Botón transparente encima (cubre la card entera)
         local btn = Instance.new("TextButton", card)
         btn.Size = UDim2.new(1, 0, 1, 0)
         btn.BackgroundTransparency = 1
@@ -63195,7 +62863,7 @@ function CreateEmotesTab()
         local _eName = emote.name
         btn.Activated:Connect(function()
             _playEmote(_eId, ES.loopActive)
-            CreateCustomNotification("EMOTES", emote.icon .. " " .. _eName .. (ES.loopActive and " [LOOP]" or ""), 1.5)
+            CreateCustomNotification("EMOTES", emote.icon .. " " .. _eName .. (ES.loopActive and " ??" or ""), 1.5)
         end)
     end
 
@@ -64149,346 +63817,6 @@ function CreateUseTab()
         end)
     end
 
-    -- =====================================================================
-    -- DETECT WHO SPECTATES YOU
-    -- Hookea SpectateService del juego para saber qué jugadores te están
-    -- spectateando. Usa SpectateStarted / SpectateTargetChanged para saber
-    -- cuando alguien empieza, y SpectateCancelled para cuando para.
-    -- =====================================================================
-    do
-        local _specSec = CreateBorderedSectionGlobal(leftColumn, "???  DETECT WHO SPECTATES YOU")
-
-        _G._specWatchState = _G._specWatchState or {
-            enabled       = false,
-            bindable      = false,
-            connections   = {},          -- RBXScriptConnections activos
-            spectators    = {},          -- [player] = true (quiénes spectating a LocalPlayer)
-            notifCooldown = {},          -- [player.Name] = tick() para no spamear notifs
-            bindableBtn   = nil,         -- GuiObject del botón en pantalla
-        }
-        local SW = _G._specWatchState
-
-        -- ----------------------------------------------------------------
-        -- Helpers internos
-        -- ----------------------------------------------------------------
-        local function _swCleanConns()
-            for _, c in ipairs(SW.connections) do
-                pcall(function() c:Disconnect() end)
-            end
-            SW.connections = {}
-        end
-
-        local function _swNotify(playerName, isNew)
-            local now = tick()
-            local last = SW.notifCooldown[playerName] or 0
-            if now - last < 4 then return end  -- cooldown 4s por jugador
-            SW.notifCooldown[playerName] = now
-            if isNew then
-                CreateCustomNotification("??? SPECTATING", playerName .. " is watching you", 3.5)
-            else
-                CreateCustomNotification("??? STOPPED", playerName .. " stopped spectating", 2.5)
-            end
-        end
-
-        -- Contar cuántos jugadores nos spectean actualmente
-        local function _swCount()
-            local n = 0
-            for _ in pairs(SW.spectators) do n = n + 1 end
-            return n
-        end
-
-        -- ----------------------------------------------------------------
-        -- Core: hookear SpectateService de cada jugador
-        -- Cuando otro jugador spectatea, el juego llama SpectateStarted
-        -- y SpectateTargetChanged en el SpectateService de ESE jugador,
-        -- pero eso es server-side. En client solo podemos detectarlo
-        -- monitoreando CameraSubject de la cámara de cada Character.
-        -- Estrategia: RunService.Heartbeat revisa CurrentCamera.CameraSubject
-        -- de workspace -> si CameraSubject apunta al Humanoid de LocalPlayer,
-        -- ESE jugador nos está spectateando.
-        -- ----------------------------------------------------------------
-        local function _swStart()
-            _swCleanConns()
-            SW.spectators    = {}
-            SW.notifCooldown = {}
-
-            -- Intentar usar SpectateService directamente si es accesible
-            local _ssOk, _ss = pcall(function()
-                local RS = game:GetService("ReplicatedStorage")
-                local mods = RS:FindFirstChild("Modules")
-                if mods then
-                    local ss = mods:FindFirstChild("SpectateService")
-                        or mods:FindFirstChild("SpectateService1")
-                    if ss then return require(ss) end
-                end
-                -- Fallback: buscar en PlayerScripts
-                local ps = LocalPlayer:FindFirstChild("PlayerScripts")
-                if ps then
-                    local ss = ps:FindFirstChild("SpectateService")
-                        or ps:FindFirstChild("SpectateService1")
-                    if ss then return require(ss) end
-                end
-                return nil
-            end)
-            local _serviceAvail = _ssOk and _ss ~= nil
-
-            -- Método principal: Heartbeat detecta CameraSubject de cada char
-            local _hbConn = RunService.Heartbeat:Connect(function()
-                if not SW.enabled then return end
-                local myChar = LocalPlayer.Character
-                local myHum  = myChar and myChar:FindFirstChildOfClass("Humanoid")
-                if not myHum then return end
-
-                local nowSpectating = {}
-
-                for _, p in ipairs(game.Players:GetPlayers()) do
-                    if p == LocalPlayer then continue end
-                    local pChar = p.Character
-                    if not pChar then continue end
-                    -- Chequear si la cámara del workspace apunta a nuestro humanoid
-                    -- (solo funciona con Camera.CameraSubject compartido en algunos modos)
-                    -- Fallback: revisar CameraSubject via getCurrentCamera trick
-                    local camOk = false
-                    pcall(function()
-                        -- Leer atributo especial que algunos games exponen
-                        local spectateVal = pChar:FindFirstChild("_Spectating")
-                        if spectateVal and spectateVal.Value == LocalPlayer.Name then
-                            camOk = true
-                        end
-                    end)
-                    -- Método seguro: CurrentRoundClient.PlayerData + comparar targets
-                    if not camOk then
-                        pcall(function()
-                            local RC = require(game:GetService("ReplicatedStorage")
-                                :WaitForChild("Modules", 2)
-                                :WaitForChild("CurrentRoundClient", 2))
-                            local pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
-                            if pd and pd.SpectateTarget == LocalPlayer.Name then
-                                camOk = true
-                            end
-                        end)
-                    end
-                    if camOk then
-                        nowSpectating[p] = true
-                    end
-                end
-
-                -- Detectar nuevos spectators
-                for p in pairs(nowSpectating) do
-                    if not SW.spectators[p] then
-                        SW.spectators[p] = true
-                        _swNotify(p.Name, true)
-                    end
-                end
-                -- Detectar los que pararon
-                for p in pairs(SW.spectators) do
-                    if not nowSpectating[p] then
-                        SW.spectators[p] = nil
-                        _swNotify(p.Name, false)
-                    end
-                end
-            end)
-            table.insert(SW.connections, _hbConn)
-
-            -- Método secundario: hookear SpectateService vía BindableEvents
-            -- SpectateStarted / SpectateTargetChanged / SpectateCancelled
-            if _serviceAvail and _ss then
-                -- SpectateStarted: alguien inició spectate
-                local _ssStart = _ss.SpectateStarted
-                if _ssStart and _ssStart.Event then
-                    local c1 = _ssStart.Event:Connect(function()
-                        -- No sabemos quién es todavía; el SpectateTargetChanged lo confirma
-                    end)
-                    table.insert(SW.connections, c1)
-                end
-
-                -- SpectateTargetChanged: cambió de target -> el target es LocalPlayer?
-                local _ssTarget = _ss.SpectateTargetChanged
-                if _ssTarget and _ssTarget.Event then
-                    local c2 = _ssTarget.Event:Connect(function(targetPlayer)
-                        if targetPlayer == LocalPlayer then
-                            -- Quién dispara este evento es el spectator
-                            -- Buscamos al jugador que activó el spectate
-                            for _, p in ipairs(game.Players:GetPlayers()) do
-                                if p ~= LocalPlayer and not SW.spectators[p] then
-                                    -- Heurística: jugador muerto más cercano que no tenemos aún
-                                    local pd = nil
-                                    pcall(function()
-                                        local RC = require(game:GetService("ReplicatedStorage")
-                                            :WaitForChild("Modules", 1)
-                                            :WaitForChild("CurrentRoundClient", 1))
-                                        pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
-                                    end)
-                                    if pd and pd.Dead == true then
-                                        if not SW.spectators[p] then
-                                            SW.spectators[p] = true
-                                            _swNotify(p.Name, true)
-                                        end
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    table.insert(SW.connections, c2)
-                end
-
-                -- SpectateCancelled: alguien paró de spectate
-                local _ssCancel = _ss.SpectateCancelled
-                if _ssCancel and _ssCancel.Event then
-                    local c3 = _ssCancel.Event:Connect(function()
-                        -- Limpiar spectators que ya no están muertos
-                        local toRemove = {}
-                        for p in pairs(SW.spectators) do
-                            local isDead = false
-                            pcall(function()
-                                local RC = require(game:GetService("ReplicatedStorage")
-                                    :WaitForChild("Modules", 1)
-                                    :WaitForChild("CurrentRoundClient", 1))
-                                local pd = RC and RC.PlayerData and RC.PlayerData[p.Name]
-                                isDead = pd and pd.Dead == true
-                            end)
-                            if not isDead then
-                                table.insert(toRemove, p)
-                            end
-                        end
-                        for _, p in ipairs(toRemove) do
-                            SW.spectators[p] = nil
-                            _swNotify(p.Name, false)
-                        end
-                    end)
-                    table.insert(SW.connections, c3)
-                end
-            end
-
-            -- PlayerRemoving: limpiar spectator si sale del juego
-            local _prConn = game.Players.PlayerRemoving:Connect(function(p)
-                if SW.spectators[p] then
-                    SW.spectators[p] = nil
-                end
-            end)
-            table.insert(SW.connections, _prConn)
-
-            CreateCustomNotification("??? SPECTATE DETECT", "Monitoring who watches you", 2.5)
-        end
-
-        local function _swStop()
-            _swCleanConns()
-            SW.spectators    = {}
-            SW.notifCooldown = {}
-        end
-
-        -- ----------------------------------------------------------------
-        -- Toggle principal: Detect Who Spectates You
-        -- ----------------------------------------------------------------
-        CreateAuroraToggle(leftColumn, "Detect Who Spectates You", function(on)
-            SW.enabled = on
-            if on then
-                _swStart()
-            else
-                _swStop()
-                CreateCustomNotification("??? SPECTATE DETECT", "Detection stopped", 2)
-            end
-        end, false)
-
-        -- ----------------------------------------------------------------
-        -- Bindable button: muestra en pantalla quién te spectea ahora mismo
-        -- ----------------------------------------------------------------
-        CreateAuroraToggle(leftColumn, "Show Spectators Bindable Button", function(on)
-            SW.bindable = on
-
-            -- Destruir botón previo si existe
-            if SW.bindableBtn then
-                pcall(function() SW.bindableBtn:Destroy() end)
-                SW.bindableBtn = nil
-            end
-
-            if not on then return end
-
-            -- Crear botón HUD
-            local _pg   = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            local _cg   = game:GetService("CoreGui")
-            local _root = (gethui and gethui()) or _pg or _cg
-            if not _root then return end
-
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.Name            = "ZerqonSpecDetectGui"
-            screenGui.ResetOnSpawn    = false
-            screenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
-            screenGui.IgnoreGuiInset  = true
-            screenGui.DisplayOrder    = 50
-            screenGui.Parent          = _root
-
-            local btn = Instance.new("TextButton", screenGui)
-            btn.Name                   = "SpecDetectBtn"
-            btn.Size                   = UDim2.new(0, 220, 0, 36)
-            btn.Position               = UDim2.new(0.5, -110, 0, 120)
-            btn.AnchorPoint            = Vector2.new(0, 0)
-            btn.BackgroundColor3       = Color3.fromRGB(5, 15, 40)
-            btn.BackgroundTransparency = 0.25
-            btn.BorderSizePixel        = 0
-            btn.Text                   = "??? Spectators: none"
-            btn.TextSize               = 13
-            btn.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-            btn.TextColor3             = Color3.fromRGB(80, 220, 255)
-            btn.AutoButtonColor        = false
-            btn.Active                 = true
-            btn.Draggable              = true
-            Instance.new("UICorner",  btn).CornerRadius  = UDim.new(0, 8)
-            local stroke = Instance.new("UIStroke", btn)
-            stroke.Color           = Color3.fromRGB(50, 180, 255)
-            stroke.Thickness       = 1
-            stroke.Transparency    = 0.3
-            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-            SW.bindableBtn = screenGui
-
-            -- Update loop: refresca el texto del botón cada 0.5s
-            task.spawn(function()
-                while SW.bindable and btn and btn.Parent do
-                    task.wait(0.5)
-                    local count = _swCount()
-                    if count == 0 then
-                        btn.Text       = "??? Spectators: none"
-                        btn.TextColor3 = Color3.fromRGB(100, 200, 255)
-                        stroke.Color   = Color3.fromRGB(50, 180, 255)
-                    else
-                        -- Listar nombres
-                        local names = {}
-                        for p in pairs(SW.spectators) do
-                            table.insert(names, p.Name)
-                        end
-                        local listStr = table.concat(names, ", ")
-                        if #listStr > 28 then listStr = listStr:sub(1, 25) .. "..." end
-                        btn.Text       = "??? " .. tostring(count) .. " watching: " .. listStr
-                        btn.TextColor3 = Color3.fromRGB(255, 90, 90)
-                        stroke.Color   = Color3.fromRGB(255, 60, 60)
-                        -- Pulse rojo
-                        TweenService:Create(stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true), {
-                            Transparency = 0.7
-                        }):Play()
-                    end
-                end
-            end)
-
-            -- Click en el botón: listar spectators en notif
-            btn.Activated:Connect(function()
-                if not SW.enabled then
-                    CreateCustomNotification("??? DETECT OFF", "Enable the main toggle first", 2.5)
-                    return
-                end
-                local count = _swCount()
-                if count == 0 then
-                    CreateCustomNotification("??? SPECTATE DETECT", "Nobody is watching you right now", 2.5)
-                else
-                    local names = {}
-                    for p in pairs(SW.spectators) do table.insert(names, p.Name) end
-                    CreateCustomNotification("??? WATCHING YOU (" .. count .. ")", table.concat(names, ", "), 4)
-                end
-            end)
-        end, false)
-    end  -- end DETECT WHO SPECTATES YOU
-
 end -- cierra CreateUseTab
 
 _ItemsFakeState = _G._ItemsFakeState or {
@@ -64538,7 +63866,7 @@ do
                     math.floor((_mem0Dur - _elapsed0) / 3600) .. "h restantes, plan " .. math.floor(_mem0Dur/3600) .. "h). Mostrando animacion y abriendo hub...")
                 -- FIX: NO abrir hub directamente. Dejar que la animacion del
                 -- checklist siempre se muestre; _openHub() es llamado por la animacion.
-                _G._keyPreValidated = true  -- se?al para que el keyscreen sepa que ya hay key
+                _G._keyPreValidated = true  -- señal para que el keyscreen sepa que ya hay key
                 return true
             else
                 -- Expiro: limpiar para que no interfiera con el resto del flujo
@@ -64677,29 +64005,11 @@ do
     end
 
     -- Intentar auto-ejecucion antes de mostrar pantalla de key
-    -- ================================================================
-    -- == BYPASS DE KEY PARA USUARIOS VIP / PREMIUM
-    -- Si el usuario tiene premium verificado, no necesita key.
-    -- Se omite todo el flujo de verificacion y se abre el hub directo.
-    -- ================================================================
-    if _G._discordPremiumVerified then
-        warn("[ZerqonHUB] Usuario VIP/Premium detectado — omitiendo verificacion de key.")
-        _G._keyPreValidated = true  -- reutiliza la animacion del checklist normal
-        -- Timer ficticio para que Settings no explote sin keyStartTime
-        if not _G._keyStartTime then
-            _G._keyStartTime      = os.time()
-            _G._zerqonKeyDuration = 999 * 3600  -- "sin limite" para VIP
-        end
-    else
-        _tryAutoExec()  -- setea _G._keyPreValidated = true si hay key valida
-    end
-    -- ================================================================
-    -- == FIN BYPASS VIP
-    -- ================================================================
+    _tryAutoExec()  -- setea _G._keyPreValidated = true si hay key valida; siempre se muestra la pantalla con animacion
 
     do  -- bloque dummy para mantener la estructura del else original
 
-    -- Token fijo por UserID: "ZQuser{uid}" ? no cambia nunca entre dias ni sesiones.
+    -- Token fijo por UserID: "ZQuser{uid}" — no cambia nunca entre dias ni sesiones.
     -- Siempre es el mismo bin, la web siempre escribe ahi, el hub siempre lee de ahi.
     local function _getToken()
         if _G._zerqonToken then return _G._zerqonToken end
@@ -64802,7 +64112,7 @@ do
     end
 
     local _myToken = _getToken()
-    -- FIX: si _tryAutoExec ya encontr? el binId en JSONBin, reutilizarlo
+    -- FIX: si _tryAutoExec ya encontró el binId en JSONBin, reutilizarlo
     -- Esto evita que el polling tenga que buscarlo de nuevo con _findBin
     local _myBinId = _G._zerqonBinId or nil
 
@@ -64831,11 +64141,24 @@ do
     pcall(function() _lsGui.Parent = _lsParent end)
     if not _lsGui.Parent then _lsGui.Parent = _lp.PlayerGui end
 
-    -- Fondo solido oscuro (sin imagen de pantalla completa)
+    -- Fondo: misma imagen rbxassetid que el hub + overlay oscuro encima
+    local _bgImg = Instance.new("ImageLabel", _lsGui)
+    _bgImg.Name                   = "KeyBg"
+    _bgImg.Size                   = UDim2.new(1, 0, 1, 0)
+    _bgImg.Position               = UDim2.new(0, 0, 0, 0)
+    _bgImg.Image                  = "rbxassetid://96937964432645"
+    _bgImg.ImageTransparency      = 0.18
+    _bgImg.BackgroundColor3       = Color3.fromRGB(2, 6, 16)
+    _bgImg.BackgroundTransparency = 0
+    _bgImg.ScaleType              = Enum.ScaleType.Crop
+    _bgImg.BorderSizePixel        = 0
+    _bgImg.ZIndex                 = 1
+
+    -- Overlay oscuro encima de la imagen para que el panel resalte
     local _bg = Instance.new("Frame", _lsGui)
     _bg.Size = UDim2.new(1, 0, 1, 0)
     _bg.BackgroundColor3 = Color3.fromRGB(2, 6, 16)
-    _bg.BackgroundTransparency = 1  -- FIX: transparente para no tapar el gameplay
+    _bg.BackgroundTransparency = 0.45
     _bg.BorderSizePixel = 0
     _bg.ZIndex = 2
 
@@ -64844,25 +64167,10 @@ do
     _panel.Size = UDim2.new(0, 420, 0, 220)
     _panel.Position = UDim2.new(0.5, -210, 0.5, -110)
     _panel.BackgroundColor3 = Color3.fromRGB(2, 6, 16)   -- Background del hub
-    _panel.BackgroundTransparency = 0.15  -- FIX: menos opaco para no tapar gameplay
+    _panel.BackgroundTransparency = 0.05
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 3
-    _panel.ClipsDescendants = false  -- FIX: no cortar el errorPanel que sale abajo
     Instance.new("UICorner", _panel).CornerRadius = UDim.new(0, 10)
-
-    -- Imagen de fondo centrada DENTRO del panel (ScaleType.Crop centrado en el rectangulo)
-    local _panelBgImg = Instance.new("ImageLabel", _panel)
-    _panelBgImg.Name                   = "PanelBg"
-    _panelBgImg.Size                   = UDim2.new(1, 0, 1, 0)
-    _panelBgImg.Position               = UDim2.new(0, 0, 0, 0)
-    _panelBgImg.AnchorPoint            = Vector2.new(0.5, 0.5)
-    _panelBgImg.Position               = UDim2.new(0.5, 0, 0.5, 0)
-    _panelBgImg.Image                  = "rbxassetid://96937964432645"
-    _panelBgImg.ImageTransparency      = 0.25
-    _panelBgImg.BackgroundTransparency = 1
-    _panelBgImg.ScaleType              = Enum.ScaleType.Crop
-    _panelBgImg.BorderSizePixel        = 0
-    _panelBgImg.ZIndex                 = 3
 
     -- Borde color Primary del hub (teal vibrante)
     local _stroke = Instance.new("UIStroke", _panel)
@@ -64959,7 +64267,7 @@ do
 
     -- Las 3 filas
     local _row1 = _makeRow(52,  "Login MM2")
-    local _row2 = _makeRow(102, _G._discordPremiumVerified and "Acceso VIP \226\173\144" or "Comprobando key")
+    local _row2 = _makeRow(102, "Comprobando key")
     local _row3 = _makeRow(152, "Ready")
 
     -- ================================================================
@@ -65040,10 +64348,9 @@ do
         task.wait(0.05)
         TweenService:Create(_panel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = UDim2.new(0, 420, 0, 220),
-            BackgroundTransparency = 0.15  -- FIX: no tapar gameplay
+            BackgroundTransparency = 0.05
         }):Play()
-        -- FIX: NO animar _bg de vuelta a opaco (tapa todo el gameplay)
-        -- TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+        TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0.45}):Play()
         if _bgImg then TweenService:Create(_bgImg, TweenInfo.new(0.5), {ImageTransparency = 0.18}):Play() end
     end)
 
@@ -65061,7 +64368,7 @@ do
         end
     end)
 
-    -- Forward declaration: _openHub se define m?s abajo pero el spinner la necesita
+    -- Forward declaration: _openHub se define más abajo pero el spinner la necesita
     local _openHub
     local _pollingActive = false
 
@@ -65081,22 +64388,17 @@ do
         _G._ksStartSpin = _startSpin
         _G._ksStopSpin  = _stopSpin
 
-        -- FIX: si ya hay key guardada (_keyPreValidated), mostrar "aprobado" r?pido
+        -- FIX: si ya hay key guardada (_keyPreValidated), mostrar "aprobado" rápido
         -- sin necesitar polling. El texto de Ready desaparece suavemente al final.
         if _G._keyPreValidated then
-            -- Comprobando key: check verde r?pido (key ya validada)
+            -- Comprobando key: check verde rápido (key ya validada)
             task.wait(0.8)
             _stopSpin(_row2, true)
-            -- Cambiar texto segun si es VIP o key normal
+            -- Cambiar texto de "Comprobando key" a "Key aprobada ?"
             if _row2.label then
                 TweenService:Create(_row2.label, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
                 task.wait(0.35)
-                if _G._discordPremiumVerified then
-                    _row2.label.Text = "\226\173\144 Acceso VIP — sin key requerida"
-                    _row2.label.TextColor3 = Color3.fromRGB(255, 215, 0)  -- dorado para VIP
-                else
-                    _row2.label.Text = "Key aprobada \226\156\147"
-                end
+                _row2.label.Text = "Key aprobada ?"
                 TweenService:Create(_row2.label, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
             end
             task.wait(0.5)
@@ -65115,7 +64417,7 @@ do
                     TweenService:Create(r.icon, _fadeInfo, {TextTransparency = 1}):Play()
                 end
             end
-            -- Llamar _openHub() que abre el hub con animaci?n de entrada
+            -- Llamar _openHub() que abre el hub con animación de entrada
             task.wait(0.6)
             _openHub()
             return
@@ -65287,7 +64589,7 @@ do
                     _scaleCreated = true
                 end
 
-                -- Estado inicial: invisible, ligeramente peque?o
+                -- Estado inicial: invisible, ligeramente pequeño
                 _mainF.BackgroundTransparency = 1
                 _uiScale.Scale = 0.92
 
@@ -65636,7 +64938,7 @@ do
                             _G._zerqonBinId = _myBinId
                             warn("[ZerqonHUB] Poll: bin encontrado por nombre = " .. _myBinId)
                         else
-                            -- JSONBin rechazo la busqueda por nombre ? esto pasa si el bin
+                            -- JSONBin rechazo la busqueda por nombre — esto pasa si el bin
                             -- fue creado pero la API no lo indexo aun. Esperar y reintentar.
                             warn("[ZerqonHUB] Poll: _findBin fallo, respuesta = " .. tostring(_res):sub(1,80))
                         end
@@ -65861,7 +65163,7 @@ do
             local _immediateStatus = _getStatus(_existingBin)
             warn("[ZerqonHUB] CHECK INMEDIATO: status = " .. tostring(_immediateStatus))
             if _immediateStatus == "verified" then
-                -- KEY YA VERIFICADA: usar animaci?n siempre, se?alar pre-validada
+                -- KEY YA VERIFICADA: usar animación siempre, señalar pre-validada
                 warn("[ZerqonHUB] AUTO-EXEC: Key ya verificada en JSONBin. Mostrando checklist animado...")
                 -- Leer timestamp original del bin para no resetear las 24h
                 pcall(function()
@@ -65884,7 +65186,7 @@ do
                         end
                     end
                 end)
-                -- NO llamar _openHub() directamente; la animaci?n del spinner ya lo llama
+                -- NO llamar _openHub() directamente; la animación del spinner ya lo llama
                 _G._keyPreValidated = true
                 return
             end
