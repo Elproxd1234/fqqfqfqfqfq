@@ -94,6 +94,31 @@ _G._hubScriptExecuted = true
 -- Antes borraba siempre -> el hub nunca detectaba la key guardada
 -- y el usuario tenia que ir al navegador cada vez que ejecutaba.
 -- ================================================================
+-- ================================================================
+-- == BORRADO FORZADO DE KEY (v1) - Elimina key guardada al arrancar
+-- El usuario puede ejecutar esto para resetear su key y volver a verificar.
+-- ================================================================
+do
+    local _fcLp  = game:GetService("Players").LocalPlayer
+    local _fcUid = tostring(_fcLp and _fcLp.UserId or "0")
+    local _fcPath = "zerqon_key_" .. _fcUid .. ".txt"
+    -- Borrar archivo local
+    pcall(function() if delfile   then delfile(_fcPath)       end end)
+    pcall(function() if writefile then writefile(_fcPath, "") end end)
+    -- Limpiar globals de session
+    _G._zerqonToken          = nil
+    _G._keyStartTime         = nil
+    _G._zerqonBinId          = nil
+    _G._zerqonSessionSeed    = nil
+    _G._zerqonKeyDuration    = nil
+    _G._keyPreValidated      = nil
+    _G._keyExpiredKickTriggered = nil
+    _G._keyTimerLastSec      = nil
+    warn("[ZerqonHUB] Key anterior eliminada. Se requiere nueva verificacion.")
+end
+-- ================================================================
+-- == FIN BORRADO FORZADO DE KEY
+-- ================================================================
 do
     local _lp  = game:GetService("Players").LocalPlayer
     local _uid = tostring(_lp and _lp.UserId or "0")
@@ -64345,7 +64370,7 @@ do
     _panel.Size = UDim2.new(0, 420, 0, 220)
     _panel.Position = UDim2.new(0.5, -210, 0.5, -110)
     _panel.BackgroundColor3 = Color3.fromRGB(2, 6, 16)   -- Background del hub
-    _panel.BackgroundTransparency = 0.05
+    _panel.BackgroundTransparency = 0.15  -- FIX: menos opaco para no tapar gameplay
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 3
     _panel.ClipsDescendants = true
