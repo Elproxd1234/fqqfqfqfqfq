@@ -33876,8 +33876,17 @@ function CreateWorldUI_QuickFlingButtons()
                 pcall(function() sg.Parent = game:GetService("CoreGui") end)
                 if not sg.Parent then sg.Parent = LocalPlayer.PlayerGui end
                 _sgBind.gui = sg
-                -- FIX: capturar frame para SetActiveState
-                local _sgFrame = MakeCapyBindableFrame(sg, "STEAL\nGUN", function()
+                -- FIX BINDABLE: inicializar _G._qfStateRef si todavia no existe
+                -- (puede ser nil si el World tab nunca fue abierto antes de usar el bindable)
+                if not _G._qfStateRef then
+                    _G._qfStateRef = { stealGunActive = false, flingAllActive = false,
+                                       flingMurderActive = false }
+                end
+                -- FIX BINDABLE: usar leftColumn como parent (NO el ScreenGui sg)
+                -- Cuando el frame es hijo del ScreenGui, AncestryChanged nunca dispara
+                -- porque el ScreenGui siempre tiene padre (CoreGui). Usando leftColumn
+                -- el frame se destruye correctamente al cerrar el tab y el boton queda activo.
+                local _sgFrame = MakeCapyBindableFrame(leftColumn, "STEAL\nGUN", function()
                     -- FIX BINDABLE: usar _G._qfStateRef en vez del _qfState local del closure
                     -- El closure captura el _qfState de la instancia de CreateWorldUI_QuickFlingButtons
                     -- que creo este toggle. Si el World tab se reconstruye, se crea un nuevo _qfState
@@ -39841,7 +39850,19 @@ local function _sgFlingPlayer(TargetPlayer)
     _refreshRoleCache()
     local currentSheriff = _roleCache and _roleCache.sheriff
 
-    -- FIX FALLBACK VISUAL: si GetPlayerData no devolvio sheriff, buscar visualmente
+    -- FIX HERO: si el sheriff viejo murio y el hero tiene la gun ahora, usar el hero
+    -- El cache puede devolver sheriff=nil pero hero=nuevo portador de la gun
+    if not currentSheriff and _roleCache and _roleCache.hero then
+        local heroPlayer = _roleCache.hero
+        local hHum = heroPlayer.Character and heroPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hHum and hHum.Health > 0 then
+            currentSheriff = heroPlayer
+            _roleCache.sheriff = heroPlayer
+            _roleCache.hero    = nil
+        end
+    end
+
+    -- FIX FALLBACK VISUAL: si GetPlayerData no devolvio sheriff ni hero, buscar visualmente
     if not currentSheriff and _findGunIn then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
