@@ -10081,7 +10081,7 @@ function updateBindables()
                         and input.UserInputType ~= Enum.UserInputType.Touch then return end
                         -- FIX MOVIL: usar delta incremental (frame a frame) en lugar de
                         -- delta acumulado desde _saDragStart. En Touch, inp.Position
-                        -- incluye eje Z (profundidad) que rompe el cálculo acumulado.
+                        -- incluye eje Z (profundidad) que rompe el c?lculo acumulado.
                         local curX = input.Position.X
                         local curY = input.Position.Y
                         local dX = curX - _saDragStart.X
@@ -58404,398 +58404,60 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 do
     mainFrame.BackgroundTransparency = 1
 
-    -- -- CAPA 1: imagen de fondo con transparencia leve --------------
+    -- FONDO: imagen del ojo abierto
     local hubBgImage = Instance.new("ImageLabel", mainFrame)
-    hubBgImage.Name            = "HubBackground"
-    hubBgImage.Size            = UDim2.new(1, 0, 1, 0)
-    hubBgImage.Position        = UDim2.new(0, 0, 0, 0)
-    hubBgImage.ZIndex          = 1
-    hubBgImage.Image           = "rbxassetid://96937964432645"
-    hubBgImage.ImageTransparency = 0.30   -- discreta: los orbs pulsantes dan la profundidad visual
+    hubBgImage.Name                  = "HubBackground"
+    hubBgImage.Size                  = UDim2.new(1, 0, 1, 0)
+    hubBgImage.Position              = UDim2.new(0, 0, 0, 0)
+    hubBgImage.ZIndex                = 1
+    hubBgImage.Image                 = "rbxassetid://96937964432645"
+    hubBgImage.ImageTransparency     = 0
     hubBgImage.BackgroundTransparency = 1
-    hubBgImage.ScaleType       = Enum.ScaleType.Stretch
-    hubBgImage.ImageRectSize   = Vector2.new(900, 480)
-    hubBgImage.ImageRectOffset = Vector2.new(0, 0)
+    hubBgImage.ScaleType             = Enum.ScaleType.Stretch
+    hubBgImage.ImageRectSize         = Vector2.new(900, 480)
+    hubBgImage.ImageRectOffset       = Vector2.new(0, 0)
     Instance.new("UICorner", hubBgImage).CornerRadius = UDim.new(0, 8)
     _G._hubBgMainImageRef = hubBgImage
 
     local _bgAnimRunning = true
     _G._hubBgAnimStop = function() _bgAnimRunning = false end
 
-    -- ================================================================
-    -- ANIMACION DE FONDO v5 - NEBULA CINEMATICA CON ORBS PULSANTES
-    -- Capas de animacion:
-    --   Loop A: parallax suave con zoom cinematico (keyframes)
-    --   Loop B: micro-deriva organica frame-a-frame
-    --   Loop C: orbs de luz pulsantes que flotan (glassmorphism)
-    --   Loop D: aurora de 4 franjas con ciclo de color vivo
-    --   Loop E: particulas triple con fade-in/out suave
-    -- ================================================================
-
-    -- Estado compartido entre loops A y B
-    local _bgOx, _bgOy = 0, 0
-    local _bgSx, _bgSy = 900, 480
-
-    -- LOOP A: Tween de keyframes (parallax cinematico)
-    task.spawn(function()
-        local _kf = {
-            {ox =   0, oy =   0, sx = 900, sy = 480, t =  0, e = Enum.EasingStyle.Sine},
-            {ox =  15, oy =   8, sx = 855, sy = 456, t = 12, e = Enum.EasingStyle.Cubic},
-            {ox =  45, oy =  20, sx = 815, sy = 435, t = 10, e = Enum.EasingStyle.Sine},
-            {ox =  85, oy =  35, sx = 788, sy = 420, t =  9, e = Enum.EasingStyle.Quad},
-            {ox = 105, oy =  55, sx = 778, sy = 415, t =  8, e = Enum.EasingStyle.Sine},
-            {ox =  72, oy =  42, sx = 808, sy = 430, t = 10, e = Enum.EasingStyle.Cubic},
-            {ox =  32, oy =  18, sx = 848, sy = 452, t = 11, e = Enum.EasingStyle.Sine},
-            {ox =   4, oy =   4, sx = 888, sy = 475, t = 12, e = Enum.EasingStyle.Quart},
-        }
-        local _idx = 1
-        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
-            local _nxt = (_idx % (#_kf - 1)) + 2
-            if _idx == 1 then _nxt = 2 end
-            local _to = _kf[_nxt]
-            _bgOx = _to.ox; _bgOy = _to.oy
-            _bgSx = _to.sx; _bgSy = _to.sy
-            local _ti = TweenInfo.new(_to.t, _to.e, Enum.EasingDirection.InOut)
-            TweenService:Create(hubBgImage, _ti, {
-                ImageRectOffset = Vector2.new(_to.ox, _to.oy),
-                ImageRectSize   = Vector2.new(_to.sx, _to.sy),
-            }):Play()
-            -- El fondo respira con el movimiento (transparencia fija, sin pulso)
-            task.wait(_to.t)
-            _idx = _nxt
-            if _nxt == #_kf then _idx = 1 end
-        end
-    end)
-
-    -- LOOP B: Micro-deriva organica con doble seno
-    task.spawn(function()
-        local _t = 0
-        local _SPEED_X = 0.22
-        local _SPEED_Y = 0.17
-        local _AMP_X   = 5
-        local _AMP_Y   = 3.5
-        while _bgAnimRunning and hubBgImage and hubBgImage.Parent do
-            task.wait(0.05)
-            _t = _t + 0.05
-            local _driftX = math.sin(_t * _SPEED_X * math.pi * 2) * _AMP_X
-                          + math.sin(_t * _SPEED_X * 1.618 * math.pi * 2) * (_AMP_X * 0.35)
-            local _driftY = math.cos(_t * _SPEED_Y * math.pi * 2) * _AMP_Y
-                          + math.cos(_t * _SPEED_Y * 1.414 * math.pi * 2) * (_AMP_Y * 0.30)
-            local _newOx = math.clamp(_bgOx + _driftX, 0, 120)
-            local _newOy = math.clamp(_bgOy + _driftY, 0, 60)
-            pcall(function()
-                hubBgImage.ImageRectOffset = Vector2.new(_newOx, _newOy)
-                -- Tinte HSV muy sutil (no cambia el color principal, solo tono calido/frio)
-                local _hue = (_t * 0.012) % 1
-                hubBgImage.ImageColor3 = Color3.fromHSV(_hue, 0.12, 0.96)
-            end)
-        end
-    end)
-
-    -- ================================================================
-    -- LOOP C: ORBS DE LUZ PULSANTES (glassmorphism flotante)
-    -- 5 esferas de luz difusa que flotan, escalan y cambian de color
-    -- dando el efecto "nebula/space" que no se nota el fondo solido
-    -- ================================================================
-    local _orbDefs = {
-        -- {xPos, yPos, size, colorHue, speed, phaseOffset}
-        {x=0.08, y=0.15, sz=200, hue=0.68, spd=0.07,  ph=0.0 },  -- violeta esquina TL
-        {x=0.75, y=0.05, sz=170, hue=0.58, spd=0.055, ph=1.2 },  -- azul esquina TR
-        {x=0.50, y=0.55, sz=230, hue=0.72, spd=0.045, ph=2.5 },  -- purpura centro
-        {x=0.20, y=0.75, sz=150, hue=0.62, spd=0.065, ph=0.8 },  -- cian BL
-        {x=0.85, y=0.65, sz=180, hue=0.80, spd=0.05,  ph=3.1 },  -- magenta BR
-    }
-    local _orbFrames = {}
-    for _, od in ipairs(_orbDefs) do
-        local orbF = Instance.new("Frame", mainFrame)
-        orbF.AnchorPoint  = Vector2.new(0.5, 0.5)
-        orbF.Position     = UDim2.new(od.x, 0, od.y, 0)
-        orbF.Size         = UDim2.new(0, od.sz, 0, od.sz)
-        orbF.BorderSizePixel = 0
-        orbF.ZIndex       = 2
-        orbF.BackgroundColor3 = Color3.fromHSV(od.hue, 0.9, 0.8)
-        orbF.BackgroundTransparency = 0.72
-        Instance.new("UICorner", orbF).CornerRadius = UDim.new(1, 0)
-        -- Gradiente radial simulado: UIGradient de 0% a 100% transparente
-        local og = Instance.new("UIGradient", orbF)
-        og.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0,   0.30),
-            NumberSequenceKeypoint.new(0.55, 0.68),
-            NumberSequenceKeypoint.new(1,   1.0),
-        })
-        table.insert(_orbFrames, {frame=orbF, grad=og, def=od, t=od.ph})
-    end
+    -- ANIMACION: parpadeo del ojo (cierra -> abre)
+    local _blinkOverlay = Instance.new("ImageLabel", mainFrame)
+    _blinkOverlay.Name                   = "EyeBlinkOverlay"
+    _blinkOverlay.Size                   = UDim2.new(1, 0, 1, 0)
+    _blinkOverlay.Position               = UDim2.new(0, 0, 0, 0)
+    _blinkOverlay.AnchorPoint            = Vector2.new(0, 0)
+    _blinkOverlay.BackgroundTransparency = 1
+    _blinkOverlay.Image                  = "rbxassetid://124196125990159"
+    _blinkOverlay.ScaleType              = Enum.ScaleType.Stretch
+    _blinkOverlay.ImageRectSize          = Vector2.new(900, 480)
+    _blinkOverlay.ImageRectOffset        = Vector2.new(0, 0)
+    _blinkOverlay.ImageTransparency      = 1
+    _blinkOverlay.ZIndex                 = 2
+    Instance.new("UICorner", _blinkOverlay).CornerRadius = UDim.new(0, 8)
 
     task.spawn(function()
-        local _ot = 0
-        while _bgAnimRunning do
-            task.wait(0.05)
-            _ot = _ot + 0.05
-            for _, orb in ipairs(_orbFrames) do
-                orb.t = orb.t + 0.05
-                local od = orb.def
-                -- Flotacion: posicion oscila suavemente
-                local floatX = od.x + math.sin(orb.t * od.spd * math.pi * 2) * 0.06
-                local floatY = od.y + math.cos(orb.t * od.spd * 0.7 * math.pi * 2) * 0.055
-                -- Pulso de escala: el orb "respira" (90%-115%)
-                local pulse = 1.0 + math.sin(orb.t * od.spd * 1.3 * math.pi * 2) * 0.13
-                local newSz = math.floor(od.sz * pulse)
-                -- Ciclo de color HSV lento
-                local newHue = (od.hue + orb.t * 0.004) % 1
-                -- Transparencia pulsante (mas visible en pico, casi invisible en valle)
-                local transPulse = 0.72 - math.sin(orb.t * od.spd * 2 * math.pi * 2) * 0.18
-                pcall(function()
-                    orb.frame.Position = UDim2.new(floatX, 0, floatY, 0)
-                    orb.frame.Size = UDim2.new(0, newSz, 0, newSz)
-                    orb.frame.BackgroundColor3 = Color3.fromHSV(newHue, 0.88, 0.82)
-                    orb.frame.BackgroundTransparency = math.clamp(transPulse, 0.55, 0.90)
-                end)
-            end
-        end
-    end)
+        local BLINK_INTERVAL = 2.5
+        local CLOSE_TIME     = 0.18
+        local OPEN_TIME      = 0.18
 
-    -- -- CAPA 2: AURORA - 4 franjas de luz mas vivas y amplias --
-    local _auroraPalette = {
-        { Color3.fromRGB(40,  0, 110), Color3.fromRGB(100,  0, 200), Color3.fromRGB(  0, 80, 230), Color3.fromRGB(20, 0, 140) },
-        { Color3.fromRGB( 0, 30, 140), Color3.fromRGB(  0,100, 240), Color3.fromRGB( 30,  0, 180), Color3.fromRGB( 0, 60, 200) },
-        { Color3.fromRGB( 0,100, 190), Color3.fromRGB(  0,200, 240), Color3.fromRGB( 30, 80, 220), Color3.fromRGB( 0,140, 210) },
-        { Color3.fromRGB(80,  0, 190), Color3.fromRGB(160,  0, 255), Color3.fromRGB(100,  0, 220), Color3.fromRGB(50,  0, 170) },
-        { Color3.fromRGB(10,  0, 100), Color3.fromRGB( 80, 30, 200), Color3.fromRGB(  0, 50, 180), Color3.fromRGB(30, 10, 150) },
-        { Color3.fromRGB( 0, 60, 170), Color3.fromRGB( 30,160, 255), Color3.fromRGB( 70,  0, 220), Color3.fromRGB( 0, 80, 190) },
-    }
-    local _auroraPaletteIdx = 1
+        while _bgAnimRunning and _blinkOverlay and _blinkOverlay.Parent do
+            task.wait(BLINK_INTERVAL)
+            if not (_bgAnimRunning and _blinkOverlay and _blinkOverlay.Parent) then break end
 
-    local function _makeAuroraStrip(yScale, heightScale, zidx, initRot)
-        local f = Instance.new("Frame", mainFrame)
-        f.Size = UDim2.new(1.4, 0, heightScale, 0)
-        f.Position = UDim2.new(-0.20, 0, yScale, 0)
-        f.BackgroundTransparency = 1
-        f.BorderSizePixel = 0
-        f.ZIndex = zidx
-        f.ClipsDescendants = false
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0.5, 0)
-        local g = Instance.new("UIGradient", f)
-        g.Rotation = initRot or 0
-        return f, g
-    end
+            -- Cerrar ojo
+            _blinkOverlay.ImageTransparency = 1
+            TweenService:Create(_blinkOverlay,
+                TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+                {ImageTransparency = 0}):Play()
+            task.wait(CLOSE_TIME)
 
-    local _auroraA, _gradA = _makeAuroraStrip(0.02, 0.60, 2,  10)
-    local _auroraB, _gradB = _makeAuroraStrip(0.28, 0.55, 2, -10)
-    local _auroraC, _gradC = _makeAuroraStrip(0.52, 0.50, 2,  16)
-    local _auroraD, _gradD = _makeAuroraStrip(0.72, 0.40, 2,  -5)
-
-    local function _applyAuroraPalette(pal)
-        local c0, c1, c2, c3 = pal[1], pal[2], pal[3], pal[4]
-        local function makeGrad(cA, cB)
-            return ColorSequence.new({
-                ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,0,0)),
-                ColorSequenceKeypoint.new(0.18, cA),
-                ColorSequenceKeypoint.new(0.50, cB),
-                ColorSequenceKeypoint.new(0.82, cA),
-                ColorSequenceKeypoint.new(1,    Color3.fromRGB(0,0,0)),
-            })
-        end
-        local makeTr = NumberSequence.new({
-            NumberSequenceKeypoint.new(0,    1),
-            NumberSequenceKeypoint.new(0.18, 0.50),
-            NumberSequenceKeypoint.new(0.50, 0.28),
-            NumberSequenceKeypoint.new(0.82, 0.50),
-            NumberSequenceKeypoint.new(1,    1),
-        })
-        _gradA.Color = makeGrad(c0, c1); _gradA.Transparency = makeTr
-        _gradB.Color = makeGrad(c1, c2); _gradB.Transparency = makeTr
-        _gradC.Color = makeGrad(c2, c3); _gradC.Transparency = makeTr
-        _gradD.Color = makeGrad(c3, c0); _gradD.Transparency = makeTr
-    end
-    _applyAuroraPalette(_auroraPalette[1])
-
-    task.spawn(function()
-        local _tA, _tB, _tC, _tD = 0, 0.6, 1.3, 2.1
-        local _rotA, _rotB, _rotC, _rotD = 10, -10, 16, -5
-        local _palTimer = 0
-        local _PAL_DUR  = 10
-        while _bgAnimRunning and _auroraA and _auroraA.Parent do
-            local dt = 0.05
-            task.wait(dt)
-            _tA = _tA+dt; _tB = _tB+dt; _tC = _tC+dt; _tD = _tD+dt
-
-            local yA = 0.02 + math.sin(_tA * 0.16) * 0.10
-            local yB = 0.28 + math.sin(_tB * 0.11) * 0.12
-            local yC = 0.52 + math.sin(_tC * 0.14) * 0.09
-            local yD = 0.72 + math.sin(_tD * 0.18) * 0.07
-
-            _rotA = 10  + math.sin(_tA * 0.08) * 24
-            _rotB = -10 + math.sin(_tB * 0.10) * 20
-            _rotC = 16  + math.sin(_tC * 0.07) * 26
-            _rotD = -5  + math.sin(_tD * 0.12) * 18
-
-            pcall(function()
-                _auroraA.Position = UDim2.new(-0.20, 0, yA, 0)
-                _auroraB.Position = UDim2.new(-0.20, 0, yB, 0)
-                _auroraC.Position = UDim2.new(-0.20, 0, yC, 0)
-                _auroraD.Position = UDim2.new(-0.20, 0, yD, 0)
-                _gradA.Rotation = _rotA
-                _gradB.Rotation = _rotB
-                _gradC.Rotation = _rotC
-                _gradD.Rotation = _rotD
-            end)
-
-            _palTimer = _palTimer + dt
-            if _palTimer >= _PAL_DUR then
-                _palTimer = 0
-                _auroraPaletteIdx = (_auroraPaletteIdx % #_auroraPalette) + 1
-                pcall(function() _applyAuroraPalette(_auroraPalette[_auroraPaletteIdx]) end)
-            end
-        end
-    end)
-
-    -- -- CAPA 3: PARTICULAS mejoradas (30 puntos, 3 tamanos, mas visibles) --
-    local _PARTICLE_COUNT = 30
-    local _particles = {}
-
-    local function _makeParticle()
-        local p = Instance.new("Frame", mainFrame)
-        -- 3 tamanios: pequeno, medio, grande (estrella)
-        local tier = math.random(1, 3)
-        local sz = tier == 1 and math.random(1, 3) or tier == 2 and math.random(3, 6) or math.random(6, 10)
-        p.Size = UDim2.new(0, sz, 0, sz)
-        p.BackgroundTransparency = 1
-        p.BorderSizePixel = 0
-        p.ZIndex = 3
-        Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
-        local palIdx = math.random(1, #_auroraPalette)
-        local cIdx   = math.random(1, 4)
-        p.BackgroundColor3 = _auroraPalette[palIdx][cIdx]
-        return p, tier
-    end
-
-    local function _resetParticle(entry)
-        local p = entry.frame
-        local startX = math.random(1, 99) / 100
-        local startY = math.random(72, 100) / 100
-        p.Position = UDim2.new(startX, 0, startY, 0)
-        p.BackgroundTransparency = 1
-        local palIdx = math.random(1, #_auroraPalette)
-        local cIdx   = math.random(1, 4)
-        pcall(function() p.BackgroundColor3 = _auroraPalette[palIdx][cIdx] end)
-        entry.x       = startX
-        entry.y       = startY
-        -- Particulas grandes suben mas lento pero brillan mas
-        entry.speed   = entry.tier == 3 and math.random(2, 5)/100 or math.random(4, 14)/100
-        entry.drift   = (math.random(-20, 20)) / 1000
-        entry.life    = 0
-        entry.maxLife = entry.tier == 3 and math.random(60, 130) or math.random(35, 90)
-        entry.phase   = math.random(0, 62) / 10
-        -- Particulas grandes brillan mas (menor transparencia en pico)
-        entry.maxAlpha = entry.tier == 3 and 0.95 or entry.tier == 2 and 0.85 or 0.70
-    end
-
-    for i = 1, _PARTICLE_COUNT do
-        local p, tier = _makeParticle()
-        local entry = { frame=p, tier=tier, x=0, y=0, speed=0, drift=0, life=0, maxLife=60, phase=0, maxAlpha=0.80 }
-        _resetParticle(entry)
-        entry.y = math.random(0, 100) / 100
-        p.Position = UDim2.new(entry.x, 0, entry.y, 0)
-        entry.life = math.random(0, entry.maxLife)
-        _particles[i] = entry
-    end
-
-    task.spawn(function()
-        while _bgAnimRunning do
-            task.wait(0.05)
-            for _, e in ipairs(_particles) do
-                if not (e.frame and e.frame.Parent) then continue end
-                e.life = e.life + 1
-                e.y = e.y - e.speed * 0.01
-                e.x = e.x + e.drift + math.sin(e.life * 0.12 + e.phase) * 0.0018
-                local lifeRatio = e.life / e.maxLife
-                local alpha
-                if lifeRatio < 0.18 then
-                    alpha = lifeRatio / 0.18
-                elseif lifeRatio > 0.72 then
-                    alpha = 1 - (lifeRatio - 0.72) / 0.28
-                else
-                    alpha = 1
-                end
-                pcall(function()
-                    e.frame.BackgroundTransparency = 1 - (alpha * e.maxAlpha)
-                    e.frame.Position = UDim2.new(e.x, 0, e.y, 0)
-                end)
-                if e.life >= e.maxLife or e.y < -0.06 then
-                    _resetParticle(e)
-                end
-            end
-        end
-    end)
-
-    -- -- CAPA 4: VI?ETA perimetral con pulso de color suave -----------
-    local _vigFrame = Instance.new("Frame", mainFrame)
-    _vigFrame.Name = "HubVignette"
-    _vigFrame.Size = UDim2.new(1, 0, 1, 0)
-    _vigFrame.Position = UDim2.new(0, 0, 0, 0)
-    _vigFrame.BackgroundTransparency = 1
-    _vigFrame.BorderSizePixel = 0
-    _vigFrame.ZIndex = 4
-    Instance.new("UICorner", _vigFrame).CornerRadius = UDim.new(0, 8)
-    local _vigGrad = Instance.new("UIGradient", _vigFrame)
-    _vigGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,  0, 20)),
-        ColorSequenceKeypoint.new(0.28, Color3.fromRGB(2,  2, 10)),
-        ColorSequenceKeypoint.new(0.72, Color3.fromRGB(2,  2, 10)),
-        ColorSequenceKeypoint.new(1,   Color3.fromRGB(10, 0, 30)),
-    })
-    _vigGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0,    0.38),
-        NumberSequenceKeypoint.new(0.28, 0.97),
-        NumberSequenceKeypoint.new(0.72, 0.97),
-        NumberSequenceKeypoint.new(1,    0.34),
-    })
-
-    -- Pulso: la vigneta rota su gradiente suavemente para efecto de "latido"
-    task.spawn(function()
-        local _vRot = 0
-        while _bgAnimRunning and _vigFrame and _vigFrame.Parent do
-            task.wait(0.08)
-            _vRot = (_vRot + 0.4) % 360
-            pcall(function() _vigGrad.Rotation = _vRot end)
-        end
-    end)
-
-    -- -- CAPA 5: SHIMMER diagonal ? barre cada 8s ---------------------
-    local _shimFrame = Instance.new("Frame", mainFrame)
-    _shimFrame.Name = "HubShimmer"
-    _shimFrame.Size = UDim2.new(0.32, 0, 1.4, 0)
-    _shimFrame.Position = UDim2.new(-0.40, 0, -0.20, 0)
-    _shimFrame.BackgroundTransparency = 1
-    _shimFrame.BorderSizePixel = 0
-    _shimFrame.ZIndex = 5
-    _shimFrame.ClipsDescendants = false
-    local _shimGrad = Instance.new("UIGradient", _shimFrame)
-    _shimGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,   0,   0)),
-        ColorSequenceKeypoint.new(0.30, Color3.fromRGB(100, 180, 255)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(200, 240, 255)),
-        ColorSequenceKeypoint.new(0.70, Color3.fromRGB(100, 180, 255)),
-        ColorSequenceKeypoint.new(1,    Color3.fromRGB(0,   0,   0)),
-    })
-    _shimGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0,    1),
-        NumberSequenceKeypoint.new(0.30, 0.84),
-        NumberSequenceKeypoint.new(0.50, 0.72),
-        NumberSequenceKeypoint.new(0.70, 0.84),
-        NumberSequenceKeypoint.new(1,    1),
-    })
-    _shimGrad.Rotation = 22
-
-    task.spawn(function()
-        task.wait(2.5)
-        while _bgAnimRunning and _shimFrame and _shimFrame.Parent do
-            _shimFrame.Position = UDim2.new(-0.40, 0, -0.20, 0)
-            TweenService:Create(_shimFrame,
-                TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                { Position = UDim2.new(1.15, 0, -0.20, 0) }
-            ):Play()
-            task.wait(2.2 + 6.5)
+            -- Abrir ojo
+            TweenService:Create(_blinkOverlay,
+                TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+                {ImageTransparency = 1}):Play()
+            task.wait(OPEN_TIME)
         end
     end)
 end
@@ -59094,7 +58756,7 @@ _getTargetScale = function()
     -- DEBUG: imprimir valores reales para diagnosticar
     warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
     if _isMobileNow then
-        -- MOBILE: escala reducida para ocupar menos pantalla (máx 42% del ancho)
+        -- MOBILE: escala reducida para ocupar menos pantalla (m?x 42% del ancho)
         local _scaleByW = (_vpNow.X - 16) / 900
         local _scaleByH = (_vpNow.Y * 0.55) / 480
         local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.26, 0.42)
@@ -59809,7 +59471,7 @@ particles = {}
 
         local function _resolveFrameTopLeft()
             -- FIX: usar AbsolutePosition directamente (ya tiene en cuenta AnchorPoint,
-            -- Scale, Offset y GuiInset de Roblox). Es la forma más confiable en móvil.
+            -- Scale, Offset y GuiInset de Roblox). Es la forma m?s confiable en m?vil.
             local ap = mainFrame.AbsolutePosition
             return Vector2.new(ap.X, ap.Y)
         end
@@ -59879,7 +59541,7 @@ particles = {}
             local fSiz = mainFrame.AbsoluteSize
             if inputPos2D.X < fPos.X or inputPos2D.X > fPos.X + fSiz.X then return end
             if inputPos2D.Y < fPos.Y or inputPos2D.Y > fPos.Y + fSiz.Y then return end
-            -- FIX: usar AbsolutePosition como top-left real (confiable en móvil con cualquier AnchorPoint)
+            -- FIX: usar AbsolutePosition como top-left real (confiable en m?vil con cualquier AnchorPoint)
             local tl = Vector2.new(fPos.X, fPos.Y)
             -- Normalizar a AnchorPoint(0,0) para que el drag sea predecible
             mainFrame.AnchorPoint = Vector2.new(0, 0)
@@ -59924,10 +59586,10 @@ particles = {}
         -- dragIcon.InputBegan queda vacio intencionalmente.
         dragIcon.InputBegan:Connect(function(_inp) end)
 
-        -- Movimiento (un solo _safeConnect – no duplicado)
+        -- Movimiento (un solo _safeConnect ? no duplicado)
         -- FIX MOBILE BARRERA: se usa GuiService:GetGuiInset() para compensar
         -- la barra de status de Roblox en celular (~36px arriba).
-        -- Sin esto el hub no puede subirse más allá del inset (barrera invisible).
+        -- Sin esto el hub no puede subirse m?s all? del inset (barrera invisible).
         _safeConnect(UserInputService.InputChanged, function(input)
             if not _dragActive then return end
             if _G._sliderDragging then return end
@@ -63587,15 +63249,67 @@ local function _ZerqonLoadingScreen(onComplete)
     end)
     if not sg.Parent then sg.Parent = lp.PlayerGui end
 
-    -- Fondo oscuro semitransparente (backdrop)
+    -- ============================================================
+    -- FONDO PRINCIPAL: imagen del ojo abierto + animacion de parpadeo
+    -- IDs:
+    --   Ojo abierto -> rbxassetid://96937964432645
+    --   Cierre ojo  -> rbxassetid://124196125990159
+    -- ============================================================
     local backdrop = Instance.new("Frame", sg)
     backdrop.Name                 = "Backdrop"
     backdrop.Size                 = UDim2.new(1, 0, 1, 0)
     backdrop.Position             = UDim2.new(0, 0, 0, 0)
     backdrop.BackgroundColor3     = Color3.fromRGB(0, 0, 0)
-    backdrop.BackgroundTransparency = 1  -- empieza invisible, fade in
+    backdrop.BackgroundTransparency = 0
     backdrop.BorderSizePixel      = 0
     backdrop.ZIndex               = 8
+
+    -- Imagen principal del fondo (ojo abierto)
+    local bgImg = Instance.new("ImageLabel", backdrop)
+    bgImg.Name                   = "BgEye"
+    bgImg.Size                   = UDim2.new(1, 0, 1, 0)
+    bgImg.Position               = UDim2.new(0, 0, 0, 0)
+    bgImg.BackgroundTransparency = 1
+    bgImg.Image                  = "rbxassetid://96937964432645"
+    bgImg.ScaleType              = Enum.ScaleType.Stretch
+    bgImg.ImageTransparency      = 0
+    bgImg.ZIndex                 = 9
+
+    -- Overlay de cierre (empieza invisible)
+    local blinkImg = Instance.new("ImageLabel", backdrop)
+    blinkImg.Name                   = "BlinkOverlay"
+    blinkImg.Size                   = UDim2.new(1, 0, 1, 0)
+    blinkImg.Position               = UDim2.new(0, 0, 0, 0)
+    blinkImg.BackgroundTransparency = 1
+    blinkImg.Image                  = "rbxassetid://124196125990159"
+    blinkImg.ScaleType              = Enum.ScaleType.Stretch
+    blinkImg.ImageTransparency      = 1
+    blinkImg.ZIndex                 = 10
+
+    -- Animacion de parpadeo en loop (cierra -> abre)
+    task.spawn(function()
+        local BLINK_INTERVAL = 2.5
+        local CLOSE_TIME     = 0.18
+        local OPEN_TIME      = 0.18
+
+        while backdrop and backdrop.Parent do
+            task.wait(BLINK_INTERVAL)
+            if not (backdrop and backdrop.Parent) then break end
+
+            -- FASE 1: Cerrar ojo
+            blinkImg.ImageTransparency = 1
+            TweenService:Create(blinkImg,
+                TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+                {ImageTransparency = 0}):Play()
+            task.wait(CLOSE_TIME)
+
+            -- FASE 2: Abrir ojo
+            TweenService:Create(blinkImg,
+                TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+                {ImageTransparency = 1}):Play()
+            task.wait(OPEN_TIME)
+        end
+    end)
 
     -- Contenedor principal (MAS GRANDE: 420x220)
     local rect = Instance.new("Frame", sg)
@@ -63772,8 +63486,7 @@ local function _ZerqonLoadingScreen(onComplete)
     uiScale.Scale = 0.7  -- empieza peque?o
 
     task.spawn(function()
-        -- Fade in del backdrop
-        TweenService:Create(backdrop, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.55}):Play()
+        -- Backdrop ya visible (fondo de ojo), sin fade-in
         task.wait(0.15)
 
         -- El rect aparece con: escala 0.7->1, posicion slide up, fade in, borde brilla
@@ -63897,7 +63610,7 @@ local function _ZerqonLoadingScreen(onComplete)
             Position = UDim2.new(0.5, -210, 0.5, -160),
         }):Play()
         TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
-        TweenService:Create(backdrop, TweenInfo.new(0.35, Enum.EasingStyle.Sine), {BackgroundTransparency = 1}):Play()
+        -- Backdrop (fondo de ojo) se destruye junto con el sg, sin fade-out separado
         for _, r in ipairs(rows) do
             TweenService:Create(r.check, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
             TweenService:Create(r.txt,   TweenInfo.new(0.2), {TextTransparency = 1}):Play()
