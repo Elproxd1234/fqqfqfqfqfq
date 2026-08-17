@@ -64373,7 +64373,7 @@ do
     _panel.BackgroundTransparency = 0.15  -- FIX: menos opaco para no tapar gameplay
     _panel.BorderSizePixel = 0
     _panel.ZIndex = 3
-    _panel.ClipsDescendants = true
+    _panel.ClipsDescendants = false  -- FIX: no cortar el errorPanel que sale abajo
     Instance.new("UICorner", _panel).CornerRadius = UDim.new(0, 10)
 
     -- Imagen de fondo centrada DENTRO del panel (ScaleType.Crop centrado en el rectangulo)
@@ -64566,9 +64566,10 @@ do
         task.wait(0.05)
         TweenService:Create(_panel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = UDim2.new(0, 420, 0, 220),
-            BackgroundTransparency = 0.05
+            BackgroundTransparency = 0.15  -- FIX: no tapar gameplay
         }):Play()
-        TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+        -- FIX: NO animar _bg de vuelta a opaco (tapa todo el gameplay)
+        -- TweenService:Create(_bg, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
         if _bgImg then TweenService:Create(_bgImg, TweenInfo.new(0.5), {ImageTransparency = 0.18}):Play() end
     end)
 
