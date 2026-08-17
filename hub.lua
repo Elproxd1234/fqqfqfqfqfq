@@ -58965,6 +58965,9 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(  5,  15,  40)  -- azul vibrante
 mainFrame.BackgroundTransparency = 0.30
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
+-- FIX MOBILE CRITICO: Active=false hace que el frame NO absorba los toques del juego
+-- Sin esto, el frame bloquea el joystick y el boton de salto en Delta/mobile
+mainFrame.Active = false
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================
@@ -59537,6 +59540,7 @@ _auroraContainer.BackgroundTransparency = 1
 _auroraContainer.BorderSizePixel        = 0
 _auroraContainer.ZIndex                 = 1
 _auroraContainer.ClipsDescendants       = true
+_auroraContainer.Active                 = false  -- FIX MOBILE: no bloquear joystick/salto
 
 -- [FONDO DE ONDAS ELIMINADO]
 
