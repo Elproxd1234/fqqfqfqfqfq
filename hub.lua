@@ -22704,7 +22704,7 @@ function CreateMainTab()
         -- Antes este boton usaba "_zqGetToken()" con formato "ZQT{uid}D{day}", un
         -- token DIFERENTE -> la web hacia auto-sync al bin equivocado y el hub nunca
         -- detectaba la verificacion. Ahora usamos SIEMPRE el mismo token del key system.
-        local KEY_PAGE_URL = "https://zerqon-key.netlify.app/zerqon-key.html"
+        local KEY_PAGE_URL = "https://glowing-sundae-a5a567.netlify.app/"
         local KEY_SALT     = "ZERQON2025"
 
         -- Reutilizar el mismo token que el key system (formato S), o generarlo si aun no existe
