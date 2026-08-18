@@ -9004,7 +9004,7 @@ _G._bindableOrderedList = _G._bindableOrderedList or {}
 
 _BIND_CS    = 76   -- tamano del boton (debe coincidir con BTN_W/BTN_H en MakeCapyBindableFrame)
 _BIND_GAP   = 10
-_BIND_COLS  = 4    -- maximo 4 botones por fila
+_BIND_COLS  = 20   -- fila unica horizontal (todos los bindables en una sola fila)
 _BIND_PAD_X = 12
 _BIND_PAD_Y = 10   -- margen desde arriba
 
@@ -9196,7 +9196,7 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     pillBg.BackgroundTransparency = 1   -- sin fondo por defecto
     pillBg.BorderSizePixel        = 0
     pillBg.ZIndex                 = 200
-    Instance.new("UICorner", pillBg).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", pillBg).CornerRadius = UDim.new(1, 0)  -- circulo completo
 
     -- -- BORDE del color del hub (principal visible, estilo SHIFT) --
     local borderFrame = Instance.new("Frame", bg)
@@ -9207,12 +9207,12 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     borderFrame.BackgroundTransparency = 1
     borderFrame.BorderSizePixel        = 0
     borderFrame.ZIndex                 = 201
-    Instance.new("UICorner", borderFrame).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", borderFrame).CornerRadius = UDim.new(1, 0)  -- sin cuadrado
 
     local borderStroke = Instance.new("UIStroke", borderFrame)
     borderStroke.Color           = ThemeColors.Aurora1
-    borderStroke.Thickness       = 3
-    borderStroke.Transparency    = 0
+    borderStroke.Thickness       = 0
+    borderStroke.Transparency    = 1
     borderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- Dummy para compatibilidad (no usado en hover/click ahora)
@@ -9236,7 +9236,7 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     fill.AutoButtonColor        = false
     fill.Active                 = true
     fill.ZIndex                 = 210
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)  -- area click circular
 
     -- fillStroke (compatibilidad)
     local fillStroke = Instance.new("UIStroke", fill)
@@ -9281,21 +9281,23 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     glowImg.Name                   = "GlowPulse"
     glowImg.AnchorPoint            = Vector2.new(0.5, 0.5)
     glowImg.Position               = UDim2.fromScale(0.5, 0.5)
-    glowImg.Size                   = UDim2.fromOffset(BTN_W * 1.5, BTN_H * 1.5)
+    glowImg.Size                   = UDim2.fromOffset(BTN_W, BTN_H)
     glowImg.BackgroundTransparency = 1
-    glowImg.Image                  = "rbxassetid://4970638706"
+    glowImg.Image                  = "rbxassetid://118930676204472"
     glowImg.ImageColor3            = ThemeColors.Aurora1
-    glowImg.ImageTransparency      = 0.65
+    glowImg.ImageTransparency      = 0.10
+    glowImg.ScaleType              = Enum.ScaleType.Fit
     glowImg.ZIndex                 = 198
     local glowOuter = Instance.new("ImageLabel", bg)
     glowOuter.Name                   = "GlowOuter"
     glowOuter.AnchorPoint            = Vector2.new(0.5, 0.5)
     glowOuter.Position               = UDim2.fromScale(0.5, 0.5)
-    glowOuter.Size                   = UDim2.fromOffset(BTN_W * 2.2, BTN_H * 2.2)
+    glowOuter.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.3)
     glowOuter.BackgroundTransparency = 1
-    glowOuter.Image                  = "rbxassetid://4970638706"
+    glowOuter.Image                  = "rbxassetid://118930676204472"
     glowOuter.ImageColor3            = ThemeColors.Primary
-    glowOuter.ImageTransparency      = 0.88
+    glowOuter.ImageTransparency      = 0.72
+    glowOuter.ScaleType              = Enum.ScaleType.Fit
     glowOuter.ZIndex                 = 197
 
     -- -- ANIMACION DE ENTRADA ------------------------------
@@ -9361,10 +9363,10 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
         -- Pulso de escala y transparencia del glow
         pcall(function()
             local _p   = math.sin(_animTick * _GLOW_SPEED * math.pi * 2) * 0.5 + 0.5
-            glowImg.Size              = UDim2.fromOffset(BTN_W*(1.35+_p*0.35), BTN_H*(1.35+_p*0.35))
-            glowImg.ImageTransparency = 0.55 + _p * 0.30
+            glowImg.Size              = UDim2.fromOffset(BTN_W*(0.95+_p*0.10), BTN_H*(0.95+_p*0.10))
+            glowImg.ImageTransparency = 0.05 + _p * 0.15
             local _po  = math.sin(_animTick * _GLOW_SPEED * 0.5 * math.pi * 2 + math.pi) * 0.5 + 0.5
-            glowOuter.Size              = UDim2.fromOffset(BTN_W*(2.0+_po*0.4), BTN_H*(2.0+_po*0.4))
+            glowOuter.Size              = UDim2.fromOffset(BTN_W*(1.25+_po*0.15), BTN_H*(1.25+_po*0.15))
             local _co  = ((_animTick + _BORDER_SPEED*0.5) % _BORDER_SPEED) / _BORDER_SPEED
             local _foi = _co * _nHC
             local _oA  = math.floor(_foi) % _nHC + 1
@@ -9442,14 +9444,10 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
 
     -- Hover: fondo sutilmente visible + glow mas intenso
     fill.MouseEnter:Connect(function()
-        TweenService:Create(pillBg,       TweenInfo.new(0.12), {BackgroundTransparency=0.75}):Play()
-        TweenService:Create(borderStroke, TweenInfo.new(0.12), {Thickness=4.5}):Play()
-        TweenService:Create(glowImg,      TweenInfo.new(0.12), {ImageTransparency=0.30}):Play()
-        TweenService:Create(glowOuter,    TweenInfo.new(0.12), {ImageTransparency=0.65}):Play()
+        TweenService:Create(glowImg,   TweenInfo.new(0.12), {ImageTransparency=0.00, Size=UDim2.fromOffset(BTN_W*1.1, BTN_H*1.1)}):Play()
+        TweenService:Create(glowOuter, TweenInfo.new(0.12), {ImageTransparency=0.50}):Play()
     end)
     fill.MouseLeave:Connect(function()
-        TweenService:Create(pillBg,       TweenInfo.new(0.15), {BackgroundTransparency=1}):Play()
-        TweenService:Create(borderStroke, TweenInfo.new(0.15), {Thickness=3}):Play()
         -- glow vuelve a ser controlado por Heartbeat (no forzar valor, simplemente dejarlo)
     end)
 
@@ -9465,15 +9463,11 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     end
     fill.MouseButton1Down:Connect(function()
         if _moved then return end
-        TweenService:Create(pillBg,       TweenInfo.new(0.07), {BackgroundTransparency=0.40}):Play()
-        TweenService:Create(borderStroke, TweenInfo.new(0.07), {Thickness=2}):Play()
-        TweenService:Create(_bindUiScale, TweenInfo.new(0.07), {Scale=0.92}):Play()
-        TweenService:Create(glowImg,      TweenInfo.new(0.07), {ImageTransparency=0.20}):Play()
+        TweenService:Create(_bindUiScale, TweenInfo.new(0.07), {Scale=0.88}):Play()
+        TweenService:Create(glowImg,      TweenInfo.new(0.07), {ImageTransparency=0.00}):Play()
     end)
     fill.MouseButton1Up:Connect(function()
         if _moved then return end
-        TweenService:Create(pillBg,       TweenInfo.new(0.18), {BackgroundTransparency=1}):Play()
-        TweenService:Create(borderStroke, TweenInfo.new(0.18), {Thickness=3}):Play()
         TweenService:Create(_bindUiScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
         _doActivate()
     end)
@@ -9484,12 +9478,11 @@ function MakeCapyBindableFrame(guiParent, labelText, callback, optPosX, optPosY)
     -- -- SetActiveState (toggle ON = fondo visible, OFF = transparente) --
     local function _setActive(on)
         _capyIsActive = on
+        -- sin cuadrado: el estado activo se refleja en el brillo del glow
         if on then
-            TweenService:Create(pillBg,       TweenInfo.new(0.18), {BackgroundTransparency=0.50}):Play()
-            TweenService:Create(borderStroke, TweenInfo.new(0.18), {Thickness=3.5}):Play()
+            TweenService:Create(glowImg, TweenInfo.new(0.18), {ImageTransparency=0.00}):Play()
         else
-            TweenService:Create(pillBg,       TweenInfo.new(0.18), {BackgroundTransparency=1}):Play()
-            TweenService:Create(borderStroke, TweenInfo.new(0.18), {Thickness=3}):Play()
+            TweenService:Create(glowImg, TweenInfo.new(0.18), {ImageTransparency=0.10}):Play()
         end
     end
     fill.SetActiveState  = function(self, on) _setActive(on) end
@@ -9763,7 +9756,8 @@ function createBindableButton(name, color)
     glow.Position               = UDim2.fromScale(0.5, 0.5)
     glow.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.8)
     glow.BackgroundTransparency = 1
-    glow.Image                  = "rbxassetid://4970638706"
+    glow.Image                  = "rbxassetid://118930676204472"
+    glow.ScaleType              = Enum.ScaleType.Fit
     glow.ImageColor3            = ThemeColors.Aurora1
     glow.ImageTransparency      = 0.82
     glow.ZIndex                 = 199
@@ -9995,7 +9989,8 @@ function updateBindables()
                 glow.Position               = UDim2.fromScale(0.5, 0.5)
                 glow.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.8)
                 glow.BackgroundTransparency = 1
-                glow.Image                  = "rbxassetid://4970638706"
+                glow.Image                  = "rbxassetid://118930676204472"
+                glow.ScaleType              = Enum.ScaleType.Fit
                 glow.ImageColor3            = ThemeColors.Aurora1
                 glow.ImageTransparency      = 0.82
                 glow.ZIndex                 = 199
@@ -53577,7 +53572,8 @@ function CreateCombatTab()
             glow.Position               = UDim2.fromScale(0.5, 0.5)
             glow.Size                   = UDim2.fromOffset(BTN_W * 1.3, BTN_H * 1.8)
             glow.BackgroundTransparency = 1
-            glow.Image                  = "rbxassetid://4970638706"
+            glow.Image                  = "rbxassetid://118930676204472"
+            glow.ScaleType              = Enum.ScaleType.Fit
             glow.ImageColor3            = ThemeColors.Aurora1
             glow.ImageTransparency      = 0.82
             glow.ZIndex                 = 199
@@ -59159,7 +59155,7 @@ _auroraContainer.Active                 = false  -- FIX MOBILE: no bloquear joys
     task.wait(0.5)
 
     local RS  = game:GetService("RunService")
-    local _GLOW_ID = "rbxassetid://4970638706"
+    local _GLOW_ID = "rbxassetid://118930676204472"
 
     local _TRAIL_COLORS = {
         Color3.fromRGB(0,   255, 100),   -- verde neon
