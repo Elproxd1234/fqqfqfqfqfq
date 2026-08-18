@@ -45616,15 +45616,18 @@ function CreateCombatTab()
                     end
 
                     if shootRem and shootRem:IsA("RemoteEvent") then
+                        -- FIX: bypass el __namecall hook del SA para evitar doble
+                        -- intercepcion y rotura del GunFired. El boton ya calculo
+                        -- los CFrames correctos, no necesita ser redirigido de nuevo.
+                        if CombatTabState then CombatTabState._saBypassHook = true end
                         pcall(function() shootRem:FireServer(oCF, tCF) end)
-                        task.wait(0.05)
-                        pcall(function() shootRem:FireServer(oCF, tCF) end)
+                        if CombatTabState then CombatTabState._saBypassHook = false end
                     else
                         -- Fallback: _fireGunMM2
                         if _fireGunMM2 then
+                            if CombatTabState then CombatTabState._saBypassHook = true end
                             _fireGunMM2(gun, tCF)
-                            task.wait(0.05)
-                            _fireGunMM2(gun, tCF)
+                            if CombatTabState then CombatTabState._saBypassHook = false end
                         end
                     end
                     -- Desequipar si vino del backpack
@@ -63592,13 +63595,43 @@ local function _ZerqonLoadingScreen(onComplete)
     local corner = Instance.new("UICorner", rect)
     corner.CornerRadius = UDim.new(0, 12)
 
+    -- ClipsDescendants: evita que el HubBackground y el BlinkOverlay se salgan del rect
+    rect.ClipsDescendants = true
+
     -- Borde brillante (stroke teal)
     local stroke = Instance.new("UIStroke", rect)
     stroke.Color       = C_ACCENT
     stroke.Thickness   = 2
     stroke.Transparency = 1  -- empieza invisible
 
-    -- Gradiente de fondo del rect
+    -- Fondo del hub (imagen principal, igual que en el hub abierto)
+    local loadHubBg = Instance.new("ImageLabel", rect)
+    loadHubBg.Name                   = "LoadHubBackground"
+    loadHubBg.Size                   = UDim2.new(1, 0, 1, 0)
+    loadHubBg.Position               = UDim2.new(0, 0, 0, 0)
+    loadHubBg.BackgroundTransparency = 1
+    loadHubBg.Image                  = "rbxassetid://96937964432645"
+    loadHubBg.ImageTransparency      = 0.30
+    loadHubBg.ScaleType              = Enum.ScaleType.Stretch
+    loadHubBg.ImageRectSize          = Vector2.new(900, 480)
+    loadHubBg.ImageRectOffset        = Vector2.new(0, 0)
+    loadHubBg.ZIndex                 = 10  -- debajo del contenido pero sobre el fondo solido
+
+    -- Overlay de parpadeo (mismo asset que el hub principal)
+    local loadBlinkOverlay = Instance.new("ImageLabel", rect)
+    loadBlinkOverlay.Name                   = "LoadBlinkOverlay"
+    loadBlinkOverlay.Size                   = UDim2.new(1, 0, 1, 0)
+    loadBlinkOverlay.Position               = UDim2.new(0, 0, 0, 0)
+    loadBlinkOverlay.BackgroundTransparency = 1
+    loadBlinkOverlay.Image                  = "rbxassetid://124196125990159"
+    loadBlinkOverlay.ImageTransparency      = 1   -- empieza invisible
+    loadBlinkOverlay.ScaleType              = Enum.ScaleType.Stretch
+    loadBlinkOverlay.ImageRectSize          = Vector2.new(900, 480)
+    loadBlinkOverlay.ImageRectOffset        = Vector2.new(0, 0)
+    loadBlinkOverlay.ZIndex                 = 11  -- encima del HubBackground, debajo del contenido
+    loadBlinkOverlay.Active                 = false
+
+    -- Gradiente de fondo del rect (encima del hubBg para que el contenido sea legible)
     local grad = Instance.new("UIGradient", rect)
     grad.Color    = ColorSequence.new({
         ColorSequenceKeypoint.new(0, C_BG_DARK),
@@ -63752,6 +63785,25 @@ local function _ZerqonLoadingScreen(onComplete)
     local uiScale = Instance.new("UIScale", rect)
     uiScale.Scale = 0.7  -- empieza peque?o
 
+    -- Loop de parpadeo del overlay (dentro del rect, confinado por ClipsDescendants)
+    local _loadBlinkActive = true
+    task.spawn(function()
+        task.wait(3)  -- primer parpadeo a los 3s (igual que en el hub principal)
+        while _loadBlinkActive and loadBlinkOverlay and loadBlinkOverlay.Parent do
+            -- Cerrar: fade in rapido
+            TweenService:Create(loadBlinkOverlay,
+                TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {ImageTransparency = 0}):Play()
+            task.wait(0.18)
+            -- Abrir: fade out suave
+            TweenService:Create(loadBlinkOverlay,
+                TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                {ImageTransparency = 1}):Play()
+            task.wait(0.12)
+            task.wait(5)  -- intervalo entre parpadeos
+        end
+    end)
+
     task.spawn(function()
         -- Fade in del backdrop
         TweenService:Create(backdrop, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.55}):Play()
@@ -63888,6 +63940,7 @@ local function _ZerqonLoadingScreen(onComplete)
 
         task.wait(0.45)
 
+        _loadBlinkActive = false  -- detener loop de parpadeo antes de destruir
         pcall(function() sg:Destroy() end)
         if type(onComplete) == "function" then
             onComplete()
