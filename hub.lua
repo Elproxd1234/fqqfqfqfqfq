@@ -11927,7 +11927,7 @@ _notifOffset = 0  -- offset Y acumulado para stack
 -- ANTI-SPAM: historial reciente de notificaciones [clave] = tick()
 -- Evita que la misma notif aparezca varias veces en menos de _NOTIF_COOLDOWN segundos
 _notifHistory = {}
-local _NOTIF_COOLDOWN   = 1.5   -- segundos minimos entre la misma notif
+local _NOTIF_COOLDOWN   = 8.0   -- segundos minimos entre la misma notif (aumentado para evitar spam en loops)
 local _NOTIF_MAX_QUEUE  = 4     -- cola maxima; descarta las mas viejas si se supera
 local _NOTIF_MAX_PER_SEC = 3    -- no mas de 3 notifs distintas por segundo
 local _notifRateWindow  = 0     -- tick del ultimo "lote" de rate-limit
