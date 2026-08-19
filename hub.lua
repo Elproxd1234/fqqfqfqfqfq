@@ -51802,10 +51802,9 @@ function CreateCombatTab()
                 if existing then
                     local w = existing:FindFirstChild("MirrorWeld")
                     if w then
-                        local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                        -- FIX DUAL GUN MIRROR: espejo en X + flip 180 en Y para que el clon no aparezca cortado
-                        local mirrorCF = CFrame.new(-px, py, pz, -r00, -r01, r02, -r10, -r11, r12, r20, r21, -r22)
-                        w.C0 = mirrorCF
+                        -- FIX VISUAL: usar el mismo CFrame que la gun original para que el clon
+                        -- tenga apariencia identica (sin espejo roto que la parte a la mitad)
+                        w.C0 = grip.C0
                         w.C1 = grip.C1
                     end
                     -- FIX DUAL INVISIBLE: mantener el clon visible aunque el handle cambie de transparencia
@@ -51847,10 +51846,9 @@ function CreateCombatTab()
                 weld.Name  = "MirrorWeld"
                 weld.Part0 = lHand
                 weld.Part1 = clon
-                local px,py,pz,r00,r01,r02,r10,r11,r12,r20,r21,r22 = grip.C0:GetComponents()
-                -- FIX DUAL GUN MIRROR: espejo en X + flip 180 en Y para que el clon no aparezca cortado
-                local mirrorCF = CFrame.new(-px, py, pz, -r00, -r01, r02, -r10, -r11, r12, r20, r21, -r22)
-                weld.C0 = mirrorCF
+                -- FIX VISUAL: usar el mismo CFrame que la gun original para que el clon
+                -- tenga apariencia identica (sin espejo roto que la parte a la mitad)
+                weld.C0 = grip.C0
                 weld.C1 = grip.C1
 
                 -- HOOK PREMIUM SKIN: solo aplicar skin al clon si es Dual Gun (no Dual Knife)
