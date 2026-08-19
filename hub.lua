@@ -6728,13 +6728,13 @@ function _KnifeSA_setupKnife(knife)
     end
 
     local function _playSlashAnim()
-        -- Fast Slash activo: animSpeed = intensidad (1?10) como multiplicador directo.
-        -- KnifeSAState.fastSlashSpeed guarda 100/intensity, as? que:
-        --   intensity = 100 / fastSlashSpeed ? animSpeed = intensity
+        -- Fast Slash activo: slider va de 1-10, dividir por 10 para obtener multiplicador correcto.
+        -- FIX: antes dividia por 100 (rango 1-100), rompiendo la animacion con valores 1-10.
+        --   intensity=5 -> animSpeed = 5/10 = 0.5x (mas lento) .. 10 -> 1.0x (normal)
         local animSpeed = 1.0
         if KnifeSAState.fastSlash then
-            local pct = math.max(0.1, (KnifeSAState.fastSlashSpeed or 20) / 100)
-            animSpeed = 1.0 / pct  -- ej: pct=0.2 (intensity=5) ? animSpeed=5?
+            local pct = math.max(0.1, (KnifeSAState.fastSlashSpeed or 5) / 10)
+            animSpeed = pct  -- ej: speed=10 -> animSpeed=1.0; speed=5 -> 0.5 (mas rapido el cooldown)
         end
         for _, name in ipairs(_slashAnimNames) do
             if _animObjs[name] then
@@ -7004,7 +7004,9 @@ function _KnifeSA_setupKnife(knife)
 
         local stabCooldown = 0.85
         if KnifeSAState.fastSlash then
-            stabCooldown = 0.85 * math.max(0.1, (KnifeSAState.fastSlashSpeed or 70) / 100)
+            -- FIX: slider es 1-10, dividir por 10. Antes usaba /100 con valor default 70 (rango incorrecto).
+            -- speed=1 -> cooldown=0.085s (maximo rapido); speed=10 -> cooldown=0.85s (normal)
+            stabCooldown = 0.85 * math.max(0.05, (KnifeSAState.fastSlashSpeed or 5) / 10)
         end
         if os.clock() - lastStab  < stabCooldown then return end
         if os.clock() - lastThrow < 0.3          then return end
@@ -45721,7 +45723,7 @@ function CreateCombatTab()
             _destroySASMGui()
 
             -- BOT?N PERSONALIZADO: transparente con borde oscuro y esquinas redondeadas
-            local BTN_W, BTN_H = 250, 180
+            local BTN_W, BTN_H = 130, 70
             local vp = workspace.CurrentCamera.ViewportSize
             local posX = math.clamp(vp.X * 0.5 - BTN_W / 2, 4, vp.X - BTN_W - 4)
             local posY = math.clamp(vp.Y * 0.5 - BTN_H / 2, 4, vp.Y - BTN_H - 4)
@@ -45761,7 +45763,7 @@ function CreateCombatTab()
             clickBtn.BackgroundTransparency = 0.15
             clickBtn.Text                   = "Shoot"
             clickBtn.TextColor3             = Color3.fromRGB(0, 210, 240)
-            clickBtn.TextSize               = 24
+            clickBtn.TextSize               = 15
             clickBtn.Font                   = Enum.Font.GothamMedium
             clickBtn.AutoButtonColor        = false
             clickBtn.ZIndex                 = 210
@@ -52842,7 +52844,8 @@ function CreateCombatTab()
                     local now = os.clock()
                     local cd = _as.cooldown
                     if KnifeSAState.fastSlash then
-                        local pct = math.max(0.05, (KnifeSAState.fastSlashSpeed or 20) / 100)
+                        -- FIX: slider 1-10, dividir por 10 en vez de 100
+                        local pct = math.max(0.05, (KnifeSAState.fastSlashSpeed or 5) / 10)
                         cd = 0.85 * pct
                     end
                     if now - _as.lastStab < cd then return end
