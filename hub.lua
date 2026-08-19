@@ -6789,11 +6789,15 @@ function _KnifeSA_setupKnife(knife)
 
     -- -- THROW (RMB) ? click derecho lanza el knife ----------------------------
     -- ARREGLADO: El lanzamiento ahora es con RMB (MouseButton2), no LMB
+    -- FIX BUG #2 MOBILE SLASH: Touch is intentionally EXCLUDED here.
+    -- On mobile a tap fires as Touch; if Touch were included it would trigger
+    -- the KnifeSA throw instead of the native slash animation. Mobile throw is
+    -- handled separately via the KnifeThrown remote. Desktop (MouseButton2) is unaffected.
     local rmbThrowTime = -999
     addConn(UserInputService.InputBegan:Connect(function(input, gp)
         if gp or not equipped then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton2
-            or input.UserInputType == Enum.UserInputType.Touch then
+        -- MOBILE FIX: only MouseButton2 triggers SA throw; Touch is handled by stab/slash path
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
             if not KnifeSAState.enabled then return end  -- FIX: salir si SA fue desactivado
             rmbThrowTime = os.clock()
             
@@ -9927,8 +9931,11 @@ function updateBindables()
         if not shootBtnGui then
             -- == BOTON SHOOT MURDERER: misma estructura y animaciones que createBindableButton ==
             do
-                local BTN_W = 76
-                local BTN_H = 76
+                -- FIX BUG #4: Reduced SA button size from 76x76 to 52x52 for cleaner
+                -- mobile UI. Same style, colors, animations - just a smaller footprint.
+                -- Touch target is still 52px which is comfortably above the 44px minimum.
+                local BTN_W = 52
+                local BTN_H = 52
                 local vp    = workspace.CurrentCamera.ViewportSize
 
                 local _saGui = Instance.new("ScreenGui")
@@ -9993,7 +10000,7 @@ function updateBindables()
                 lbl.Name                   = "StarIcon"
                 lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
                 lbl.Position               = UDim2.fromScale(0.5, 0.5)
-                lbl.Size                   = UDim2.fromOffset(40, 40)
+                lbl.Size                   = UDim2.fromOffset(28, 28)  -- FIX #4: scaled from 40 to 28
                 lbl.BackgroundTransparency = 1
                 lbl.Image                  = "rbxassetid://45428892"
                 lbl.ImageColor3            = Color3.fromRGB(255, 255, 255)
@@ -10102,7 +10109,16 @@ function updateBindables()
                             _saStartPos  = _saBg.Position
                         end
                     end)
-                    UserInputService.InputChanged:Connect(function(input)
+                    -- FIX BUG #5 PERF: store connection so it can be cleaned up when
+                    -- the button is destroyed. Without this it leaked on every rebuild
+                    -- of the Bindable layout, accumulating N global InputChanged listeners.
+                    local _saDragConn
+                    _saDragConn = UserInputService.InputChanged:Connect(function(input)
+                        -- Auto-disconnect if the button was destroyed (layout rebuild, etc.)
+                        if not _saBg or not _saBg.Parent then
+                            if _saDragConn then _saDragConn:Disconnect(); _saDragConn = nil end
+                            return
+                        end
                         if not _saDragging then return end
                         if input.UserInputType ~= Enum.UserInputType.MouseMovement
                         and input.UserInputType ~= Enum.UserInputType.Touch then return end
@@ -10121,6 +10137,10 @@ function updateBindables()
                         _saBg.Position = UDim2.fromOffset(
                             math.clamp(curPosX + dX, 0, vpN.X - BTN_W),
                             math.clamp(curPosY + dY, 0, vpN.Y - BTN_H))
+                    end)
+                    -- Clean up the global drag connection when the GUI is destroyed
+                    _saGui.Destroying:Connect(function()
+                        if _saDragConn then _saDragConn:Disconnect(); _saDragConn = nil end
                     end)
                     shootButton.InputEnded:Connect(function(input)
                         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -41291,13 +41311,23 @@ function CreatePremiumTab()
             if not _skinState._equippedConns[tool] then
                 _skinState._equippedConns[tool] = tool.Equipped:Connect(function()
                     task.wait(0.016)
+                    -- FIX BUG #1 PREMIUM GUN ORIENTATION:
+                    -- Guard against BOTH Dual Knife AND Dual Gun being active.
+                    -- When Dual Gun is active the MirrorWeld copies grip.C0/C1 from the
+                    -- live RightGrip. The delayed re-apply below would fire AFTER the weld
+                    -- is created and stomp the orientation, making the clone face backward.
+                    local _isDualActive = (_G._dualKnifeEnabled == true)
+                        or (_G._dualGunState and _G._dualGunState.enabled == true)
                     if _skinState.enabled and _skinState._equippedConns[tool] then
-                        if not (_G._dualKnifeEnabled == true) then
+                        if not _isDualActive then
                             pcall(function() tool.Grip = skin.grip end)
                             task.wait(0.1)
-                            pcall(function() tool.Grip = skin.grip end)
+                            if not (_G._dualKnifeEnabled == true or (_G._dualGunState and _G._dualGunState.enabled)) then
+                                pcall(function() tool.Grip = skin.grip end)
+                            end
                             task.wait(0.3)
-                            if _skinState.enabled then
+                            if _skinState.enabled
+                                and not (_G._dualKnifeEnabled == true or (_G._dualGunState and _G._dualGunState.enabled)) then
                                 pcall(function() tool.Grip = skin.grip end)
                             end
                         end
@@ -41388,9 +41418,11 @@ function CreatePremiumTab()
                     if tool.Parent and _skinState.enabled then
                         _scApplyInner(tool, skin)
                         -- Re-aplicar 0.5s despues por si el grip se pisa en mobile
-                        -- Solo cuando Dual Knife NO esta activo (para no dejar el knife acostado)
+                        -- FIX BUG #1: guard against BOTH Dual Knife AND Dual Gun
                         task.delay(0.5, function()
-                            if tool.Parent and _skinState.enabled and not (_G._dualKnifeEnabled == true) then
+                            local _dualActive = (_G._dualKnifeEnabled == true)
+                                or (_G._dualGunState and _G._dualGunState.enabled == true)
+                            if tool.Parent and _skinState.enabled and not _dualActive then
                                 pcall(function() tool.Grip = skin.grip end)
                             end
                         end)
@@ -51898,7 +51930,11 @@ function CreateCombatTab()
                 local knifeStabbed = events and events:FindFirstChild("KnifeStabbed")
 
                 -- -- LMB/Touch = SLASH cuando SA est OFF (SA lo maneja si est ON) --
-                if isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
+                -- FIX BUG #2/#3 MOBILE: Touch is mapped ONLY to the slash/stab path.
+                -- The RMB/DualStab path below must NOT claim Touch, or a single mobile
+                -- tap would fall into both branches causing SA throw instead of slash.
+                local _isTouchInput = (input.UserInputType == Enum.UserInputType.Touch)
+                if isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or _isTouchInput)
                     and not (KnifeSAState and KnifeSAState.enabled) then
                     if state.isAttacking then return end
                     local now = os.clock()
@@ -51917,8 +51953,10 @@ function CreateCombatTab()
                     if ks then pcall(function() ks:FireServer() end) end
                     _dl(0.85, function() state.isAttacking = false end)
 
-                -- -- RMB/Touch = DUALSTAB ANIMATION (Dual Knife ON) ---------------------------
-                elseif isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch) then
+                -- -- RMB only = DUALSTAB ANIMATION (Dual Knife ON) --
+                -- FIX BUG #3: Touch is intentionally excluded here to prevent mobile
+                -- tap from triggering DualStab instead of the slash path above.
+                elseif isDualKnife and input.UserInputType == Enum.UserInputType.MouseButton2 then
                     local now = os.clock()
                     if now - (state._lastThrow or -999) < 0.8 then return end
                     state._lastThrow = now
@@ -51939,7 +51977,10 @@ function CreateCombatTab()
                     if ks then pcall(function() ks:FireServer() end) end
                     _dl(0.8, function() state.isAttacking = false end)
 
-                -- -- LMB/Touch = THROW (modo normal sin Dual) --------------------
+                -- -- LMB/Touch = THROW (Dual Gun mode, no Dual Knife) ----------
+                -- FIX BUG #3: Touch here is safe because this branch only runs when
+                -- isDualKnife==false (Dual Gun mode). The slash/stab branch above only
+                -- runs when isDualKnife==true, so there is no overlap.
                 elseif not isDualKnife and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
                     -- Dual Gun: LMB lanza
                     -- (solo si Knife SA no est activo  si SA est ON, l maneja el LMB)
