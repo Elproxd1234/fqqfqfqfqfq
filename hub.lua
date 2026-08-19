@@ -9753,31 +9753,22 @@ function createBindableButton(name, color)
 
     local outerStroke = Instance.new("UIStroke", outerRing)
     outerStroke.Color           = ThemeColors.Aurora1
-    outerStroke.Thickness       = 3
-    outerStroke.Transparency    = 0
+    outerStroke.Thickness       = 0
+    outerStroke.Transparency    = 1
     outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     local outerGrad = nil  -- sin gradiente rotatorio
 
-    -- -- TEXTO centrado (estilo SHIFT: blanco, bold, centrado) ------
-    local lbl = Instance.new("TextLabel", bg)
+    -- -- ESTRELLA centrada (ImageLabel con rbxassetid estrella) -----
+    local lbl = Instance.new("ImageLabel", bg)
+    lbl.Name                   = "StarIcon"
     lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
     lbl.Position               = UDim2.fromScale(0.5, 0.5)
-    lbl.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
+    lbl.Size                   = UDim2.fromOffset(40, 40)
     lbl.BackgroundTransparency = 1
-    lbl.Text                   = name
-    lbl.TextSize               = 11
-    lbl.Font                   = Enum.Font.GothamBold
-    lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
-    lbl.TextXAlignment         = Enum.TextXAlignment.Center
-    lbl.TextYAlignment         = Enum.TextYAlignment.Center
-    lbl.TextWrapped            = true
-    lbl.TextScaled             = false
+    lbl.Image                  = "rbxassetid://45428892"
+    lbl.ImageColor3            = Color3.fromRGB(255, 255, 255)
+    lbl.ScaleType              = Enum.ScaleType.Fit
     lbl.ZIndex                 = 205
-
-    local lblStroke = Instance.new("UIStroke", lbl)
-    lblStroke.Color        = Color3.fromRGB(0, 0, 0)
-    lblStroke.Thickness    = 1
-    lblStroke.Transparency = 0.5
 
     -- Dummies para compatibilidad
     local icon = lbl
@@ -9993,29 +9984,22 @@ function updateBindables()
 
                 local outerStroke = Instance.new("UIStroke", outerRing)
                 outerStroke.Color           = ThemeColors.Aurora1
-                outerStroke.Thickness       = 3
-                outerStroke.Transparency    = 0
+                outerStroke.Thickness       = 0
+                outerStroke.Transparency    = 1
                 outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                 -- Label centrado con contorno negro
-                local lbl = Instance.new("TextLabel", _saBg)
+                local lbl = Instance.new("ImageLabel", _saBg)
+                lbl.Name                   = "StarIcon"
                 lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
                 lbl.Position               = UDim2.fromScale(0.5, 0.5)
-                lbl.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
+                lbl.Size                   = UDim2.fromOffset(40, 40)
                 lbl.BackgroundTransparency = 1
-                lbl.Text                   = "Shoot"
-                lbl.TextSize               = 11
-                lbl.Font                   = Enum.Font.GothamBold
-                lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
-                lbl.TextXAlignment         = Enum.TextXAlignment.Center
-                lbl.TextYAlignment         = Enum.TextYAlignment.Center
-                lbl.TextWrapped            = true
-                lbl.TextScaled             = false
+                lbl.Image                  = "rbxassetid://45428892"
+                lbl.ImageColor3            = Color3.fromRGB(255, 255, 255)
+                lbl.ScaleType              = Enum.ScaleType.Fit
                 lbl.ZIndex                 = 205
-                local lblStroke = Instance.new("UIStroke", lbl)
-                lblStroke.Color        = Color3.fromRGB(0, 0, 0)
-                lblStroke.Thickness    = 1
-                lblStroke.Transparency = 0.5
+
 
                 -- Boton invisible encima para capturar clicks
                 local shootButton = Instance.new("TextButton", _saBg)
@@ -10053,25 +10037,25 @@ function updateBindables()
                 -- Hover
                 shootButton.MouseEnter:Connect(function()
                     TweenService:Create(pill,        TweenInfo.new(0.12), {BackgroundTransparency = 0.75}):Play()
-                    TweenService:Create(outerStroke, TweenInfo.new(0.12), {Thickness = 3.5}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.12), {Transparency = 1, Thickness = 3.5}):Play()
                 end)
                 shootButton.MouseLeave:Connect(function()
                     TweenService:Create(pill,        TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
-                    TweenService:Create(outerStroke, TweenInfo.new(0.15), {Thickness = 3}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.15), {Transparency = 1, Thickness = 3}):Play()
                 end)
 
                 -- Press / Release: hundido + glow intenso
                 shootButton.MouseButton1Down:Connect(function()
                     if _saMoved then return end
                     TweenService:Create(pill,        TweenInfo.new(0.07), {BackgroundTransparency = 0.40}):Play()
-                    TweenService:Create(outerStroke, TweenInfo.new(0.07), {Thickness = 2}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.07), {Transparency = 1, Thickness = 2}):Play()
                     TweenService:Create(_saScale,    TweenInfo.new(0.07), {Scale = 0.92}):Play()
                     TweenService:Create(glow,        TweenInfo.new(0.07), {ImageTransparency = 0.55}):Play()
                 end)
                 shootButton.MouseButton1Up:Connect(function()
                     if _saMoved then return end
                     TweenService:Create(pill,        TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
-                    TweenService:Create(outerStroke, TweenInfo.new(0.18), {Thickness = 3}):Play()
+                    TweenService:Create(outerStroke, TweenInfo.new(0.18), {Transparency = 1, Thickness = 3}):Play()
                     TweenService:Create(_saScale,    TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
                     TweenService:Create(glow,        TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
                 end)
@@ -12026,30 +12010,30 @@ function CreateCustomNotification(titleRaw, message, duration)
         -- Fondo principal (responsive para m?vil)
         local _notifVP = workspace.CurrentCamera.ViewportSize
         local _notifIsMob = _notifVP.X < 600
-        local _notifW = _notifIsMob and math.min(math.floor(_notifVP.X * 0.55), 220) or 260
-        local _notifH = _notifIsMob and 60 or 72
-        -- Aplicar forma segun configuracion del usuario
-        local _notifShape = (_G._hubSettings and _G._hubSettings.notifShape) or "Rounded"
+        local _notifW = _notifIsMob and math.min(math.floor(_notifVP.X * 0.60), 230) or 270
+        local _notifH = _notifIsMob and 52 or 60
+        -- Forma siempre compacta/minimal para no molestar
+        local _notifShape = "Minimal"
         -- Ajustar altura segun forma
         if _notifShape == "Banner" then _notifH = _notifIsMob and 44 or 52 end
-        if _notifShape == "Minimal" then _notifH = _notifIsMob and 34 or 40 end
+        if _notifShape == "Minimal" then _notifH = _notifIsMob and 38 or 46 end
 
         local mainFrame = Instance.new("Frame")
         mainFrame.Size = UDim2.new(0, _notifW, 0, _notifH)
         mainFrame.Position = UDim2.new(1, -8, 1, -50)
         mainFrame.AnchorPoint = Vector2.new(1, 1)
-        mainFrame.BackgroundColor3 = ThemeColors.Background
-        mainFrame.BackgroundTransparency = (_notifShape == "Minimal") and 0.35 or 0.15
+        mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+        mainFrame.BackgroundTransparency = 0.18
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = notifSG
 
         -- Radio de esquinas segun forma
-        local _cornerRadius = 6
-        if _notifShape == "Rounded" then _cornerRadius = 6
+        local _cornerRadius = 12
+        if _notifShape == "Rounded" then _cornerRadius = 12
         elseif _notifShape == "Sharp"   then _cornerRadius = 0
         elseif _notifShape == "Pill"    then _cornerRadius = 24
         elseif _notifShape == "Banner"  then _cornerRadius = 0
-        elseif _notifShape == "Minimal" then _cornerRadius = 10
+        elseif _notifShape == "Minimal" then _cornerRadius = 12
         end
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, _cornerRadius)
@@ -12065,29 +12049,29 @@ function CreateCustomNotification(titleRaw, message, duration)
             accentBar.ZIndex = 2
         end
 
-        -- Borde con gradiente morado/azul
+        -- Borde sutil muy fino
         local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 1.5
-        stroke.Color = ThemeColors.Primary
-        stroke.Transparency = 0
+        stroke.Thickness = 1
+        stroke.Color = ThemeColors.Aurora1
+        stroke.Transparency = 0.3
         stroke.Parent = mainFrame
 
         -- Icono checkmark verde (oculto en Minimal/Banner)
-        local _iconSize = (_notifShape == "Minimal" or _notifShape == "Banner") and 0 or 26
-        local _iconOffX  = (_notifShape == "Banner") and 14 or 10
+        local _iconSize = 0  -- sin icono en modo compacto
+        local _iconOffX  = 10
         local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.new(0, _iconSize, 0, _iconSize)
-        icon.Position = UDim2.new(0, _iconOffX, 0.5, -13)
+        icon.Size = UDim2.new(0, 0, 0, 0)
+        icon.Position = UDim2.new(0, 0, 0.5, 0)
         icon.BackgroundTransparency = 1
-        icon.Image = "rbxassetid://6031094678"
+        icon.Image = ""
         icon.ImageColor3 = ThemeColors.Primary
-        icon.Visible = (_notifShape ~= "Minimal" and _notifShape ~= "Banner")
+        icon.Visible = false
         icon.Parent = mainFrame
 
         -- Titulo con RichText
-        local _titleOffX = (_notifShape == "Minimal") and 10 or (_notifShape == "Banner") and 14 or 46
+        local _titleOffX = (_notifShape == "Minimal") and 12 or (_notifShape == "Banner") and 14 or 46
         local _titleOffY = (_notifShape == "Minimal") and 0 or (_notifShape == "Banner") and 6 or 8
-        local _titleH    = (_notifShape == "Minimal") and _notifH or 20
+        local _titleH    = (_notifShape == "Minimal") and math.floor(_notifH * 0.55) or 20
         local titleLbl = Instance.new("TextLabel")
         titleLbl.Size = UDim2.new(1, -(_titleOffX + 8), 0, _titleH)
         titleLbl.Position = UDim2.new(0, _titleOffX, 0, _titleOffY)
@@ -12095,23 +12079,23 @@ function CreateCustomNotification(titleRaw, message, duration)
         titleLbl.RichText = true
         local _pr = ThemeColors.Primary
         local _phex = string.format("#%02X%02X%02X", math.floor(_pr.R*255), math.floor(_pr.G*255), math.floor(_pr.B*255))
-        titleLbl.Text = '<font color="' .. _phex .. '">' .. tostring(titleRaw) .. '</font> <font color="#FFFFFF">Says:</font>'
-        titleLbl.TextSize = 13
-        titleLbl.Font = Enum.Font.GothamMedium
+        titleLbl.Text = '<font color="' .. _phex .. '">' .. tostring(titleRaw) .. '</font>'
+        titleLbl.TextSize = 12
+        titleLbl.Font = Enum.Font.GothamBold
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
         titleLbl.Parent = mainFrame
 
         -- Mensaje (oculto en Minimal)
-        local _descOffX = (_notifShape == "Banner") and 14 or 46
+        local _descOffX = (_notifShape == "Banner") and 14 or 12
         local descLbl = Instance.new("TextLabel")
-        descLbl.Size = UDim2.new(1, -(_descOffX + 8), 0, 28)
-        descLbl.Position = UDim2.new(0, _descOffX, 0, (_notifShape == "Banner") and 22 or 28)
-        descLbl.Visible = (_notifShape ~= "Minimal")
+        descLbl.Size = UDim2.new(1, -(_descOffX + 8), 0, 22)
+        descLbl.Position = UDim2.new(0, _descOffX, 0, (_notifShape == "Banner") and 22 or math.floor(_notifH * 0.52))
+        descLbl.Visible = true  -- siempre visible en modo compacto
         descLbl.BackgroundTransparency = 1
         descLbl.RichText = true
         descLbl.Text = tostring(message)
         descLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-        descLbl.TextSize = 10
+        descLbl.TextSize = 9
         descLbl.Font = Enum.Font.Gotham
         descLbl.TextWrapped = true
         descLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -12120,10 +12104,10 @@ function CreateCustomNotification(titleRaw, message, duration)
 
         -- Barra de progreso verde
         local progressBarBg = Instance.new("Frame")
-        progressBarBg.Size = UDim2.new(1, -24, 0, 2)
-        progressBarBg.Position = UDim2.new(0, 12, 1, -12)
-        progressBarBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        progressBarBg.BackgroundTransparency = 0.5
+        progressBarBg.Size = UDim2.new(1, -16, 0, 2)
+        progressBarBg.Position = UDim2.new(0, 8, 1, -6)
+        progressBarBg.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+        progressBarBg.BackgroundTransparency = 0.3
         progressBarBg.BorderSizePixel = 0
         progressBarBg.Parent = mainFrame
 
@@ -12175,9 +12159,9 @@ function CreateCustomNotification(titleRaw, message, duration)
         local _notifMarginBottom = _notifIsMob and (_notifH + 14) or (_notifH + 20)
         local _notifTargetY = -_notifMarginBottom
 
-        -- Slide in desde el borde inferior
-        mainFrame.Position = UDim2.new(1, -8, 1, 30)  -- empieza debajo de la pantalla
-        local tweenIn = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        -- Slide in desde derecha (menos intrusivo, rapido)
+        mainFrame.Position = UDim2.new(1, _notifW + 20, 1, _notifTargetY)  -- empieza fuera a la derecha
+        local tweenIn = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(mainFrame, tweenIn, {Position = UDim2.new(1, -8, 1, _notifTargetY)}):Play()
 
         -- Barra se encoge durante 'duration' segundos
@@ -31437,7 +31421,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     _attachScrollPassthrough(clickRow)
 
     -- FIX LEAK: desconectar _dokkRainbowConn cuando el container se destruye.
-    -- Sin esto, cada cambio de pestaña deja conexiones Heartbeat huerfanas
+    -- Sin esto, cada cambio de pesta?a deja conexiones Heartbeat huerfanas
     -- corriendo a 60Hz (una por cada toggle ON). Con 185 toggles y N cambios
     -- de pestana el numero de conexiones crece indefinidamente.
     container.Destroying:Connect(function()
@@ -46096,26 +46080,24 @@ function CreateCombatTab()
 
             local bsaStroke = Instance.new("UIStroke", bsaBorderFrame)
             bsaStroke.Color           = ThemeColors.Aurora1
-            bsaStroke.Thickness       = 3
-            bsaStroke.Transparency    = 0
+            bsaStroke.Thickness       = 0
+            bsaStroke.Transparency    = 1
             bsaStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
             -- Texto centrado
-            local bsaLabel = Instance.new("TextLabel", bsaRoot)
-            bsaLabel.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
+            local bsaLabel = Instance.new("ImageLabel", bsaRoot)
+            bsaLabel.Name                   = "StarIcon"
+            bsaLabel.Size                   = UDim2.fromOffset(40, 40)
             bsaLabel.AnchorPoint            = Vector2.new(0.5, 0.5)
             bsaLabel.Position               = UDim2.fromScale(0.5, 0.5)
             bsaLabel.BackgroundTransparency = 1
-            bsaLabel.Text                   = "SILENT\nAIM"
-            bsaLabel.FontFace               = Font.fromEnum(Enum.Font.GothamBold)
-            bsaLabel.TextSize               = 11
-            bsaLabel.TextColor3             = Color3.fromRGB(255, 255, 255)
+            bsaLabel.Image                  = "rbxassetid://45428892"
+            bsaLabel.ImageColor3            = Color3.fromRGB(255, 255, 255)
+            bsaLabel.ScaleType              = Enum.ScaleType.Fit
             bsaLabel.TextXAlignment         = Enum.TextXAlignment.Center
             bsaLabel.TextYAlignment         = Enum.TextYAlignment.Center
             bsaLabel.TextWrapped            = true
             bsaLabel.ZIndex                 = 204
-            local bsaLblStroke = Instance.new("UIStroke", bsaLabel)
-            bsaLblStroke.Color = Color3.fromRGB(0,0,0); bsaLblStroke.Thickness = 1; bsaLblStroke.Transparency = 0.5
 
             -- Bot?n clickeable encima
             local bsaFill = Instance.new("TextButton", bsaRoot)
@@ -46192,24 +46174,24 @@ function CreateCombatTab()
             -- Hover
             bsaFill.MouseEnter:Connect(function()
                 TweenService:Create(bsaPillBg, TweenInfo.new(0.12), {BackgroundTransparency=0.75}):Play()
-                TweenService:Create(bsaStroke, TweenInfo.new(0.12), {Thickness=3.5}):Play()
+-- [border removed]
             end)
             bsaFill.MouseLeave:Connect(function()
                 TweenService:Create(bsaPillBg, TweenInfo.new(0.15), {BackgroundTransparency=1}):Play()
-                TweenService:Create(bsaStroke, TweenInfo.new(0.15), {Thickness=3}):Play()
+-- [border removed]
             end)
 
             -- Press / Release
             bsaFill.MouseButton1Down:Connect(function()
                 if _bMoved then return end
                 TweenService:Create(bsaPillBg, TweenInfo.new(0.07), {BackgroundTransparency=0.40}):Play()
-                TweenService:Create(bsaStroke, TweenInfo.new(0.07), {Thickness=2}):Play()
+-- [border removed]
                 TweenService:Create(bsaScale,  TweenInfo.new(0.07), {Scale=0.92}):Play()
             end)
             bsaFill.MouseButton1Up:Connect(function()
                 if _bMoved then return end
                 TweenService:Create(bsaPillBg, TweenInfo.new(0.18), {BackgroundTransparency=1}):Play()
-                TweenService:Create(bsaStroke, TweenInfo.new(0.18), {Thickness=3}):Play()
+-- [border removed]
                 TweenService:Create(bsaScale,  TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
             end)
 
@@ -46224,7 +46206,7 @@ function CreateCombatTab()
                 -- Flash borde al disparar
                 TweenService:Create(bsaStroke, TweenInfo.new(0.07), {Thickness=2}):Play()
                 task.delay(0.15, function()
-                    pcall(function() TweenService:Create(bsaStroke, TweenInfo.new(0.2), {Thickness=3}):Play() end)
+-- [border removed]
                 end)
                 _sp(_bsaGunFlashAndShoot)
             end)
@@ -53511,17 +53493,32 @@ function CreateCombatTab()
             local tTors = tChar:FindFirstChild("UpperTorso") or tChar:FindFirstChild("Torso")
             if not tHRP then return end
             local hitParts = {tHRP, tHead or tHRP, tTors or tHRP}
-            -- Calcular origen real del disparo (boca del ca??n o HRP del jugador)
-            local barrelAtt = getGunAttachment and getGunAttachment(gun, myHRP)
-            local _cam = workspace.CurrentCamera
-            local baseOrigin = (barrelAtt and barrelAtt.WorldPosition)
-                            or (_cam and _cam.CFrame.Position)
-                            or (myHRP.Position + Vector3.new(0, 1.5, 0))
+
+            -- PIERCE v4 WALL-BYPASS: teletransportarse junto al murder para que el servidor
+            -- no rechace el disparo por pared/distancia. La bala conecta desde cualquier
+            -- distancia atravesando TODAS las paredes del mapa. Volvemos instantaneamente.
+            local originalCF    = myHRP.CFrame
+            local savedAnchored = myHRP.Anchored
+            local tPos = tHRP.Position
+            local offset = (originalCF.Position - tPos)
+            local offsetMag = offset.Magnitude
+            local nearPos
+            if offsetMag < 0.01 then
+                nearPos = tPos + Vector3.new(0, 0, 1.5)
+            else
+                nearPos = tPos + (offset.Unit * 1.5)
+            end
+            -- Teletransportar junto al target silenciosamente
+            pcall(function()
+                myHRP.Anchored = true
+                myHRP.CFrame = CFrame.new(nearPos, tPos)
+            end)
+            -- Disparar desde ahi: el servidor ve HRP al lado del target -> sin wall check
+            local baseOrigin = nearPos + Vector3.new(0, 1.5, 0)
             if CombatTabState then CombatTabState._saBypassHook = true end
             for i = 1, _pPens do
                 local hp = hitParts[(i-1) % #hitParts + 1]
                 if hp then
-                    -- PIERCE v3: origen real desde la gun -> funciona a cualquier distancia
                     local aimPos    = hp.Position
                     local originPos = baseOrigin
                     local graCF, targetCF = _pBuildCF(originPos, aimPos)
@@ -53530,6 +53527,11 @@ function CreateCombatTab()
                 if i < _pPens then _w(0.016) end
             end
             if CombatTabState then CombatTabState._saBypassHook = false end
+            -- Volver instantaneamente a la posicion original
+            pcall(function()
+                myHRP.CFrame    = originalCF
+                myHRP.Anchored  = savedAnchored
+            end)
         end
 
         -- Boton SHOOT flotante -- misma estructura y animaciones que createBindableButton
@@ -53592,29 +53594,22 @@ function CreateCombatTab()
 
             local outerStroke = Instance.new("UIStroke", outerRing)
             outerStroke.Color           = ThemeColors.Aurora1
-            outerStroke.Thickness       = 3
-            outerStroke.Transparency    = 0
+            outerStroke.Thickness       = 0
+            outerStroke.Transparency    = 1
             outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
             -- Label centrado con contorno negro ? igual que bindable
-            local lbl = Instance.new("TextLabel", bg)
+            local lbl = Instance.new("ImageLabel", bg)
+            lbl.Name                   = "StarIcon"
             lbl.AnchorPoint            = Vector2.new(0.5, 0.5)
             lbl.Position               = UDim2.fromScale(0.5, 0.5)
-            lbl.Size                   = UDim2.fromOffset(BTN_W - 8, BTN_H - 8)
+            lbl.Size                   = UDim2.fromOffset(40, 40)
             lbl.BackgroundTransparency = 1
-            lbl.Text                   = "PIERCE"
-            lbl.TextSize               = 11
-            lbl.Font                   = Enum.Font.GothamBold
-            lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
-            lbl.TextXAlignment         = Enum.TextXAlignment.Center
-            lbl.TextYAlignment         = Enum.TextYAlignment.Center
-            lbl.TextWrapped            = true
-            lbl.TextScaled             = false
+            lbl.Image                  = "rbxassetid://45428892"
+            lbl.ImageColor3            = Color3.fromRGB(255, 255, 255)
+            lbl.ScaleType              = Enum.ScaleType.Fit
             lbl.ZIndex                 = 205
-            local lblStroke = Instance.new("UIStroke", lbl)
-            lblStroke.Color        = Color3.fromRGB(0, 0, 0)
-            lblStroke.Thickness    = 1
-            lblStroke.Transparency = 0.5
+
 
             -- Boton invisible encima para capturar clicks ? igual que bindable
             local fill = Instance.new("TextButton", bg)
@@ -53652,25 +53647,25 @@ function CreateCombatTab()
             -- -- HOVER ---------------------------------------------------------
             fill.MouseEnter:Connect(function()
                 TweenService:Create(pill,        TweenInfo.new(0.12), {BackgroundTransparency = 0.75}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.12), {Thickness = 3.5}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.12), {Transparency = 1, Thickness = 3.5}):Play()
             end)
             fill.MouseLeave:Connect(function()
                 TweenService:Create(pill,        TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.15), {Thickness = 3}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.15), {Transparency = 1, Thickness = 3}):Play()
             end)
 
             -- -- PRESS / RELEASE: hundido + glow intenso -----------------------
             fill.MouseButton1Down:Connect(function()
                 if _moved then return end
                 TweenService:Create(pill,        TweenInfo.new(0.07), {BackgroundTransparency = 0.40}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.07), {Thickness = 2}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.07), {Transparency = 1, Thickness = 2}):Play()
                 TweenService:Create(_bgScale,    TweenInfo.new(0.07), {Scale = 0.92}):Play()
                 TweenService:Create(glow,        TweenInfo.new(0.07), {ImageTransparency = 0.55}):Play()
             end)
             fill.MouseButton1Up:Connect(function()
                 if _moved then return end
                 TweenService:Create(pill,        TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
-                TweenService:Create(outerStroke, TweenInfo.new(0.18), {Thickness = 3}):Play()
+                TweenService:Create(outerStroke, TweenInfo.new(0.18), {Transparency = 1, Thickness = 3}):Play()
                 TweenService:Create(_bgScale,    TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
                 TweenService:Create(glow,        TweenInfo.new(0.25), {ImageTransparency = 0.82}):Play()
             end)
