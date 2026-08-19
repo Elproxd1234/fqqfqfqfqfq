@@ -22155,6 +22155,8 @@ function CreateMainUI_KnifeDodge()
         end)
 
         -- Loop actualizacion
+        -- FIX: desconectar conexion previa si existe antes de crear una nueva
+        if _infoHbConn then pcall(function() _infoHbConn:Disconnect() end); _infoHbConn = nil end
         local _hbT = 0
         local _lastDt = 1/60
         _infoHbConn = RunService.Heartbeat:Connect(function(dt)
@@ -31030,7 +31032,7 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     }
     local function _dokkStartRainbow()
         if _dokkRainbowConn then return end
-        _dokkRainbowConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        _dokkRainbowConn = RunService.Heartbeat:Connect(function(dt)
             if not (thumb and thumb.Parent) then
                 if _dokkRainbowConn then _dokkRainbowConn:Disconnect(); _dokkRainbowConn = nil end
                 return
@@ -31433,6 +31435,17 @@ function CreateAuroraToggle(parent, nombre, callback, initialValue)
     -- FIX SCROLL: TextButton absorbe MouseWheel y Touch, impide scroll en PC y mobile.
     clickRow.Selectable = false
     _attachScrollPassthrough(clickRow)
+
+    -- FIX LEAK: desconectar _dokkRainbowConn cuando el container se destruye.
+    -- Sin esto, cada cambio de pestaña deja conexiones Heartbeat huerfanas
+    -- corriendo a 60Hz (una por cada toggle ON). Con 185 toggles y N cambios
+    -- de pestana el numero de conexiones crece indefinidamente.
+    container.Destroying:Connect(function()
+        if _dokkRainbowConn then
+            pcall(function() _dokkRainbowConn:Disconnect() end)
+            _dokkRainbowConn = nil
+        end
+    end)
 
     return container
 end
