@@ -11,8 +11,12 @@ if not task then
     local _legacyWait  = (type(wait)  == "function") and wait
         or function(t)
             if _osClock then
-                local t0 = _osClock() + (t or 0)
-                repeat until _osClock() >= t0
+                local t0 = _osClock() + math.min(t or 0, 0.5)
+                repeat
+                    coroutine.yield()
+                until _osClock() >= t0
+            else
+                coroutine.yield()
             end
         end
     local _legacySpawn = (type(spawn) == "function") and spawn or function(f, ...) local co = coroutine.wrap(f) co(...) end
@@ -41,9 +45,9 @@ end
 -- Si ya existe una instancia corriendo, simplemente reabre el hub.
 -- ================================================================
 if _G._hubScriptExecuted then
-    warn("[ZerqonHUB] Script ya ejecutado. Re-abriendo hub existente...")
+    _log("Script ya ejecutado. Re-abriendo hub existente...")
     if _G._hubRunning then
-        warn("[ZerqonHUB] Hub ya en construccion, ignorando.")
+        _log("Hub ya en construccion, ignorando.")
         return
     end
     local _pg = game:GetService("Players").LocalPlayer
@@ -62,7 +66,7 @@ if _G._hubScriptExecuted then
         end)
         _existing.Enabled = true
         _G._hubHidden = false
-        warn("[ZerqonHUB] Hub reactivado.")
+        _log("Hub reactivado.")
     else
         if type(abrirHub) == "function" then
             abrirHub()
@@ -76,7 +80,11 @@ _G._hubScriptExecuted = true
 -- ================================================================
 
 -- Mensaje de bienvenida en consola con color azul
-print("[34m" .. "Welcome to Zerqon Hub" .. "[0m")
+-- FIX #1: _DEBUG flag - silencia todos los warn/print identificables en produccion
+local _DEBUG = false
+local function _log(...)
+    if _DEBUG then warn("[ZQ]", ...) end
+end
 
 -- ================================================================
 -- == PERF BOOST v1 ? Optimizaciones aplicadas al ejecutar el hub
@@ -205,11 +213,21 @@ do
     -- PERF-9: Reducir frecuencia de RunService.Heartbeat en loops no criticos
     -- Compartir un solo tick global evita N listeners independientes corriendo a 60fps
     if not _G._sharedHB then
+        local _sharedListeners = {}
+        setmetatable(_sharedListeners, {__mode = "v"})  -- FIX #10: weak values, GC auto-remove
         _G._sharedHB = {
             tick     = 0,
             frame    = 0,
             delta    = 0,
-            listeners = {},
+            _listeners = _sharedListeners,
+            -- FIX #10: handle-based removal to prevent unbounded growth on re-execution
+            connect = function(fn)
+                local id = {}  -- unique handle
+                _sharedListeners[id] = fn
+                return {
+                    Disconnect = function() _sharedListeners[id] = nil end
+                }
+            end,
         }
         local _hb = game:GetService("RunService").Heartbeat
         _hb:Connect(function(dt)
@@ -217,10 +235,9 @@ do
             s.tick  = tick()
             s.delta = dt
             s.frame = s.frame + 1
-            -- Ejecutar listeners registrados (con pcall para aislar errores)
-            for i = #s.listeners, 1, -1 do
-                local fn = s.listeners[i]
-                if fn then pcall(fn, dt) end
+            -- FIX #10: iterate dict-style (no reverse order issue, no unbounded array)
+            for _, fn in next, s._listeners do
+                pcall(fn, dt)
             end
         end)
     end
@@ -350,7 +367,7 @@ do
         end
     end)
 
-    print("[PERF BOOST v1] Optimizaciones aplicadas correctamente ?")
+    _log("PERF BOOST v1: Optimizaciones aplicadas")
 end
 -- ================================================================
 -- == FIN PERF BOOST v1
@@ -499,9 +516,11 @@ do
     end)
 
     -- OPT-8: Reducir frecuencia del GC durante carga, restaurar al terminar
+    -- FIX #5: setstepmul(80) aumentaba el GC en vez de reducirlo. Correcto: subir stepmul y pause.
     pcall(function()
         if collectgarbage then
-            collectgarbage("setstepmul", 80)
+            collectgarbage("setpause", 200)    -- esperar hasta que el heap doble antes del proximo ciclo
+            collectgarbage("setstepmul", 400)  -- cada paso de GC hace mas trabajo pero corre menos seguido
         end
     end)
     task.defer(function()
@@ -511,7 +530,11 @@ do
             _waited = _waited + 0.5
         end
         pcall(function()
-            if collectgarbage then collectgarbage("setstepmul", 200) end
+            if collectgarbage then
+                collectgarbage("setpause", 100)    -- restaurar default
+                collectgarbage("setstepmul", 200)  -- restaurar default
+                collectgarbage("collect")           -- un collect final forzado
+            end
         end)
     end)
 
@@ -706,7 +729,7 @@ do
                         local _freed  = math.max(0, _before - _after)
                         if _freed > 256 then  -- Solo notificar si libero mas de 256KB
                             -- Silencioso: no spamear notificaciones al usuario
-                            warn("[ZerqonHUB] GC periodico: " .. _freed .. " KB liberados")
+                            _log("GC periodico:", _freed, "KB liberados")
                         end
                     end
                 end)
@@ -775,13 +798,13 @@ do
             _G._discordUsername        = (_uname and _uname ~= "") and _uname or "Usuario"
             _G._premiumSavedDiscordId  = _did
             _G._zerqonSessionToken     = (_tok and _tok ~= "") and _tok or nil
-            warn("[ZerqonHUB] Sesi?n guardada encontrada ? " .. math.floor((_PREM_DUR - _elapsed) / 3600) .. "h restantes. Recheck en curso...")
+            _log("Sesion guardada encontrada, horas restantes:", math.floor((_PREM_DUR - _elapsed) / 3600))
         else
             -- Vencio: borrar
             pcall(function() if delfile   then delfile(_premPath)       end end)
             pcall(function() if writefile then writefile(_premPath, "") end end)
             _G._zerqonSessionToken = nil
-            warn("[ZerqonHUB] Sesi?n premium vencida. Se requiere re-verificaci?n.")
+            _log("Sesion premium vencida. Se requiere re-verificacion.")
         end
     end)
 end
@@ -858,7 +881,7 @@ if false and _G._discordPremiumVerified then
                     _G._discordPremiumVerified = true
                     _G._discordUsername  = data.username  or _G._discordUsername
                     _G._discordAvatarUrl = data.avatarUrl or _G._discordAvatarUrl or ""
-                    warn("[ZerqonHUB] Recheck OK ? premium confirmado, RobloxId=" .. _robloxId)
+                    _log("Recheck OK: premium confirmado, RobloxId=", _robloxId)
 
                     -- DESBLOQUEO EN CALIENTE del tab VIP
                     local _PIDX = 4
@@ -876,11 +899,11 @@ if false and _G._discordPremiumVerified then
                     end)
                 elseif data.needsLogin then
                     -- Token inv?lido, sesi?n vencida o v?nculo eliminado ? forzar re-login
-                    warn("[ZerqonHUB] Recheck: sesi?n inv?lida o vencida. Se requiere re-login.")
+                    _log("Recheck: sesion invalida o vencida. Se requiere re-login.")
                     _clearPremiumSession()
                 else
                     -- Perdi? el rol Discord ? limpiar
-                    warn("[ZerqonHUB] Recheck: premium revocado, RobloxId=" .. _robloxId)
+                    _log("Recheck: premium revocado, RobloxId=", _robloxId)
                     _clearPremiumSession()
                 end
             end
@@ -1912,11 +1935,12 @@ end
 
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-Debris = game:GetService("Debris")
-Lighting = game:GetService("Lighting")
-TeleportService = game:GetService("TeleportService")
-HttpService = game:GetService("HttpService")
-ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- FIX #4: Declarar como local para evitar pollucion del namespace global y fingerprint de deteccion
+local Debris          = game:GetService("Debris")
+local Lighting        = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local HttpService     = game:GetService("HttpService")  -- FIX #4: era global, ahora local (elimina duplicado de linea ~1166)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- ===================================================================
 -- VARIABLES GLOBALES DE PREMIUM FEATURES
@@ -2151,7 +2175,7 @@ task.spawn(function()
         _G._visualRoundOver = false
         _G._murdererDied    = false
         _G._betweenRounds   = false
-        _G._roundStartTime  = tick()
+        _G._roundStartTime  = os.clock()  -- FIX #3: usar os.clock() para consistencia con polling loop
         _hlRoundEndDone     = false
 
         -- Farm BelowMap hook eliminado: el nuevo AutoFarm maneja su propia posicion
@@ -2573,26 +2597,19 @@ function _refreshRoleCache()
     end
 end
 
+-- FIX #8: Separar lectura de roles del refresh con InvokeServer.
+-- Estas funciones son llamadas desde ESP/SA/Aimbot a 60fps; no deben hacer server calls.
+-- Solo el loop de polling dedicado (Issue #2) llama InvokeServer.
 function findMurderer()
-    _refreshRoleCache()
-    return _roleCache.murderer
+    return _roleCache.murderer  -- FIX #8: pure read, sin side effects de servidor
 end
 
 function findSheriffPlayer()
-    _refreshRoleCache()
-    return _roleCache.sheriff
+    return _roleCache.sheriff  -- FIX #8: pure read
 end
 
 function findHeroPlayer()
-    _refreshRoleCache()
-    -- Si hero sigue nil pero hay ronda activa, forzar un refresh inmediato ignorando el throttle
-    if _roleCache.hero == nil and _roleCache.murderer ~= nil and not _G._visualRoundOver then
-        local prev = _roleCache.lastUpdate
-        _roleCache.lastUpdate = 0
-        _refreshRoleCache()
-        _roleCache.lastUpdate = prev  -- restaurar throttle para no romper otros sistemas
-    end
-    return _roleCache.hero
+    return _roleCache.hero  -- FIX #8: pure read; el polling loop se encarga del refresh
 end
 
 -- ==========================================================
@@ -3136,31 +3153,26 @@ task.spawn(function()
     end
     if not GetPlayerData then return end
 
+    -- FIX #2: exponential backoff en vez de polling a 0.08s (12.5 llamadas/seg)
+    -- Empieza en 500ms, sube a 2s cuando los roles estan confirmados
+    local _backoff = 0.5
     while true do
-        -- Al inicio de ronda (primeros 8s) pollear cada 0.25s para detectar roles rapido
-        -- Despues de que el cache este completo, volver a 1s
-        local timeSinceRound = tick() - (_G._roundStartTime or 0)
-        local isRoundStart   = timeSinceRound < 12
-        -- ACELERADO: 0.25->0.08s en los primeros 12s de ronda para detectar roles casi instantaneo
-        -- Despues vuelve a 1s para no consumir red innecesariamente
-        local waitTime = (isRoundStart and not (_roleCache.murderer and _roleCache.sheriff)) and 0.08 or 1
-
-        task.wait(waitTime)
+        task.wait(_backoff)
 
         -- No pollear si la ronda termino
-        if _G._visualRoundOver then continue end
-        -- FIX DETECCION TARDIA: eliminar el "continue si ya tenemos roles".
-        -- El bug: en rondas donde el RoundStart llega con datos completos, el polling
-        -- veia _roleCache.murderer and _roleCache.sheriff -> hacia continue -> nunca
-        -- re-confirmaba los roles -> si el RoundStart llegaba con datos viejos/parciales
-        -- del servidor, el cache quedaba mal para toda la ronda (~10s de delay visual).
-        -- Ahora siempre pollean los primeros 8s de ronda para verificar consistencia.
-        -- Despues de los 8s, volver a saltar para no consumir red innecesariamente.
-        local timeSinceRoundCheck = tick() - (_G._roundStartTime or 0)
-        if _roleCache.murderer and _roleCache.sheriff and timeSinceRoundCheck > 12 then continue end
+        if _G._visualRoundOver then _backoff = 2; continue end
+
+        -- FIX #2: ya tenemos ambos roles y pasaron los primeros 8s -> slow poll
+        local elapsed = os.clock() - (_G._roundStartTime or 0)
+        if _roleCache.murderer and _roleCache.sheriff and elapsed > 8 then
+            _backoff = 2; continue
+        end
 
         local ok, data = pcall(function() return GetPlayerData:InvokeServer() end)
-        if not ok or type(data) ~= "table" then continue end
+        if not ok or type(data) ~= "table" then
+            _backoff = math.min(_backoff * 2, 5)  -- FIX #2: backoff en fallo
+            continue
+        end
 
         -- FIX: asignar roles ATOMICAMENTE -- nunca nil el cache antes de llenar.
         -- El window entre nil y re-fill causaba que todos se pinten de verde (Innocent)
@@ -3187,7 +3199,14 @@ task.spawn(function()
         _roleCache.sheriff   = newSheriff
         _roleCache.hero      = newHero
         if newLocalRole then _roleCache.localRole = newLocalRole end
-        _roleCache.lastUpdate = tick()
+        _roleCache.lastUpdate = os.clock()  -- FIX #3: os.clock() consistente con _refreshRoleCache
+
+        -- FIX #2: ajustar backoff segun estado del cache
+        if _roleCache.murderer and _roleCache.sheriff then
+            _backoff = 1.5  -- roles confirmados: poll cada 1.5s
+        else
+            _backoff = 0.4  -- buscando roles: poll cada 400ms (no 80ms)
+        end
 
         -- ACELERADO: si el roleCache acaba de detectar un sheriff, notificar a StealGun inmediatamente
         if newSheriff and StealGunSystem and StealGunSystem.enabled
@@ -3415,26 +3434,53 @@ end
 local _wcParams = RaycastParams.new()
 _wcParams.FilterType = Enum.RaycastFilterType.Exclude
 
-function wallCheckRaycast(from, to, extraExclude)
-    -- Excluir: propio character + character del target (para que el raycast
-    -- no golpee el cuerpo del murder y devuelva false incorrectamente)
-    local ignoreList = {}
+-- FIX #7: lista de exclusion cacheada, reconstruida solo cuando cambian characters
+-- (antes se reconstruia en CADA llamada a 60fps - O(n) players + new table allocation)
+local _wcIgnoreList  = {}
+local _wcIgnoreDirty = true
+local function _markWcDirty() _wcIgnoreDirty = true end
+Players.PlayerAdded:Connect(_markWcDirty)
+Players.PlayerRemoving:Connect(_markWcDirty)
+LocalPlayer.CharacterAdded:Connect(_markWcDirty)
+
+local function _rebuildWcIgnore(targetPos)
+    _wcIgnoreList = {}
     if LocalPlayer.Character then
-        table.insert(ignoreList, LocalPlayer.Character)
+        _wcIgnoreList[1] = LocalPlayer.Character
     end
-    -- Detectar automaticamente el character que contiene el punto "to"
-    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+    for _, p in ipairs(_cachedPlayers) do  -- FIX #7: usar cache pre-construido en vez de GetPlayers()
         if p ~= LocalPlayer and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and (hrp.Position - to).Magnitude < 6 then
-                table.insert(ignoreList, p.Character)
+            if hrp and hrp.Position then
+                if (hrp.Position - targetPos).Magnitude < 8 then
+                    _wcIgnoreList[#_wcIgnoreList + 1] = p.Character
+                end
             end
         end
     end
-    if extraExclude then
-        table.insert(ignoreList, extraExclude)
+    _wcParams.FilterDescendantsInstances = _wcIgnoreList
+    _wcIgnoreDirty = false
+end
+
+function wallCheckRaycast(from, to, extraExclude)
+    -- FIX #7: solo reconstruir si hubo cambios de characters (no en cada frame)
+    if _wcIgnoreDirty then
+        _rebuildWcIgnore(to)
+    else
+        -- Mismo params pero el extraExclude puede variar por llamada
+        -- Para mantener el comportamiento original con extraExclude, reconstruir si hay uno
+        if extraExclude then
+            _rebuildWcIgnore(to)
+        else
+            _wcParams.FilterDescendantsInstances = _wcIgnoreList
+        end
     end
-    _wcParams.FilterDescendantsInstances = ignoreList
+    if extraExclude then
+        local extList = {}
+        for i, v in ipairs(_wcIgnoreList) do extList[i] = v end
+        extList[#extList + 1] = extraExclude
+        _wcParams.FilterDescendantsInstances = extList
+    end
 
     local direction = (to - from)
     local result = workspace:Raycast(from, direction, _wcParams)
@@ -24683,7 +24729,7 @@ function StartShootMurder()
                     -- Sin este chequeo el toggle te mandaba al lobby durante la carga
                     -- de ronda porque _roleCache.murderer apuntaba al murder viejo.
                     if _G._betweenRounds or not _G._roundStartTime
-                    or (tick() - (_G._roundStartTime or 0)) < 1.5 then
+                    or (os.clock() - (_G._roundStartTime or 0)) < 1.5 then  -- FIX #3
                         _w(0.5); break
                     end
                     if mHRP.Position.Y > 70 then
@@ -28524,7 +28570,7 @@ do
                           or _vs.tracer.hero     or _vs.tracer.assassin  or _vs.tracer.zombie
                           or _vs.tracer.knife    or _vs.tracer.gun       or _vs.tracer.droppedknife))
         )
-        local _timeSinceRS   = tick() - (_G._roundStartTime or 0)
+        local _timeSinceRS   = os.clock() - (_G._roundStartTime or 0)  -- FIX #3
         local _isEarlyRound  = _timeSinceRS < 12
         -- FIX REPINTADO: intervalo adaptativo
         --   - Sin visuals activos: 2s (LAG FIX -- no hacer nada si no hay nada que pintar)
@@ -34535,7 +34581,7 @@ function CreateWorldUI_AutoGrabGun()
                 -- FIX: permitir grab aunque _visualRoundOver sea true si hay drop visible
                 -- Solo saltear si estamos en intermission larga (>3s sin RoundStart)
                 if _G._visualRoundOver then
-                    local timeSinceStart = _G._roundStartTime and (tick() - _G._roundStartTime) or 999
+                    local timeSinceStart = _G._roundStartTime and (os.clock() - _G._roundStartTime) or 999  -- FIX #3
                     if timeSinceStart > 3 then return end
                 end
                 _hbT = _hbT + dt
@@ -40202,7 +40248,7 @@ function CreatePremiumTab()
                 local _now   = tostring(os.time())
                 -- formato v2: discordId|robloxId|username|savedAt|sessionToken
                 writefile(_pPath, _dId .. "|" .. _uid3 .. "|" .. _uname .. "|" .. _now .. "|" .. _tok)
-                warn("[ZerqonHUB] Sesi?n guardada en disco (v?lida 7 d?as).")
+                _log("Sesion guardada en disco (valida 7 dias).")
             end)
             setStatus("? ?Verificado! Abriendo Premium...", Color3.fromRGB(87, 242, 135))
             task.wait(0.8)
@@ -41600,10 +41646,10 @@ function CreatePremiumTab()
                     end
 
                     -- Verificar que es un RemoteEvent de gun (por nombre)
+                    -- FIX #6: removidos gunkill y fakeshoot (eventos de gameplay, no de disparo)
                     local selfName = ""
                     pcall(function() selfName = self.Name:lower() end)
                     local isGunRemote = selfName == "shoot" or selfName == "gunshoot"
-                        or selfName == "gunkill" or selfName == "fakeshoot"
                         or selfName == "bulletfire" or selfName == "gunfire"
                         or selfName == "shootremote" or selfName == "gunshot"
 
@@ -45277,16 +45323,19 @@ function CreateCombatTab()
                 return _orig(self, ...)
             end
 
-            -- FIX desync: check rpido SOLO por nombre del remote (sin loops)
+            -- FIX desync: check rapido SOLO por nombre del remote (sin loops)
             -- No usar IsDescendantOf ni GetChildren porque corre en CADA __namecall (cientos/seg)
-            local isGunRemote = false
-            local lname = selfName:lower()
-            if lname == "shoot" or lname == "gunkill" or lname == "fakeshoot"
-            or lname == "gunshoot" or lname == "playershot"
-            or lname == "bulletfire" or lname == "gunfire"
-            or lname == "shootremote" then
-                isGunRemote = true
-            end
+            -- FIX #6: removidos GunKill y FakeShoot - son eventos de resultado gameplay (server->client),
+            -- NO remotes de disparo. Interceptarlos corrompia su payload y rompia death detection.
+            local _SHOOT_REMOTES = {
+                shoot       = true,
+                gunshoot    = true,
+                playershot  = true,
+                bulletfire  = true,
+                gunfire     = true,
+                shootremote = true,
+            }
+            local isGunRemote = _SHOOT_REMOTES[selfName:lower()] == true
 
             if not isGunRemote then
                 return _orig(self, ...)
@@ -47423,7 +47472,7 @@ function CreateCombatTab()
 
             -- Validar ronda activa
             if _G._betweenRounds or not _G._roundStartTime
-            or (tick() - (_G._roundStartTime or 0)) < 1.5
+            or (os.clock() - (_G._roundStartTime or 0)) < 1.5  -- FIX #3
             or mHRP.Position.Y > 70 then
                 CreateCustomNotification("SHOOT MURDER", "Ronda no activa.", 2); return
             end
@@ -58222,7 +58271,7 @@ function abrirHub()
     -- Si el hub ya se esta construyendo, ignorar la llamada extra.
     -- ================================================================
     if _G._hubRunning then
-        warn("[ZerqonHUB] abrirHub() ya en ejecucion, ignorando llamada duplicada.")
+        _log("abrirHub() ya en ejecucion, ignorando llamada duplicada.")
         return
     end
     _G._hubRunning = true
@@ -59079,13 +59128,13 @@ _getTargetScale = function()
         _isMobileNow = _uis.TouchEnabled and not _uis.KeyboardEnabled
     end)
     -- DEBUG: imprimir valores reales para diagnosticar
-    warn("[ZerqonHUB SCALE DEBUG] VP=" .. tostring(_vpNow.X) .. "x" .. tostring(_vpNow.Y) .. " isMobile=" .. tostring(_isMobileNow))
+    _log("SCALE DEBUG VP=", tostring(_vpNow.X), "x", tostring(_vpNow.Y), "isMobile=", tostring(_isMobileNow))
     if _isMobileNow then
         -- Calcular escala exacta para que el frame 900x480 entre en pantalla con margen
         local _scaleByW = (_vpNow.X - 24) / 900
         local _scaleByH = (_vpNow.Y - 24) / 480
         local _final = math.clamp(math.min(_scaleByW, _scaleByH), 0.30, 0.55)
-        warn("[ZerqonHUB SCALE DEBUG] mobile -> final=" .. tostring(_final))
+        _log("SCALE DEBUG mobile -> final=", tostring(_final))
         return _final
     else
         -- PC: 70%
@@ -59112,7 +59161,7 @@ if _G._isMobileHub then
         end)
     end)
 end
-print("[ZerqonHUB] Layout relativo 80%x82% aplicado")
+_log("Layout relativo 80%x82% aplicado")
 -- Limpiar orbs de ejecuciones previas
 pcall(function()
     for _, n in ipairs({"_HubSatOrb", "_HubSatOrbBot", "_HubSatGrad"}) do
