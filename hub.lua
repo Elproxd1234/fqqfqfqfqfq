@@ -6713,6 +6713,7 @@ function _KnifeSA_setupKnife(knife)
     local _slashAnimNames = {"SlashKnife", "Slash", "Stab", "Hit", "Animation1"}
 
     local function _playThrowAnim()
+        KnifeSAState._playThrowAnim = _playThrowAnim  -- exponer para _ksaDoThrow mobile
         for _, name in ipairs(_throwAnimNames) do
             if _animObjs[name] then
                 if _playKnifeAnim(name, 1.0) then return end
@@ -49091,35 +49092,31 @@ function CreateCombatTab()
                         handleCF = CFrame.new(orig, fwd)
                         targetCF = CFrame.new(fwd)
                     end
-                    -- Reproducir animaci?n de lanzamiento en el cliente (mobile)
+                    -- Reproducir animacion de lanzamiento en el cliente (mobile)
+                    -- FIX: usar KnifeSAState._playThrowAnim (expuesta desde _KnifeSA_setupKnife)
+                    -- porque _playThrowAnim local no existe en este scope
                     pcall(function()
-                        local myChar2 = LocalPlayer.Character
-                        if myChar2 then
-                            local knife2 = myChar2:FindFirstChild("Knife")
+                        if KnifeSAState._playThrowAnim then
+                            -- Funcion correcta del knife actual (usa cache de tracks)
+                            KnifeSAState._playThrowAnim()
+                        else
+                            -- Fallback: cargar y reproducir animacion directamente
+                            local myChar2 = LocalPlayer.Character
+                            local knife2 = myChar2 and myChar2:FindFirstChild("Knife")
                             if knife2 then
                                 local hum2 = myChar2:FindFirstChildOfClass("Humanoid")
                                 local animator2 = hum2 and hum2:FindFirstChildOfClass("Animator")
                                 if animator2 then
-                                    -- Intentar usar _playThrowAnim si est? disponible (misma sesi?n de knife)
-                                    if _playThrowAnim then
-                                        _playThrowAnim()
-                                    else
-                                        -- Fallback: buscar animaci?n ThrowCharge/ThrowKnife/Throw en el knife
-                                        local throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}
-                                        for _, animName in ipairs(throwAnimNames) do
-                                            local animObj = knife2:FindFirstChild(animName, true)
-                                            if not animObj then
-                                                animObj = knife2:FindFirstChild("Animate") and
-                                                    knife2:FindFirstChild("Animate"):FindFirstChild(animName)
-                                            end
-                                            if animObj and animObj:IsA("Animation") then
-                                                local ok, track = pcall(function()
-                                                    return animator2:LoadAnimation(animObj)
-                                                end)
-                                                if ok and track then
-                                                    track:Play(0.1, 1, 1)
-                                                    break
-                                                end
+                                    local throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}
+                                    for _, animName in ipairs(throwAnimNames) do
+                                        local animObj = knife2:FindFirstChild(animName, true)
+                                        if animObj and animObj:IsA("Animation") then
+                                            local ok, track = pcall(function()
+                                                return animator2:LoadAnimation(animObj)
+                                            end)
+                                            if ok and track then
+                                                pcall(function() track:Play(0.05, 1, 1) end)
+                                                break
                                             end
                                         end
                                     end
@@ -49130,67 +49127,105 @@ function CreateCombatTab()
                     pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
                 end
 
-                -- Buscar y hookear el bot?n Throw nativo de MM2 en PlayerGui
-                -- MM2 usa un ScreenGui con un bot?n llamado "Throw" dentro del combat GUI
-                local function _ksaHookNativeThrow()
-                    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 10)
-                    if not pg then return end
-
-                    -- Funci?n recursiva para encontrar el bot?n Throw en cualquier nivel
-                    local function _findThrowBtn(parent, depth)
-                        if not parent or depth > 6 then return nil end
-                        for _, child in ipairs(parent:GetChildren()) do
-                            local n = child.Name
-                            -- Buscar por nombre: "Throw", "ThrowButton", "ThrowBtn", "ThrowKnife"
-                            if (n == "Throw" or n == "ThrowButton" or n == "ThrowBtn" or n == "ThrowKnife")
-                                and (child:IsA("TextButton") or child:IsA("ImageButton") or child:IsA("GuiButton")) then
-                                return child
-                            end
-                            local found = _findThrowBtn(child, depth + 1)
-                            if found then return found end
-                        end
-                        return nil
+                -- MOBILE SA v2: detectar ThrowingKnife del jugador local en workspace.
+                -- El boton "throwig" (y sus variantes) puede no ser un GuiButton estandar,
+                -- por eso el approach anterior falla. Este metodo es 100% confiable:
+                -- cuando el juego crea un ThrowingKnife en workspace, confirmamos via
+                -- HandleLink.Value que pertenece al local player y ejecutamos SA.
+                local _lastMobileSAThrow = -999
+                local function _ksaOnThrowingKnifeAdded(obj)
+                    if not KnifeSAState.enabled then return end
+                    if obj.Name ~= "ThrowingKnife" then return end
+                    -- Verificar que es del local player via HandleLink
+                    local myChar = LocalPlayer.Character
+                    if not myChar then return end
+                    -- WaitForChild con timeout corto para que HandleLink este listo
+                    local handleLink = obj:FindFirstChild("HandleLink")
+                    if not handleLink then
+                        -- Puede llegar un frame despues
+                        local ok, hl = pcall(function() return obj:WaitForChild("HandleLink", 0.5) end)
+                        if not ok or not hl then return end
+                        handleLink = hl
                     end
-
-                    local throwBtn = _findThrowBtn(pg, 0)
-                    if throwBtn then
-                        -- Hookear el Activated del bot?n nativo
-                        local hookConn = throwBtn.Activated:Connect(function()
-                            if not KnifeSAState.enabled then return end
-                            task.spawn(_ksaDoThrow)
-                        end)
-                        table.insert(KnifeSAState._mobileConns, hookConn)
-                        return true
-                    end
-                    return false
+                    if not handleLink.Value then return end
+                    local handle = handleLink.Value
+                    -- Confirmar que el Handle pertenece al Knife del local player
+                    if not handle:IsDescendantOf(myChar) then return end
+                    -- Cooldown: evitar doble-disparo si llegan dos eventos seguidos
+                    local now = os.clock()
+                    if now - _lastMobileSAThrow < 0.35 then return end
+                    _lastMobileSAThrow = now
+                    -- Redirigir con SA
+                    task.spawn(_ksaDoThrow)
                 end
 
-                -- Intentar hookear inmediatamente; si no se encuentra el bot?n,
-                -- esperar a que aparezca (puede que la GUI de combat cargue despu?s)
+                -- Hookear workspace.ChildAdded para detectar ThrowingKnife del local player
+                local wsConn = workspace.ChildAdded:Connect(function(obj)
+                    task.spawn(_ksaOnThrowingKnifeAdded, obj)
+                end)
+                table.insert(KnifeSAState._mobileConns, wsConn)
+
+                -- SEGUNDA VIA: hookear el boton "throwig" (y variantes) como respaldo.
+                -- Acepta cualquier GuiObject (Frame, ImageLabel, etc.), no solo GuiButton.
                 task.spawn(function()
-                    if not _ksaHookNativeThrow() then
-                        -- Escuchar DescendantAdded en PlayerGui hasta encontrar el bot?n Throw
-                        local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-                        if not pg then return end
-                        local watchConn
-                        watchConn = pg.DescendantAdded:Connect(function(desc)
-                            if not KnifeSAState.enabled then
-                                if watchConn then watchConn:Disconnect() end
-                                return
-                            end
-                            local n = desc.Name
-                            if (n == "Throw" or n == "ThrowButton" or n == "ThrowBtn" or n == "ThrowKnife")
-                                and (desc:IsA("TextButton") or desc:IsA("ImageButton") or desc:IsA("GuiButton")) then
-                                local hookConn = desc.Activated:Connect(function()
-                                    if not KnifeSAState.enabled then return end
-                                    task.spawn(_ksaDoThrow)
-                                end)
-                                table.insert(KnifeSAState._mobileConns, hookConn)
-                                if watchConn then watchConn:Disconnect() end
-                            end
+                    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+                        or LocalPlayer:WaitForChild("PlayerGui", 10)
+                    if not pg then return end
+
+                    local _throwBtnNames = {
+                        throwig=true, Throw=true, ThrowButton=true,
+                        ThrowBtn=true, ThrowKnife=true
+                    }
+
+                    local function _tryHookObj(obj)
+                        if not obj then return end
+                        -- Intentar Activated (GuiButton)
+                        local hookedActivated = false
+                        pcall(function()
+                            local c = obj.Activated:Connect(function()
+                                if not KnifeSAState.enabled then return end
+                                task.spawn(_ksaDoThrow)
+                            end)
+                            table.insert(KnifeSAState._mobileConns, c)
+                            hookedActivated = true
                         end)
-                        table.insert(KnifeSAState._mobileConns, watchConn)
+                        -- Siempre agregar InputBegan como respaldo (funciona en Frame/ImageLabel con Active=true)
+                        pcall(function()
+                            local c = obj.InputBegan:Connect(function(inp)
+                                if inp.UserInputType ~= Enum.UserInputType.Touch
+                                and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                                if not KnifeSAState.enabled then return end
+                                local now = os.clock()
+                                if now - _lastMobileSAThrow < 0.35 then return end
+                                _lastMobileSAThrow = now
+                                task.spawn(_ksaDoThrow)
+                            end)
+                            table.insert(KnifeSAState._mobileConns, c)
+                        end)
                     end
+
+                    local function _scanAndHook(parent, depth)
+                        if not parent or depth > 8 then return end
+                        local ok, children = pcall(function() return parent:GetChildren() end)
+                        if not ok then return end
+                        for _, child in ipairs(children) do
+                            if _throwBtnNames[child.Name] and child:IsA("GuiObject") then
+                                _tryHookObj(child)
+                            end
+                            _scanAndHook(child, depth + 1)
+                        end
+                    end
+
+                    _scanAndHook(pg, 0)
+
+                    -- Watcher: la GUI puede cargar despues de activar el toggle
+                    local watchConn = pg.DescendantAdded:Connect(function(desc)
+                        if not KnifeSAState.enabled then return end
+                        if _throwBtnNames[desc.Name] and desc:IsA("GuiObject") then
+                            _tryHookObj(desc)
+                        end
+                    end)
+                    table.insert(KnifeSAState._mobileConns, watchConn)
                 end)
             end
  CreateCustomNotification("KNIFE SA", _isMobileKSA and " Activo ? usa el bot?n Throw del juego ??" or " Activo ? equipa knife, lanz? con RMB", 3)
