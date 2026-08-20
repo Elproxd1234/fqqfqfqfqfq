@@ -6714,21 +6714,38 @@ function _KnifeSA_setupKnife(knife)
 
     local function _playThrowAnim()
         KnifeSAState._playThrowAnim = _playThrowAnim  -- exponer para _ksaDoThrow mobile
+        KnifeSAState._lastThrowTrackName = nil         -- resetear antes de reproducir
         for _, name in ipairs(_throwAnimNames) do
             if _animObjs[name] then
-                if _playKnifeAnim(name, 1.0) then return end
+                if _playKnifeAnim(name, 1.0) then
+                    KnifeSAState._lastThrowTrackName = name  -- guardar nombre del track activo
+                    return
+                end
             end
         end
         -- Fallback: cualquier anim que no sea de slash ni Animation1
         local slashSet = {SlashKnife=true, Slash=true, Stab=true, Hit=true, Animation1=true}
         for name in pairs(_animObjs) do
             if not slashSet[name] then
-                if _playKnifeAnim(name, 1.0) then return end
+                if _playKnifeAnim(name, 1.0) then
+                    KnifeSAState._lastThrowTrackName = name
+                    return
+                end
             end
         end
     end
 
+    -- Exponer _animTracks para que _ksaDoThrow pueda esperar el fin del track
+    KnifeSAState._getThrowTrack = function()
+        local name = KnifeSAState._lastThrowTrackName
+        return name and _animTracks[name] or nil
+    end
+
+    -- Exponer _playSlashAnim para hook de touch mobile
+    KnifeSAState._playSlashAnim = nil  -- se asigna abajo
+
     local function _playSlashAnim()
+        KnifeSAState._playSlashAnim = _playSlashAnim  -- exponer para hook touch mobile
         -- Fast Slash activo: slider va de 1-10, dividir por 10 para obtener multiplicador correcto.
         -- FIX: antes dividia por 100 (rango 1-100), rompiendo la animacion con valores 1-10.
         --   intensity=5 -> animSpeed = 5/10 = 0.5x (mas lento) .. 10 -> 1.0x (normal)
@@ -6989,40 +7006,50 @@ function _KnifeSA_setupKnife(knife)
     end))
 
     -- -- STAB (LMB) ? click izquierdo = golpe cuerpo a cuerpo -------
-    -- ARREGLADO: Ahora es LMB (MouseButton1) para pegar
+    -- ARREGLADO: Ahora es LMB (MouseButton1) para pegar, Touch en mobile
     local lmbStabTime = -999
     addConn(UserInputService.InputBegan:Connect(function(input, gp)
         if gp or not equipped then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
             lmbStabTime = os.clock()
         end
     end))
 
-    addConn(UserInputService.InputEnded:Connect(function(input)
+    -- Helper compartido para ejecutar el slash (desktop LMB y mobile Touch)
+    local function _doSlash()
         if not equipped or stabbing then return end
-        if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-        if os.clock() - lmbStabTime > 0.5 then return end
-
         local stabCooldown = 0.85
         if KnifeSAState.fastSlash then
-            -- FIX: slider es 1-10, dividir por 10. Antes usaba /100 con valor default 70 (rango incorrecto).
-            -- speed=1 -> cooldown=0.085s (maximo rapido); speed=10 -> cooldown=0.85s (normal)
             stabCooldown = 0.85 * math.max(0.05, (KnifeSAState.fastSlashSpeed or 5) / 10)
         end
         if os.clock() - lastStab  < stabCooldown then return end
         if os.clock() - lastThrow < 0.3          then return end
         stabbing = true
         lastStab = os.clock()
-
         task.spawn(_playSlashAnim)
         pcall(function() knifeStabbed:FireServer() end)
-        -- FIX: usar stabCooldown (respeta fastSlash) en vez de 0.85 hardcodeado
         task.wait(stabCooldown)
-        
-        -- Detener animaciones de slash via cache (limpio y sin buscar por nombre en el Animator)
         for _, name in ipairs(_slashAnimNames) do _stopKnifeAnim(name) end
-        
         stabbing = false
+    end
+
+    addConn(UserInputService.InputEnded:Connect(function(input)
+        if not equipped or stabbing then return end
+        -- Desktop: MouseButton1
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if os.clock() - lmbStabTime > 0.5 then return end
+            task.spawn(_doSlash)
+            return
+        end
+        -- Mobile: Touch (tap rapido = slash, sin drag)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            -- Solo si el toque fue corto (menos de 0.4s = tap, no drag)
+            if os.clock() - lmbStabTime > 0.4 then return end
+            -- No reproducir slash si KnifeSA esta lanzando (evita conflicto con throw)
+            if KnifeSAState.enabled then return end
+            task.spawn(_doSlash)
+        end
     end))
 
     -- Handle touch para stab
@@ -45369,6 +45396,54 @@ function CreateCombatTab()
             }
             local isGunRemote = _SHOOT_REMOTES[selfName:lower()] == true
 
+            -- KNIFE SA MOBILE: interceptar Events/Throw (el remote que dispara el lanzamiento en mobile)
+            -- Cuando el juego llama Throw:FireServer(), lo suprimimos y en su lugar
+            -- llamamos KnifeThrown:FireServer(handleCF, targetCF) con direccion SA.
+            if selfName == "Throw" and KnifeSAState and KnifeSAState.enabled then
+                local _intercepted = false
+                pcall(function()
+                    local myChar = LocalPlayer.Character
+                    if not myChar then return end
+                    local knife = myChar:FindFirstChild("Knife")
+                    if not knife then return end
+                    -- Verificar que self es el Events/Throw del knife del local player
+                    if not self:IsDescendantOf(knife) then return end
+                    local events = knife:FindFirstChild("Events") or knife
+                    local knifeThrown = events:FindFirstChild("KnifeThrown")
+                    if not knifeThrown then return end
+                    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+                    if not myHRP then return end
+                    local target = _KnifeSA_getBestTarget and _KnifeSA_getBestTarget()
+                    local handleCF, targetCF
+                    if target and target.Character then
+                        local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                        local tHum = target.Character:FindFirstChildOfClass("Humanoid")
+                        if tHRP and tHum and tHum.Health > 0 then
+                            local predictedPos = _KnifeSA_getPredictedPos and _KnifeSA_getPredictedPos(tHRP, target.Character) or tHRP.Position
+                            local orig = myHRP.Position + Vector3.new(0, 1.5, 0)
+                            local aimVec = predictedPos - orig
+                            if aimVec.Magnitude < 0.01 then aimVec = myHRP.CFrame.LookVector end
+                            handleCF = CFrame.new(orig, orig + aimVec.Unit)
+                            local back = orig - predictedPos
+                            targetCF = back.Magnitude > 0.1 and CFrame.new(predictedPos, predictedPos + back.Unit) or CFrame.new(predictedPos)
+                        end
+                    end
+                    if not targetCF then
+                        -- Sin target: dejar pasar el Throw original sin modificar
+                        return
+                    end
+                    -- Suprimir el Throw original y disparar KnifeThrown con SA
+                    pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+                    _intercepted = true
+                end)
+                if _intercepted then
+                    -- Throw suprimido: KnifeThrown ya fue enviado con SA, no llamar _orig
+                    return
+                end
+                -- Sin target SA o error: dejar pasar el Throw original intacto
+                return _orig(self, ...)
+            end
+
             if not isGunRemote then
                 return _orig(self, ...)
             end
@@ -49070,7 +49145,10 @@ function CreateCombatTab()
                     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
                     if not myHRP then return end
                     local events = knife:FindFirstChild("Events") or knife
-                    local knifeThrown = events:FindFirstChild("KnifeThrown") or knife:FindFirstChildWhichIsA("RemoteEvent")
+                    -- KNIFE SA MOBILE FIX: usar Events/Throw como primary (el __namecall hook lo intercepta)
+                    -- Si no hay hook activo, usar KnifeThrown directamente como fallback
+                    local throwRemote  = events:FindFirstChild("Throw")
+                    local knifeThrown  = events:FindFirstChild("KnifeThrown") or knife:FindFirstChildWhichIsA("RemoteEvent")
                     if not knifeThrown then return end
                     local target = _KnifeSA_getBestTarget()
                     local targetCF, handleCF
@@ -49092,39 +49170,33 @@ function CreateCombatTab()
                         handleCF = CFrame.new(orig, fwd)
                         targetCF = CFrame.new(fwd)
                     end
-                    -- Reproducir animacion de lanzamiento en el cliente (mobile)
-                    -- FIX: usar KnifeSAState._playThrowAnim (expuesta desde _KnifeSA_setupKnife)
-                    -- porque _playThrowAnim local no existe en este scope
+                    -- 1. Reproducir animacion de throw y ESPERAR a que termine
                     pcall(function()
                         if KnifeSAState._playThrowAnim then
-                            -- Funcion correcta del knife actual (usa cache de tracks)
                             KnifeSAState._playThrowAnim()
-                        else
-                            -- Fallback: cargar y reproducir animacion directamente
-                            local myChar2 = LocalPlayer.Character
-                            local knife2 = myChar2 and myChar2:FindFirstChild("Knife")
-                            if knife2 then
-                                local hum2 = myChar2:FindFirstChildOfClass("Humanoid")
-                                local animator2 = hum2 and hum2:FindFirstChildOfClass("Animator")
-                                if animator2 then
-                                    local throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}
-                                    for _, animName in ipairs(throwAnimNames) do
-                                        local animObj = knife2:FindFirstChild(animName, true)
-                                        if animObj and animObj:IsA("Animation") then
-                                            local ok, track = pcall(function()
-                                                return animator2:LoadAnimation(animObj)
-                                            end)
-                                            if ok and track then
-                                                pcall(function() track:Play(0.05, 1, 1) end)
-                                                break
-                                            end
-                                        end
-                                    end
-                                end
+                        end
+                    end)
+                    -- Esperar la duracion real del track ThrowCharge (o fallback 0.6s)
+                    local throwWait = 0.6
+                    pcall(function()
+                        local track = KnifeSAState._getThrowTrack and KnifeSAState._getThrowTrack()
+                        if track then
+                            -- track.Length puede ser 0 si aun no cargó; usar max con minimo razonable
+                            local len = track.Length or 0
+                            if len > 0.1 then
+                                throwWait = len
                             end
                         end
                     end)
-                    pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+                    task.wait(throwWait)
+
+                    -- 2. Lanzar el knife con SA una vez terminada la animacion
+                    if throwRemote and CombatTabState and CombatTabState._saHookActive then
+                        -- El __namecall hook intercepta Throw:FireServer() y lo redirige con SA
+                        pcall(function() throwRemote:FireServer() end)
+                    else
+                        pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+                    end
                 end
 
                 -- MOBILE SA v2: detectar ThrowingKnife del jugador local en workspace.
