@@ -49170,29 +49170,43 @@ function CreateCombatTab()
                         handleCF = CFrame.new(orig, fwd)
                         targetCF = CFrame.new(fwd)
                     end
-                    -- 1. Reproducir animacion de throw y ESPERAR a que termine
+                    -- 1. Reproducir animacion de throw
                     pcall(function()
                         if KnifeSAState._playThrowAnim then
                             KnifeSAState._playThrowAnim()
                         end
                     end)
-                    -- Esperar la duracion real del track ThrowCharge (o fallback 0.6s)
-                    local throwWait = 0.6
+
+                    -- 2. Esperar a que el track termine usando el evento Stopped
+                    -- track.Length es 0 justo despues de Play() en mobile (engine no proceso el frame aun)
+                    -- Stopped se dispara cuando realmente termina, sin depender de Length
+                    local _throwDone = false
                     pcall(function()
                         local track = KnifeSAState._getThrowTrack and KnifeSAState._getThrowTrack()
-                        if track then
-                            -- track.Length puede ser 0 si aun no cargó; usar max con minimo razonable
-                            local len = track.Length or 0
-                            if len > 0.1 then
-                                throwWait = len
-                            end
-                        end
+                        if not track then return end
+                        -- Esperar un frame para que Length se populate
+                        task.wait()
+                        local len = track.Length or 0
+                        if len < 0.05 then return end  -- track vacio o invalido, no esperar
+                        -- Conectar Stopped con timeout de seguridad (len + 0.3s max)
+                        local _conn
+                        local _timer = false
+                        _conn = track.Stopped:Connect(function()
+                            _throwDone = true
+                            if _conn then _conn:Disconnect(); _conn = nil end
+                        end)
+                        -- Timeout: si Stopped no se dispara, continuar igual
+                        task.delay(len + 0.3, function()
+                            _throwDone = true
+                            if _conn then _conn:Disconnect(); _conn = nil end
+                        end)
+                        -- Esperar hasta que Stopped o timeout
+                        local _t0 = os.clock()
+                        repeat task.wait(0.016) until _throwDone or (os.clock() - _t0 > len + 0.5)
                     end)
-                    task.wait(throwWait)
 
-                    -- 2. Lanzar el knife con SA una vez terminada la animacion
+                    -- 3. Lanzar el knife con SA una vez terminada la animacion
                     if throwRemote and CombatTabState and CombatTabState._saHookActive then
-                        -- El __namecall hook intercepta Throw:FireServer() y lo redirige con SA
                         pcall(function() throwRemote:FireServer() end)
                     else
                         pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
@@ -64198,4 +64212,163 @@ task.spawn(function()
         end)
     end)
 end)
+
+
+-- ================================================================
+-- FIX MOBILE: EquipWeapon se auto-equipaba al rotar camara (sheriff)
+-- El boton EquipWeapon del juego usa GameplayButton que interpreta
+-- TouchBegin como Activated, incluyendo drags de camara.
+-- SOLUCION: interceptar InputBegan/InputEnded del boton y cancelar
+-- si el touch tuvo movimiento significativo (= drag de camara, no tap).
+-- Solo aplica en mobile (TouchEnabled).
+-- ================================================================
+task.spawn(function()
+    local _UIS = game:GetService("UserInputService")
+    if not _UIS.TouchEnabled then return end
+
+    local _lp = game:GetService("Players").LocalPlayer
+    local _pg = _lp:WaitForChild("PlayerGui", 15)
+    if not _pg then return end
+
+    -- Esperar a que GameplayControlsUI exista (carga al entrar en partida)
+    local function _waitForEquipBtn()
+        local gcui = _pg:FindFirstChild("GameplayControlsUI")
+        if not gcui then
+            local conn; conn = _pg.ChildAdded:Connect(function(c)
+                if c.Name == "GameplayControlsUI" then
+                    conn:Disconnect()
+                    task.spawn(_waitForEquipBtn)
+                end
+            end)
+            return
+        end
+
+        -- Ruta: GameplayControlsUI -> TouchControls -> RightBar -> EquipWeapon
+        local tc = gcui:FindFirstChild("TouchControls")
+        if not tc then return end
+        local rb = tc:FindFirstChild("RightBar")
+        if not rb then return end
+        local equipBtn = rb:FindFirstChild("EquipWeapon")
+        if not equipBtn then return end
+
+        -- Variables de tracking por toque
+        local _touchStart   = {}   -- [inputId] = {x, y}
+        local _touchMoved   = {}   -- [inputId] = bool
+        local DRAG_THRESHOLD = 12  -- pixeles minimos para considerar drag
+
+        -- InputBegan: registrar inicio del toque sobre el boton
+        equipBtn.InputBegan:Connect(function(inp)
+            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+            local id = inp
+            _touchStart[id]  = {x = inp.Position.X, y = inp.Position.Y}
+            _touchMoved[id]  = false
+        end)
+
+        -- InputChanged: detectar si el toque se movio (drag de camara)
+        _UIS.InputChanged:Connect(function(inp)
+            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+            local id = inp
+            if not _touchStart[id] then return end
+            local dx = math.abs(inp.Position.X - _touchStart[id].x)
+            local dy = math.abs(inp.Position.Y - _touchStart[id].y)
+            if dx > DRAG_THRESHOLD or dy > DRAG_THRESHOLD then
+                _touchMoved[id] = true
+            end
+        end)
+
+        -- Bloquear Activated si el toque fue un drag
+        -- GameplayButton dispara Activated en InputEnded; usamos GuiObject.InputEnded
+        -- para interceptar ANTES de que GameplayButton lo procese.
+        -- Tecnica: si fue drag, hacer que el boton pierda el foco del touch via
+        -- cancelar la propagacion reposicionando el cursorPoint fuera del boton.
+        -- En la practica: marcar _touchMoved y dejar que InputEnded del boton
+        -- llame a un overguard que bloquea el EquipTool durante 0.15s.
+        local _blockEquip = false
+        equipBtn.InputEnded:Connect(function(inp)
+            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+            local id = inp
+            if _touchMoved[id] then
+                -- Fue drag: bloquear el EquipTool por un frame corto
+                _blockEquip = true
+                task.delay(0.15, function() _blockEquip = false end)
+            end
+            _touchStart[id] = nil
+            _touchMoved[id] = nil
+        end)
+
+        -- Parchear el Humanoid:EquipTool para ignorar llamadas durante _blockEquip
+        -- Esto intercepta la llamada que hace onEquipButtonActivated del GameplayControlsScript
+        local _patchedChar = nil
+        local function _patchHumanoid(char)
+            if _patchedChar == char then return end
+            _patchedChar = char
+            local hum = char:WaitForChild("Humanoid", 5)
+            if not hum then return end
+            -- Usar un metatable hook en el humanoid para filtrar EquipTool
+            -- Solo funciona si el executor soporta getrawmetatable/setreadonly
+            pcall(function()
+                if not (getrawmetatable and setreadonly and newcclosure) then return end
+                local mt = getrawmetatable(hum)
+                if not mt then return end
+                local oldIndex = mt.__index
+                setreadonly(mt, false)
+                mt.__index = newcclosure(function(self, key)
+                    if key == "EquipTool" and _blockEquip then
+                        -- Devolver funcion dummy que no hace nada durante el drag
+                        return function() end
+                    end
+                    if type(oldIndex) == "function" then
+                        return oldIndex(self, key)
+                    elseif type(oldIndex) == "table" then
+                        return oldIndex[key]
+                    end
+                end)
+                setreadonly(mt, true)
+            end)
+        end
+
+        -- Fallback simple si no hay soporte de metatable:
+        -- Interceptar Activated del boton directamente via conexion con prioridad
+        -- (se ejecuta antes que la del GameplayControlsScript porque se conecta despues
+        -- pero con task.spawn que corre inmediatamente en el mismo frame)
+        local _origActivated = equipBtn:FindFirstChildOfClass("BindableEvent")
+        equipBtn.Activated:Connect(function()
+            if _blockEquip then
+                -- Drag detectado: desconectar temporalmente no es posible,
+                -- pero podemos deshacer el equip inmediatamente
+                task.spawn(function()
+                    task.wait()  -- un frame
+                    if _blockEquip then
+                        local char = _lp.Character
+                        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                        -- Si la gun se equipo por error, desequiparla
+                        if hum then
+                            local hasGun = false
+                            if char then
+                                for _, t in ipairs(char:GetChildren()) do
+                                    if t:IsA("Tool") and (t:HasTag("Weapon_Gun") or t.Name == "Gun") then
+                                        hasGun = true; break
+                                    end
+                                end
+                            end
+                            if hasGun then
+                                pcall(function() hum:UnequipTools() end)
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+
+        -- Monitorear cambios de personaje para parchear el nuevo Humanoid
+        local char0 = _lp.Character
+        if char0 then task.spawn(_patchHumanoid, char0) end
+        _lp.CharacterAdded:Connect(function(char)
+            task.spawn(_patchHumanoid, char)
+        end)
+    end
+
+    task.spawn(_waitForEquipBtn)
+end)
+
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
