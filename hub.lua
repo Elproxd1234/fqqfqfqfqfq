@@ -64240,160 +64240,130 @@ end)
 
 
 -- ================================================================
--- FIX MOBILE: EquipWeapon se auto-equipaba al rotar camara (sheriff)
--- El boton EquipWeapon del juego usa GameplayButton que interpreta
--- TouchBegin como Activated, incluyendo drags de camara.
--- SOLUCION: interceptar InputBegan/InputEnded del boton y cancelar
--- si el touch tuvo movimiento significativo (= drag de camara, no tap).
--- Solo aplica en mobile (TouchEnabled).
+-- FIX MOBILE: la gun se equipa sola al tocar cualquier parte de la pantalla.
+-- CAUSA: el GameplayButton del juego hookea el ContextActionService con
+-- un binding de touch que abarca toda la pantalla. Cualquier touch que
+-- no caiga sobre otro boton UI con Sunk=true llega al EquipWeapon handler.
+-- SOLUCION: interceptar __namecall para bloquear Humanoid:EquipTool/UnequipTools
+-- cuando el touch NO ocurrio dentro del area visual del boton EquipWeapon.
 -- ================================================================
 task.spawn(function()
     local _UIS = game:GetService("UserInputService")
     if not _UIS.TouchEnabled then return end
 
-    local _lp = game:GetService("Players").LocalPlayer
-    local _pg = _lp:WaitForChild("PlayerGui", 15)
+    local _lp   = game:GetService("Players").LocalPlayer
+    local _pg   = _lp:WaitForChild("PlayerGui", 15)
     if not _pg then return end
 
-    -- Esperar a que GameplayControlsUI exista (carga al entrar en partida)
-    local function _waitForEquipBtn()
-        local gcui = _pg:FindFirstChild("GameplayControlsUI")
-        if not gcui then
-            local conn; conn = _pg.ChildAdded:Connect(function(c)
-                if c.Name == "GameplayControlsUI" then
-                    conn:Disconnect()
-                    task.spawn(_waitForEquipBtn)
-                end
-            end)
-            return
-        end
+    -- Ultima posicion de touch registrada globalmente
+    local _lastTouchX, _lastTouchY = -999, -999
+    local _lastTouchTime = -999
 
-        -- Ruta: GameplayControlsUI -> TouchControls -> RightBar -> EquipWeapon
-        local tc = gcui:FindFirstChild("TouchControls")
-        if not tc then return end
-        local rb = tc:FindFirstChild("RightBar")
-        if not rb then return end
-        local equipBtn = rb:FindFirstChild("EquipWeapon")
-        if not equipBtn then return end
+    _UIS.InputBegan:Connect(function(inp, sunk)
+        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+        _lastTouchX    = inp.Position.X
+        _lastTouchY    = inp.Position.Y
+        _lastTouchTime = os.clock()
+    end)
 
-        -- Variables de tracking por toque
-        local _touchStart   = {}   -- [inputId] = {x, y}
-        local _touchMoved   = {}   -- [inputId] = bool
-        local DRAG_THRESHOLD = 12  -- pixeles minimos para considerar drag
-
-        -- InputBegan: registrar inicio del toque sobre el boton
-        equipBtn.InputBegan:Connect(function(inp)
-            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-            local id = inp
-            _touchStart[id]  = {x = inp.Position.X, y = inp.Position.Y}
-            _touchMoved[id]  = false
+    -- Funcion que verifica si el ultimo touch cayo dentro del boton EquipWeapon
+    local function _touchWasOnEquipBtn(equipBtn)
+        if os.clock() - _lastTouchTime > 0.5 then return false end  -- touch demasiado viejo
+        local ok, inBtn = pcall(function()
+            local ap  = equipBtn.AbsolutePosition
+            local as  = equipBtn.AbsoluteSize
+            return _lastTouchX >= ap.X and _lastTouchX <= ap.X + as.X
+               and _lastTouchY >= ap.Y and _lastTouchY <= ap.Y + as.Y
         end)
-
-        -- InputChanged: detectar si el toque se movio (drag de camara)
-        _UIS.InputChanged:Connect(function(inp)
-            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-            local id = inp
-            if not _touchStart[id] then return end
-            local dx = math.abs(inp.Position.X - _touchStart[id].x)
-            local dy = math.abs(inp.Position.Y - _touchStart[id].y)
-            if dx > DRAG_THRESHOLD or dy > DRAG_THRESHOLD then
-                _touchMoved[id] = true
-            end
-        end)
-
-        -- Bloquear Activated si el toque fue un drag
-        -- GameplayButton dispara Activated en InputEnded; usamos GuiObject.InputEnded
-        -- para interceptar ANTES de que GameplayButton lo procese.
-        -- Tecnica: si fue drag, hacer que el boton pierda el foco del touch via
-        -- cancelar la propagacion reposicionando el cursorPoint fuera del boton.
-        -- En la practica: marcar _touchMoved y dejar que InputEnded del boton
-        -- llame a un overguard que bloquea el EquipTool durante 0.15s.
-        local _blockEquip = false
-        equipBtn.InputEnded:Connect(function(inp)
-            if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-            local id = inp
-            if _touchMoved[id] then
-                -- Fue drag: bloquear el EquipTool por un frame corto
-                _blockEquip = true
-                task.delay(0.15, function() _blockEquip = false end)
-            end
-            _touchStart[id] = nil
-            _touchMoved[id] = nil
-        end)
-
-        -- Parchear el Humanoid:EquipTool para ignorar llamadas durante _blockEquip
-        -- Esto intercepta la llamada que hace onEquipButtonActivated del GameplayControlsScript
-        local _patchedChar = nil
-        local function _patchHumanoid(char)
-            if _patchedChar == char then return end
-            _patchedChar = char
-            local hum = char:WaitForChild("Humanoid", 5)
-            if not hum then return end
-            -- Usar un metatable hook en el humanoid para filtrar EquipTool
-            -- Solo funciona si el executor soporta getrawmetatable/setreadonly
-            pcall(function()
-                if not (getrawmetatable and setreadonly and newcclosure) then return end
-                local mt = getrawmetatable(hum)
-                if not mt then return end
-                local oldIndex = mt.__index
-                setreadonly(mt, false)
-                mt.__index = newcclosure(function(self, key)
-                    if key == "EquipTool" and _blockEquip then
-                        -- Devolver funcion dummy que no hace nada durante el drag
-                        return function() end
-                    end
-                    if type(oldIndex) == "function" then
-                        return oldIndex(self, key)
-                    elseif type(oldIndex) == "table" then
-                        return oldIndex[key]
-                    end
-                end)
-                setreadonly(mt, true)
-            end)
-        end
-
-        -- Fallback simple si no hay soporte de metatable:
-        -- Interceptar Activated del boton directamente via conexion con prioridad
-        -- (se ejecuta antes que la del GameplayControlsScript porque se conecta despues
-        -- pero con task.spawn que corre inmediatamente en el mismo frame)
-        local _origActivated = equipBtn:FindFirstChildOfClass("BindableEvent")
-        equipBtn.Activated:Connect(function()
-            if _blockEquip then
-                -- Drag detectado: desconectar temporalmente no es posible,
-                -- pero podemos deshacer el equip inmediatamente
-                task.spawn(function()
-                    task.wait()  -- un frame
-                    if _blockEquip then
-                        local char = _lp.Character
-                        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-                        -- Si la gun se equipo por error, desequiparla
-                        if hum then
-                            local hasGun = false
-                            if char then
-                                for _, t in ipairs(char:GetChildren()) do
-                                    if t:IsA("Tool") and (t:HasTag("Weapon_Gun") or t.Name == "Gun") then
-                                        hasGun = true; break
-                                    end
-                                end
-                            end
-                            if hasGun then
-                                pcall(function() hum:UnequipTools() end)
-                            end
-                        end
-                    end
-                end)
-            end
-        end)
-
-        -- Monitorear cambios de personaje para parchear el nuevo Humanoid
-        local char0 = _lp.Character
-        if char0 then task.spawn(_patchHumanoid, char0) end
-        _lp.CharacterAdded:Connect(function(char)
-            task.spawn(_patchHumanoid, char)
-        end)
+        return ok and inBtn
     end
 
-    task.spawn(_waitForEquipBtn)
+    local function _applyFix()
+        local gcui = _pg:FindFirstChild("GameplayControlsUI")
+        if not gcui then return false end
+        local tc = gcui:FindFirstChild("TouchControls")
+        if not tc then return false end
+        local rb = tc:FindFirstChild("RightBar")
+        if not rb then return false end
+        local equipBtn = rb:FindFirstChild("EquipWeapon")
+        if not equipBtn then return false end
+
+        -- Hookear __namecall para interceptar Humanoid:EquipTool
+        -- cuando el touch no fue sobre el boton EquipWeapon
+        if not (getrawmetatable and setreadonly and newcclosure and getnamecallmethod) then
+            -- Fallback sin metatable: escuchar CharacterAdded y parchear Humanoid directamente
+            local function _patchChar(char)
+                -- Remplazar EquipTool con wrapper que verifica el touch
+                -- Nota: solo funciona en executors que permiten rawset en instancias
+                pcall(function()
+                    local hum = char:WaitForChild("Humanoid", 5)
+                    if not hum then return end
+                    -- Monitorear AncestryChanged del Tool para detectar equips automaticos
+                    char.ChildAdded:Connect(function(child)
+                        if not child:IsA("Tool") then return end
+                        if not (child:HasTag("Weapon_Gun") or child.Name == "Gun") then return end
+                        -- Una gun se equipo: verificar si el touch fue en el boton
+                        if not _touchWasOnEquipBtn(equipBtn) then
+                            task.wait()  -- diferir un frame
+                            pcall(function() hum:UnequipTools() end)
+                        end
+                    end)
+                end)
+            end
+            local char0 = _lp.Character
+            if char0 then task.spawn(_patchChar, char0) end
+            _lp.CharacterAdded:Connect(function(c) task.spawn(_patchChar, c) end)
+            return true
+        end
+
+        -- Hook __namecall (Solara y executors completos)
+        local _mt = getrawmetatable(game)
+        if not _G._equipFixRealNC then
+            _G._equipFixRealNC = _mt.__namecall
+        end
+        local _realNC = _G._equipFixRealNC
+        setreadonly(_mt, false)
+        _mt.__namecall = newcclosure(function(self, ...)
+            local method = ""
+            pcall(function() method = getnamecallmethod() end)
+
+            -- Interceptar Humanoid:EquipTool para guns
+            if method == "EquipTool" then
+                local isHum = false
+                pcall(function() isHum = self:IsA("Humanoid") end)
+                if isHum then
+                    local args = {...}
+                    local tool = args[1]
+                    local isGun = false
+                    pcall(function()
+                        isGun = tool and tool:IsA("Tool")
+                            and (tool:HasTag("Weapon_Gun") or tool.Name == "Gun")
+                    end)
+                    if isGun and not _touchWasOnEquipBtn(equipBtn) then
+                        -- Touch no fue sobre el boton: bloquear el equip
+                        return
+                    end
+                end
+            end
+
+            return _realNC(self, ...)
+        end)
+        setreadonly(_mt, true)
+        return true
+    end
+
+    -- Intentar aplicar inmediatamente; si GameplayControlsUI no existe, esperar
+    if not _applyFix() then
+        local _watchConn
+        _watchConn = _pg.DescendantAdded:Connect(function(desc)
+            if desc.Name == "EquipWeapon" then
+                task.wait(0.1)
+                if _applyFix() then
+                    _watchConn:Disconnect()
+                end
+            end
+        end)
+    end
 end)
 
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
