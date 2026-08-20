@@ -6610,7 +6610,7 @@ function _KnifeSA_setupKnife(knife)
     -- Recopilar todos los objetos Animation disponibles en el knife
     local function _findAllAnims()
         local found = {}
-        -- 1. Folder "Animations" (MM2 est?ndar)
+        -- 1. Folder "Animations" (MM2 estandar)
         local animFolder = knife:FindFirstChild("Animations")
         if animFolder then
             for _, v in ipairs(animFolder:GetChildren()) do
@@ -6621,14 +6621,39 @@ function _KnifeSA_setupKnife(knife)
         for _, v in ipairs(knife:GetChildren()) do
             if v:IsA("Animation") and not found[v.Name] then found[v.Name] = v end
         end
-        -- 3. B?squeda recursiva como fallback
+        -- 3. KnifeClient especificamente (MM2: ThrowCharge/ThrowHold/ThrowKnife viven ahi)
+        local kc = knife:FindFirstChild("KnifeClient")
+        if kc then
+            for _, v in ipairs(kc:GetChildren()) do
+                if v:IsA("Animation") and not found[v.Name] then found[v.Name] = v end
+            end
+            -- Sub-carpetas dentro de KnifeClient
+            for _, v in ipairs(kc:GetDescendants()) do
+                if v:IsA("Animation") and not found[v.Name] then found[v.Name] = v end
+            end
+        end
+        -- 4. Busqueda recursiva completa como fallback final
         for _, v in ipairs(knife:GetDescendants()) do
             if v:IsA("Animation") and not found[v.Name] then found[v.Name] = v end
         end
         return found
     end
 
-    local _animObjs   = _findAllAnims()   -- tabla nombre?Animation
+    local _animObjs   = _findAllAnims()   -- tabla nombre->Animation
+    -- FIX: KnifeClient puede cargar sus animaciones con un frame de delay.
+    -- Re-escanear despues de un momento para capturar ThrowKnife/ThrowCharge/ThrowHold.
+    task.spawn(function()
+        task.wait(0.5)
+        local fresh = _findAllAnims()
+        for k, v in pairs(fresh) do
+            if not _animObjs[k] then
+                _animObjs[k] = v
+            end
+        end
+        -- Debug actualizado
+        local _n2 = {}; for k in pairs(_animObjs) do table.insert(_n2, k) end
+        print("[KnifeSA] Anims tras re-scan:", table.concat(_n2, ", "))
+    end)
     local _animTracks = {}                -- tabla nombre?AnimationTrack (cacheado)
 
     -- Debug en consola
@@ -6709,7 +6734,7 @@ function _KnifeSA_setupKnife(knife)
     -- Nombres de throw y slash seg?n estructura real de MM2:
     -- ThrowCharge primero porque es el nombre real en MM2.
     -- Animation1 es SOLO slash ? no usarla para throw.
-    local _throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}
+    local _throwAnimNames = {"ThrowKnife", "ThrowCharge", "Throw", "Animation2"}  -- ThrowKnife primero: es el nombre real en MM2 (Knife.KnifeClient.ThrowKnife)
     local _slashAnimNames = {"SlashKnife", "Slash", "Stab", "Hit", "Animation1"}
 
     local function _playThrowAnim()
