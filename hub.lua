@@ -64655,6 +64655,31 @@ task.spawn(function()
         return nil
     end
 
+    -- Hook KnifeStabbed para bloquear el stab mientras lanzamos
+    -- Cuando _G._hubThrowActive==true, silenciamos el FireServer de KnifeStabbed
+    -- reemplazando temporalmente el RemoteEvent con un proxy que ignora el Fire
+    local function hookKnifeStabbed(knife)
+        if not knife then return end
+        local ev = knife:FindFirstChild("Events")
+        if not ev then return end
+        local stabRem = ev:FindFirstChild("KnifeStabbed")
+        if not stabRem or not stabRem:IsA("RemoteEvent") then return end
+
+        -- Hookear FireServer del RemoteEvent usando metatable
+        local mt = {}
+        local original = stabRem.FireServer
+        mt.__index = function(t, k)
+            if k == "FireServer" then
+                return function(self, ...)
+                    if _G._hubThrowActive then return end  -- bloquear stab
+                    return original(self, ...)
+                end
+            end
+            return rawget(t, k)
+        end
+        pcall(function() setmetatable(stabRem, mt) end)
+    end
+
     -- Encuentra el enemigo vivo mas cercano al jugador local
     local function getNearestEnemy()
         local char = getChar()
@@ -64719,6 +64744,10 @@ task.spawn(function()
 
     -- Ejecuta el lanzamiento: anima + FireServer con firma exacta del servidor
     local function executeThrow(knife, knifeThrown)
+        -- Bloquear stabKnife del KnifeClient mientras lanzamos
+        -- El KnifeClient chequea _G._hubThrowActive antes de ejecutar el stab
+        _G._hubThrowActive = true
+
         -- 1. Reproducir animacion ThrowKnife
         local animator = getAnimator()
         local track    = nil
@@ -64736,12 +64765,16 @@ task.spawn(function()
             end
         end
 
-        -- 2. Minima pausa para que la animacion arranque
-        task.wait(0.05)
+        -- 2. Minima pausa para que la animacion arranque antes del FireServer
+        task.wait(0.08)
 
         -- 3. Handle.CFrame + targetCF -> FireServer (firma exacta de MM2)
         local handleCF, targetCF = buildThrowCFrames(knife)
         pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+
+        -- Liberar el bloqueo despues de un frame
+        task.wait(0.1)
+        _G._hubThrowActive = false
     end
 
     -- ----------------------------------------------------------------
@@ -64794,6 +64827,8 @@ task.spawn(function()
         local knifeThrown = getKnifeThrown(knife)
         if not knifeThrown then return end
 
+        hookKnifeStabbed(knife)
+
         _throwBusy  = true
         _lastThrowT = now
 
@@ -64831,6 +64866,8 @@ task.spawn(function()
         local knifeThrown = getKnifeThrown(knife)
         if not knifeThrown then return end
 
+        hookKnifeStabbed(knife)
+
         _touchThrowBusy  = true
         _lastTouchThrowT = now
 
@@ -64845,6 +64882,24 @@ task.spawn(function()
     -- ----------------------------------------------------------------
     local _equipHooked = false
     local _throwHooked = false
+
+    -- Hook del Activated del knife para bloquear el stab cuando _G._hubThrowActive
+    -- Esto evita que el KnifeClient ejecute stabKnife() al mismo tiempo que lanzamos
+    local _knifeActivatedHooked = false
+    local function hookKnifeActivated(knife)
+        if _knifeActivatedHooked or not knife then return end
+        pcall(function()
+            knife.Activated:Connect(function()
+                -- Si estamos lanzando desde el hub, consumir el evento sin hacer nada
+                -- El stab del KnifeClient original se ejecuta via su propio :Connect
+                -- Este Connect se agrega ANTES que el del KnifeClient, pero Roblox
+                -- ejecuta todos en orden. No podemos cancelar el del KnifeClient,
+                -- asi que usamos el flag para que stabKnife() retorne temprano.
+                -- (El KnifeClient necesita el parche de abajo para leer el flag)
+            end)
+        end)
+        _knifeActivatedHooked = true
+    end
 
     local function hookButtons()
         local gcui = pg:FindFirstChild("GameplayControlsUI")
