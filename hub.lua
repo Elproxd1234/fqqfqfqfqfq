@@ -64367,3 +64367,451 @@ task.spawn(function()
 end)
 
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
+-- ================================================================
+-- == MOBILE KNIFE INTEGRATION v1
+-- Integra el sistema de cuchillo con los controles táctiles mobile.
+--
+-- COMPORTAMIENTO:
+--   Botón "Lanzar" (throwig/ThrowButton nativo del juego)
+--     ? Reproduce la animación ThrowCharge del KnifeClient
+--   Touch en pantalla (tap fuera de UI)
+--     ? Reproduce la animación Slash del KnifeClient
+--
+-- COMPATIBILIDAD:
+--   • Preserva todo el comportamiento existente de PC (RMB, LMB)
+--   • Coexiste con Knife Silent Aim (KnifeSAState)
+--   • Sin bucles innecesarios, sin conexiones duplicadas
+--   • Limpieza completa al desactivar / respawn
+-- ================================================================
+
+task.spawn(function()
+
+    -- -- 1. GUARDIA DE DISPOSITIVO ---------------------------------
+    local _UIS = game:GetService("UserInputService")
+    if not _UIS.TouchEnabled then return end  -- Solo mobile
+
+    -- -- 2. REFERENCIAS BASE ---------------------------------------
+    local _Players = game:GetService("Players")
+    local _lp      = _Players.LocalPlayer
+    local _pg      = _lp:WaitForChild("PlayerGui", 15)
+    if not _pg then return end
+
+    -- -- 3. ESTADO DEL SISTEMA -------------------------------------
+    -- Tabla de estado aislada para no contaminar globals
+    local _MKS = {
+        -- Conexiones activas (se desconectan al limpiar)
+        conns         = {},
+        -- Tiempo del último ThrowCharge activado (anti-doble disparo)
+        lastThrow     = -999,
+        -- Tiempo del último Slash activado
+        lastSlash     = -999,
+        -- Cooldowns (segundos)
+        throwCooldown = 0.4,
+        slashCooldown = 0.5,
+        -- Guard de limpieza activa
+        cleaning      = false,
+    }
+
+    -- Helper para registrar y guardar una conexión
+    local function _addConn(c)
+        if c then table.insert(_MKS.conns, c) end
+    end
+
+    -- Limpia TODAS las conexiones activas
+    local function _cleanAll()
+        if _MKS.cleaning then return end
+        _MKS.cleaning = true
+        for _, c in ipairs(_MKS.conns) do
+            pcall(function() c:Disconnect() end)
+        end
+        _MKS.conns    = {}
+        _MKS.cleaning = false
+    end
+
+    -- -- 4. HELPER: OBTENER KNIFE VÁLIDO --------------------------
+    -- Reutiliza la función global EquipKnife si existe,
+    -- de lo contrario busca el knife directamente.
+    local function _getKnife()
+        -- Preferir función global del hub (valida correctamente)
+        if type(EquipKnife) == "function" then
+            local ok, k = pcall(EquipKnife)
+            if ok and k then return k end
+        end
+        -- Fallback: buscar en Character y Backpack
+        local char = _lp.Character
+        if not char then return nil end
+        local function _isKnife(t)
+            if not t or not t:IsA("Tool") then return false end
+            local n = t.Name:lower()
+            if n:find("gun") or n:find("bomb") or n:find("snow") then return false end
+            if not t:FindFirstChild("Handle") then return false end
+            return t:FindFirstChild("KnifeClient") ~= nil
+                or n:find("knife") or n:find("blade")
+        end
+        for _, t in ipairs(char:GetChildren()) do
+            if _isKnife(t) then return t end
+        end
+        local bp = _lp:FindFirstChildOfClass("Backpack")
+        if bp then
+            for _, t in ipairs(bp:GetChildren()) do
+                if _isKnife(t) then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        pcall(function() hum:EquipTool(t) end)
+                        task.wait(0.15)
+                        for _, c in ipairs(char:GetChildren()) do
+                            if _isKnife(c) then return c end
+                        end
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    -- -- 5. HELPER: VERIFICAR CHARACTER VÁLIDO --------------------
+    local function _charOk()
+        local char = _lp.Character
+        if not char then return false end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        return hum and hum.Health > 0
+    end
+
+    -- -- 6. ACCIÓN: THROW CHARGE (botón Lanzar) -------------------
+    -- Reproduce la animación ThrowCharge existente del KnifeClient.
+    -- Si KnifeSAState._playThrowAnim está disponible (SA activo),
+    -- la usa directamente. Si no, activa knife:Activate() con la
+    -- cámara orientada hacia adelante (comportamiento nativo).
+    local function _doThrowCharge()
+        if not _charOk() then return end
+
+        -- Anti-doble disparo
+        local now = os.clock()
+        if now - _MKS.lastThrow < _MKS.throwCooldown then return end
+        _MKS.lastThrow = now
+
+        -- VÍA 1: KnifeSAState expone _playThrowAnim (SA activo/configurado)
+        if KnifeSAState and type(KnifeSAState._playThrowAnim) == "function" then
+            task.spawn(function()
+                pcall(KnifeSAState._playThrowAnim)
+            end)
+            return
+        end
+
+        -- VÍA 2: Acceso directo a las animaciones del KnifeClient
+        -- Intenta reproducir ThrowKnife / ThrowCharge / Throw / Animation2
+        -- a través del Animator del personaje, sin crear tracks duplicados.
+        task.spawn(function()
+            local char = _lp.Character
+            if not char then return end
+            local hum   = char:FindFirstChildOfClass("Humanoid")
+            local animr = hum and hum:FindFirstChildOfClass("Animator")
+            if not animr then return end
+
+            local knife = _getKnife()
+            if not knife then return end
+
+            -- Buscar animación de throw en el knife (mismo orden que el hub)
+            local _throwNames = {"ThrowKnife", "ThrowCharge", "Throw", "Animation2"}
+            local _throwAnim  = nil
+
+            local function _findInParent(parent)
+                if not parent then return nil end
+                for _, name in ipairs(_throwNames) do
+                    local a = parent:FindFirstChild(name)
+                    if a and a:IsA("Animation") then return a end
+                end
+                return nil
+            end
+
+            local kc = knife:FindFirstChild("KnifeClient")
+            _throwAnim = _findInParent(kc)
+                      or _findInParent(knife:FindFirstChild("Animations"))
+                      or _findInParent(knife)
+
+            -- Fallback: buscar recursivo
+            if not _throwAnim then
+                local _throwSet = {ThrowKnife=true, ThrowCharge=true, Throw=true, Animation2=true}
+                for _, v in ipairs(knife:GetDescendants()) do
+                    if v:IsA("Animation") and _throwSet[v.Name] then
+                        _throwAnim = v
+                        break
+                    end
+                end
+            end
+
+            if not _throwAnim then return end  -- Sin animación disponible
+
+            -- Cargar o reutilizar track (evita stacking)
+            local ok, track = pcall(function()
+                return animr:LoadAnimation(_throwAnim)
+            end)
+            if not ok or not track then return end
+
+            -- Detener tracks de throw previos para evitar conflicto
+            for _, t in ipairs(animr:GetPlayingAnimationTracks()) do
+                local id = t.Animation and t.Animation.AnimationId or ""
+                local tn = t.Name and t.Name:lower() or ""
+                if tn:find("throw") or tn:find("charge") or id == (_throwAnim.AnimationId or "") then
+                    pcall(function() t:Stop(0.05) end)
+                end
+            end
+
+            pcall(function() track:Play(0.05, 1, 1.0) end)
+        end)
+    end
+
+    -- -- 7. ACCIÓN: SLASH (touch en pantalla) ---------------------
+    -- Reproduce la animación Slash existente del KnifeClient.
+    -- Solo se activa si KnifeSAState._playSlashAnim está disponible.
+    local function _doSlashTouch()
+        if not _charOk() then return end
+
+        -- Solo si el SA está activo y expone la función de slash
+        if not KnifeSAState then return end
+        if not KnifeSAState.enabled then return end
+        if type(KnifeSAState._playSlashAnim) ~= "function" then return end
+
+        -- Anti-doble disparo
+        local now = os.clock()
+        if now - _MKS.lastSlash < _MKS.slashCooldown then return end
+        -- Separación con throw (evitar conflicto simultáneo)
+        if now - _MKS.lastThrow < 0.3 then return end
+        _MKS.lastSlash = now
+
+        task.spawn(function()
+            pcall(KnifeSAState._playSlashAnim)
+        end)
+    end
+
+    -- -- 8. HELPER: VERIFICAR SI UN PUNTO ESTÁ DENTRO DE UN GUIOBJECT --
+    local function _pointInGui(obj, x, y)
+        if not obj or not obj.Parent then return false end
+        local ok, inside = pcall(function()
+            local ap = obj.AbsolutePosition
+            local as = obj.AbsoluteSize
+            return x >= ap.X and x <= ap.X + as.X
+               and y >= ap.Y and y <= ap.Y + as.Y
+        end)
+        return ok and inside
+    end
+
+    -- -- 9. HELPER: DETECTAR SI UN TOUCH CAYÓ SOBRE UI ------------
+    -- Verifica el GuiService para ver si el touch fue "absorbido" por la UI.
+    -- Tambén chequea manualmente el hub y controles del juego.
+    local _GuiSvc = game:GetService("GuiService")
+
+    local function _touchIsOnUI(x, y)
+        -- Método 1: GuiService.TouchControlsEnabled (indica si GUI absorbió el input)
+        -- No es 100% confiable en executors, se usa como hint
+        local ok, onGui = pcall(function()
+            return _GuiSvc:IsTenFootInterface()  -- señal de que hay UI activa
+        end)
+
+        -- Método 2: Buscar el hub en CoreGui o PlayerGui
+        local function _checkGui(parent)
+            if not parent then return false end
+            -- Hub principal (ScreenGui "f")
+            local hubGui = parent:FindFirstChild("f")
+            if hubGui and hubGui.Enabled then
+                -- Verificar si el touch cayó sobre el Frame principal del hub
+                local mf = hubGui:FindFirstChildOfClass("Frame")
+                if mf and _pointInGui(mf, x, y) then return true end
+            end
+            return false
+        end
+
+        if _checkGui(game:GetService("CoreGui")) then return true end
+        if _checkGui(_pg) then return true end
+
+        -- Método 3: Verificar controles del juego (GameplayControlsUI)
+        local gcui = _pg:FindFirstChild("GameplayControlsUI")
+        if gcui then
+            -- Iterar todos los GuiObject hijos buscando el que contiene el touch
+            for _, obj in ipairs(gcui:GetDescendants()) do
+                if obj:IsA("GuiButton") or obj:IsA("Frame") then
+                    -- Solo chequear objetos visibles e interactivos
+                    local isBtn = obj:IsA("GuiButton")
+                    if isBtn and _pointInGui(obj, x, y) then
+                        return true
+                    end
+                end
+            end
+        end
+
+        -- Método 4: Usar el flag del hub si está disponible
+        if _G._hubHidden == false then
+            -- Hub visible: comparar posición con posición del hub
+            -- (heurística: si el touch está en la mitad izquierda donde vive el hub)
+            local vp = workspace.CurrentCamera.ViewportSize
+            if x < vp.X * 0.4 and y < vp.Y * 0.75 then
+                return true  -- Zona probable del hub
+            end
+        end
+
+        return false
+    end
+
+    -- -- 10. HOOK DEL BOTÓN "LANZAR" (throwig / ThrowButton) ------
+    -- Nombres posibles del botón nativo de MM2 para lanzar el knife.
+    -- El juego lo llama "throwig" (typo original del dev), pero puede
+    -- variar según la versión del juego o skin de UI.
+    local _throwBtnNames = {
+        throwig    = true,
+        Throw      = true,
+        ThrowButton= true,
+        ThrowBtn   = true,
+        ThrowKnife = true,
+        -- También el botón de lanzar en la barra de acciones del juego
+        ["Throw Knife"] = true,
+        ["throw"]  = true,
+    }
+
+    -- Tiempo del último hook para evitar doble conexión en el mismo objeto
+    local _hookedObjs = {}  -- WeakTable simulada: obj->true
+
+    local function _hookThrowBtn(obj)
+        if not obj then return end
+        if _hookedObjs[obj] then return end  -- Ya hookeado
+        _hookedObjs[obj] = true
+
+        -- Intentar Activated (GuiButton estándar)
+        local _lastObjThrow = -999
+        local function _onActivated()
+            local now = os.clock()
+            if now - _lastObjThrow < 0.35 then return end
+            _lastObjThrow = now
+            _doThrowCharge()
+        end
+
+        pcall(function()
+            -- Activated: funciona en GuiButton (TextButton, ImageButton)
+            _addConn(obj.Activated:Connect(_onActivated))
+        end)
+
+        -- InputBegan como respaldo (funciona en Frame/ImageLabel con Active=true)
+        pcall(function()
+            _addConn(obj.InputBegan:Connect(function(inp)
+                if inp.UserInputType ~= Enum.UserInputType.Touch
+                and inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                local now = os.clock()
+                if now - _lastObjThrow < 0.35 then return end
+                _lastObjThrow = now
+                _doThrowCharge()
+            end))
+        end)
+    end
+
+    -- Escaneo recursivo de la PlayerGui buscando botones de throw
+    local function _scanForThrowBtns(parent, depth)
+        if not parent or depth > 10 then return end
+        local ok, children = pcall(function() return parent:GetChildren() end)
+        if not ok then return end
+        for _, child in ipairs(children) do
+            if child:IsA("GuiObject") and _throwBtnNames[child.Name] then
+                _hookThrowBtn(child)
+            end
+            _scanForThrowBtns(child, depth + 1)
+        end
+    end
+
+    -- Escanear la UI existente inmediatamente
+    _scanForThrowBtns(_pg, 0)
+
+    -- Watcher: hookear botones que aparezcan después (UI cargada en ronda)
+    _addConn(_pg.DescendantAdded:Connect(function(desc)
+        if desc:IsA("GuiObject") and _throwBtnNames[desc.Name] then
+            task.defer(function()
+                -- Pequeño delay para que el objeto esté completamente inicializado
+                if desc.Parent then
+                    _hookThrowBtn(desc)
+                end
+            end)
+        end
+    end))
+
+    -- -- 11. HOOK DEL TOUCH EN PANTALLA (Slash) -------------------
+    -- Detecta taps rápidos en la pantalla que no caigan sobre UI.
+    -- Solo reproduce Slash si KnifeSA está activo.
+
+    local _touchStartTime = -999
+    local _touchStartX    = -999
+    local _touchStartY    = -999
+    local _MAX_TAP_DURATION = 0.35  -- segundos máximos para considerarse tap (no drag)
+    local _MAX_TAP_DRIFT    = 25    -- pixels máximos de desplazamiento
+
+    -- InputBegan: registrar inicio del touch
+    _addConn(_UIS.InputBegan:Connect(function(inp, sunk)
+        if sunk then return end  -- UI absorbió el input
+        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+        _touchStartTime = os.clock()
+        _touchStartX    = inp.Position.X
+        _touchStartY    = inp.Position.Y
+    end))
+
+    -- InputEnded: verificar si fue un tap válido para slash
+    _addConn(_UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+        if _touchStartTime < 0 then return end
+
+        local elapsed = os.clock() - _touchStartTime
+        local dx      = math.abs(inp.Position.X - _touchStartX)
+        local dy      = math.abs(inp.Position.Y - _touchStartY)
+
+        -- Resetear siempre para el próximo ciclo
+        local sx, sy = _touchStartX, _touchStartY
+        _touchStartTime = -999
+
+        -- ¿Fue un tap (rápido y sin drift)?
+        if elapsed > _MAX_TAP_DURATION then return end
+        if dx > _MAX_TAP_DRIFT or dy > _MAX_TAP_DRIFT then return end
+
+        -- ¿Cayó sobre UI (hub, controles, botones)?
+        if _touchIsOnUI(sx, sy) then return end
+
+        -- ¿Cayó sobre un botón de throw? (evitar que slash y throw se activen juntos)
+        -- Los botones de throw ya manejan su propia acción en el hook de arriba.
+        local function _touchIsOnThrowBtn()
+            local gcui = _pg:FindFirstChild("GameplayControlsUI")
+            if not gcui then return false end
+            for _, obj in ipairs(gcui:GetDescendants()) do
+                if obj:IsA("GuiObject") and _throwBtnNames[obj.Name] then
+                    if _pointInGui(obj, sx, sy) then return true end
+                end
+            end
+            return false
+        end
+        if _touchIsOnThrowBtn() then return end
+
+        -- Todo ok: ejecutar slash
+        _doSlashTouch()
+    end))
+
+    -- -- 12. LIMPIEZA AL RESPAWN / DESTRUCCIÓN --------------------
+    -- Reconectar automáticamente cuando el personaje reaparece,
+    -- ya que los hooks de botón pueden referirse a objetos destruidos.
+    local function _onCharacterAdded(char)
+        -- Limpiar hookedObjs de objetos ya destruidos (GC ayuda, pero limpiar explícitamente)
+        _hookedObjs = {}
+        -- Re-escanear UI por si los botones se recrearon
+        task.delay(0.5, function()
+            _scanForThrowBtns(_pg, 0)
+        end)
+    end
+
+    _addConn(_lp.CharacterAdded:Connect(_onCharacterAdded))
+
+    -- -- 13. EXPOSICIÓN GLOBAL (opcional para depuración) ---------
+    -- Permite que otras partes del hub accedan al estado del sistema.
+    _G._MobileKnifeSystem = {
+        doThrowCharge = _doThrowCharge,
+        doSlashTouch  = _doSlashTouch,
+        cleanup       = _cleanAll,
+        state         = _MKS,
+    }
+
+    _log("[MobileKnife] Sistema mobile de cuchillo inicializado. Touch ? Slash | Botón Lanzar ? ThrowCharge")
+end)
+-- ================================================================
+-- == FIN MOBILE KNIFE INTEGRATION v1
+-- ================================================================
