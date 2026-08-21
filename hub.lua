@@ -64592,11 +64592,15 @@ task.spawn(function()
                 pcall(function()
                     local hum = char:WaitForChild("Humanoid", 5)
                     if not hum then return end
-                    -- Monitorear AncestryChanged del Tool para detectar equips automaticos
+                    -- Monitorear ChildAdded del Character para detectar equips automaticos de gun.
+                    -- FIX: ignorar completamente knives - solo revertir guns no intencionales.
                     char.ChildAdded:Connect(function(child)
                         if not child:IsA("Tool") then return end
+                        -- Si es knife: NUNCA interferir, dejar pasar siempre
+                        if child:HasTag("Weapon_Knife") or child.Name == "Knife" then return end
+                        -- Solo actuar sobre guns
                         if not (child:HasTag("Weapon_Gun") or child.Name == "Gun") then return end
-                        -- Una gun se equipo: verificar si el touch fue en el boton
+                        -- Una gun se equipo sola: verificar si el touch fue en el boton
                         if not _touchWasOnEquipBtn(equipBtn) then
                             task.wait()  -- diferir un frame
                             pcall(function() hum:UnequipTools() end)
@@ -64621,7 +64625,10 @@ task.spawn(function()
             local method = ""
             pcall(function() method = getnamecallmethod() end)
 
-            -- Interceptar Humanoid:EquipTool para guns
+            -- Interceptar Humanoid:EquipTool SOLO para guns que se disparan solas.
+            -- FIX: NO bloquear knives jamas - el knife siempre debe pasar sin filtro.
+            -- Antes el bloque aplicaba a cualquier Tool, lo que impedia equipar el
+            -- knife cuando el touch no caia exactamente sobre el boton EquipWeapon.
             if method == "EquipTool" then
                 local isHum = false
                 pcall(function() isHum = self:IsA("Humanoid") end)
@@ -64629,12 +64636,17 @@ task.spawn(function()
                     local args = {...}
                     local tool = args[1]
                     local isGun = false
+                    local isKnife = false
                     pcall(function()
-                        isGun = tool and tool:IsA("Tool")
-                            and (tool:HasTag("Weapon_Gun") or tool.Name == "Gun")
+                        isGun   = tool and tool:IsA("Tool")
+                                  and (tool:HasTag("Weapon_Gun") or tool.Name == "Gun")
+                        -- Knife: tag oficial MM2 o nombre "Knife" - NUNCA bloquear
+                        isKnife = tool and tool:IsA("Tool")
+                                  and (tool:HasTag("Weapon_Knife") or tool.Name == "Knife")
                     end)
-                    if isGun and not _touchWasOnEquipBtn(equipBtn) then
-                        -- Touch no fue sobre el boton: bloquear el equip
+                    -- Solo bloquear guns que se equipan solas (touch fuera del boton)
+                    -- Si es knife, dejar pasar siempre
+                    if isGun and not isKnife and not _touchWasOnEquipBtn(equipBtn) then
                         return
                     end
                 end
