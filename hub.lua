@@ -64628,30 +64628,6 @@ task.spawn(function()
     end
 
 
-    -- Hook KnifeStabbed para bloquear el stab mientras lanzamos
-    -- Cuando _G._hubThrowActive==true, silenciamos el FireServer de KnifeStabbed
-    -- reemplazando temporalmente el RemoteEvent con un proxy que ignora el Fire
-    local function hookKnifeStabbed(knife)
-        if not knife then return end
-        local ev = knife:FindFirstChild("Events")
-        if not ev then return end
-        local stabRem = ev:FindFirstChild("KnifeStabbed")
-        if not stabRem or not stabRem:IsA("RemoteEvent") then return end
-
-        -- Hookear FireServer del RemoteEvent usando metatable
-        local mt = {}
-        local original = stabRem.FireServer
-        mt.__index = function(t, k)
-            if k == "FireServer" then
-                return function(self, ...)
-                    if _G._hubThrowActive then return end  -- bloquear stab
-                    return original(self, ...)
-                end
-            end
-            return rawget(t, k)
-        end
-        pcall(function() setmetatable(stabRem, mt) end)
-    end
 
     -- Encuentra el enemigo vivo mas cercano al jugador local
     local function getNearestEnemy()
@@ -64717,8 +64693,6 @@ task.spawn(function()
 
     -- Ejecuta el lanzamiento
     local function executeThrow(knife, knifeThrown)
-        _G._hubThrowActive = true
-
         -- Reproducir ThrowKnife directo desde la ruta exacta
         local animator = getAnimator()
         if animator then
@@ -64737,9 +64711,6 @@ task.spawn(function()
 
         local handleCF, targetCF = buildThrowCFrames(knife)
         pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
-
-        task.wait(0.1)
-        _G._hubThrowActive = false
     end
 
     -- ----------------------------------------------------------------
@@ -64792,8 +64763,6 @@ task.spawn(function()
         local knifeThrown = getKnifeThrown(knife)
         if not knifeThrown then return end
 
-        hookKnifeStabbed(knife)
-
         _throwBusy  = true
         _lastThrowT = now
 
@@ -64803,44 +64772,7 @@ task.spawn(function()
         end)
     end
 
-    -- ----------------------------------------------------------------
-    -- TOUCH EN PANTALLA -> LANZAR  [v4]
-    --
-    -- Usamos InputBegan con Touch para detectar el tap en pantalla.
-    -- gameProcessed=true significa que el tap fue en un boton de UI -> ignorar.
-    -- Esto no colisiona con el TouchTapInWorld del KnifeClient original
-    -- porque ese solo dispara cuando v13==true (estado ThrowHold).
-    -- Nosotros disparamos directamente con FireServer siempre que el
-    -- knife este en mano, sin importar el estado interno del KnifeClient.
-    -- ----------------------------------------------------------------
-    local _touchThrowBusy  = false
-    local _lastTouchThrowT = -999
-    local TOUCH_THROW_CD   = 0.5
 
-    UIS.InputBegan:Connect(function(inp, gp)
-        if gp then return end  -- tap en boton de UI -> ignorar
-        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-
-        local now = os.clock()
-        if now - _lastTouchThrowT < TOUCH_THROW_CD then return end
-        if _touchThrowBusy then return end
-
-        local knife, loc = findKnife()
-        if not knife or loc ~= "char" then return end
-
-        local knifeThrown = getKnifeThrown(knife)
-        if not knifeThrown then return end
-
-        hookKnifeStabbed(knife)
-
-        _touchThrowBusy  = true
-        _lastTouchThrowT = now
-
-        task.spawn(function()
-            executeThrow(knife, knifeThrown)
-            _touchThrowBusy = false
-        end)
-    end)
 
     -- ----------------------------------------------------------------
     -- HOOKEAR BOTONES (una sola conexion por boton)
@@ -64848,23 +64780,6 @@ task.spawn(function()
     local _equipHooked = false
     local _throwHooked = false
 
-    -- Hook del Activated del knife para bloquear el stab cuando _G._hubThrowActive
-    -- Esto evita que el KnifeClient ejecute stabKnife() al mismo tiempo que lanzamos
-    local _knifeActivatedHooked = false
-    local function hookKnifeActivated(knife)
-        if _knifeActivatedHooked or not knife then return end
-        pcall(function()
-            knife.Activated:Connect(function()
-                -- Si estamos lanzando desde el hub, consumir el evento sin hacer nada
-                -- El stab del KnifeClient original se ejecuta via su propio :Connect
-                -- Este Connect se agrega ANTES que el del KnifeClient, pero Roblox
-                -- ejecuta todos en orden. No podemos cancelar el del KnifeClient,
-                -- asi que usamos el flag para que stabKnife() retorne temprano.
-                -- (El KnifeClient necesita el parche de abajo para leer el flag)
-            end)
-        end)
-        _knifeActivatedHooked = true
-    end
 
     local function hookButtons()
         local gcui = pg:FindFirstChild("GameplayControlsUI")
@@ -64912,10 +64827,8 @@ task.spawn(function()
         _throwHooked   = false
         _equipFired    = false
         _throwBusy     = false
-        _touchThrowBusy = false
         _lastEquipT    = -999
         _lastThrowT    = -999
-        _lastTouchThrowT = -999
         task.wait(0.6)
         hookButtons()
     end)
