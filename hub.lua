@@ -49332,11 +49332,93 @@ function CreateCombatTab()
                         repeat task.wait(0.016) until _throwDone or (os.clock() - _t0 > len + 0.5)
                     end)
 
-                    -- 3. Lanzar el knife con SA una vez terminada la animacion
-                    if throwRemote and CombatTabState and CombatTabState._saHookActive then
-                        pcall(function() throwRemote:FireServer() end)
-                    else
-                        pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+                    -- 3. Calcular target SA y lanzar el knife al terminar ThrowCharge
+                    -- FIX MOBILE THROW: recalcular handleCF/targetCF AQUI, despues de la animacion,
+                    -- usando la misma logica de prediccion que el desktop (RMB).
+                    do
+                        local myChar2 = LocalPlayer.Character
+                        local myHRP   = myChar2 and myChar2:FindFirstChild("HumanoidRootPart")
+                        local finalHandleCF, finalTargetCF
+
+                        -- Obtener knife/remote frescos (pueden haber cambiado durante la anim)
+                        local freshKnife       = myChar2 and myChar2:FindFirstChild("Knife")
+                        local freshEvents      = freshKnife and (freshKnife:FindFirstChild("Events") or freshKnife)
+                        local freshKnifeThrown = freshEvents and (
+                            freshEvents:FindFirstChild("KnifeThrown")
+                            or freshKnife:FindFirstChildWhichIsA("RemoteEvent")
+                        )
+                        local freshThrowRemote = freshEvents and freshEvents:FindFirstChild("Throw")
+
+                        if KnifeSAState.enabled then
+                            local target = _KnifeSA_getBestTarget()
+                            if target and target.Character and myHRP then
+                                local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                                local tHum = target.Character:FindFirstChildOfClass("Humanoid")
+                                if tHRP and tHum and tHum.Health > 0 then
+                                    local canShoot = true
+                                    if KnifeSAState.wallCheck then
+                                        local tChar2 = target.Character
+                                        local tHead  = tChar2:FindFirstChild("Head")
+                                        local losHRP = wallCheckRaycast(myHRP.Position, tHRP.Position, tChar2)
+                                        local losHead = not losHRP and tHead and wallCheckRaycast(
+                                            myHRP.Position + Vector3.new(0,1.5,0), tHead.Position, tChar2)
+                                        canShoot = losHRP or losHead
+                                    end
+                                    if canShoot then
+                                        local predictedPos = _KnifeSA_getPredictedPos(tHRP, target.Character)
+                                        local throwOrigin  = myHRP.Position + Vector3.new(0, 1.5, 0)
+                                        if throwOrigin.Y < 0.5 then
+                                            throwOrigin = Vector3.new(throwOrigin.X, 0.5, throwOrigin.Z)
+                                        end
+                                        local minY = math.max(0.3, tHRP.Position.Y - 1.5)
+                                        if predictedPos.Y < minY then
+                                            predictedPos = Vector3.new(predictedPos.X, tHRP.Position.Y + 0.5, predictedPos.Z)
+                                        end
+                                        local aimVec = predictedPos - throwOrigin
+                                        if aimVec.Magnitude < 0.01 then aimVec = myHRP.CFrame.LookVector end
+                                        local aimDir = aimVec.Unit
+                                        local backDir = throwOrigin - predictedPos
+                                        finalTargetCF = backDir.Magnitude > 0.1
+                                            and CFrame.new(predictedPos, predictedPos + backDir.Unit)
+                                            or  CFrame.new(predictedPos)
+                                        finalHandleCF = CFrame.new(throwOrigin, throwOrigin + aimDir)
+                                    end
+                                end
+                            end
+                        end
+
+                        -- Fallback: lanzar hacia el frente si no hay target SA
+                        if not finalTargetCF and myHRP then
+                            local orig = myHRP.Position + Vector3.new(0, 1.5, 0)
+                            local fwd  = orig + myHRP.CFrame.LookVector * 30
+                            finalHandleCF = CFrame.new(orig, fwd)
+                            local back = orig - fwd
+                            finalTargetCF = back.Magnitude > 0.1
+                                and CFrame.new(fwd, fwd + back.Unit)
+                                or  CFrame.new(fwd)
+                        end
+
+                        -- Disparar con multiples firmas (igual que desktop)
+                        local fired = false
+                        if freshThrowRemote and CombatTabState and CombatTabState._saHookActive then
+                            pcall(function() freshThrowRemote:FireServer(); fired = true end)
+                        end
+                        if not fired and freshKnifeThrown and finalHandleCF and finalTargetCF then
+                            pcall(function() freshKnifeThrown:FireServer(finalHandleCF, finalTargetCF); fired = true end)
+                        end
+                        if not fired and freshKnifeThrown and finalTargetCF then
+                            pcall(function() freshKnifeThrown:FireServer(finalTargetCF, finalHandleCF); fired = true end)
+                        end
+                        if not fired and freshKnifeThrown and finalTargetCF then
+                            pcall(function() freshKnifeThrown:FireServer(finalTargetCF); fired = true end)
+                        end
+                        if not fired and freshKnifeThrown and finalHandleCF then
+                            pcall(function() freshKnifeThrown:FireServer(finalHandleCF); fired = true end)
+                        end
+                        -- Fallback final: usar referencias originales del inicio de _ksaDoThrow
+                        if not fired and knifeThrown then
+                            pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
+                        end
                     end
                 end
 
@@ -64512,19 +64594,19 @@ task.spawn(function()
 end)
 
 -- ================================================================
--- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim)
+-- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim) v2
 --
--- PROBLEMA: cuando Knife SA esta activo, deshabilita KnifeClient y
--- toma control del knife. El boton "EquipWeapon" nativo de MM2 en
--- mobile llama a Humanoid:EquipTool/UnequipTools, pero como KnifeClient
--- esta deshabilitado el equip puede no reflejarse correctamente y ademas
--- el touch del boton Equipar podia disparar _ksaDoThrow (ThrowCharge).
+-- FIX v2: el hook anterior se rompia despues del primer uso porque:
+--   1. Capturaba 'char' en el closure -> quedaba stale tras respawn
+--   2. No tenia guard de doble-hook -> si el boton se recreaba, el
+--      Activated anterior se desconectaba silenciosamente
+--   3. No reconectaba en CharacterAdded
 --
--- SOLUCION: hookear el boton EquipWeapon del GameplayControlsUI para
--- que al tocarlo:
---   1. Registre _lastEquipTime (evita que _ksaDoThrow se dispare por ese touch)
---   2. Mueva el knife directamente al Character (replica al servidor) si no esta equipado
---   3. Lo desequipe (moverlo a Backpack) si ya esta equipado
+-- SOLUCION v2:
+--   - _equipKnifeForSA siempre lee LocalPlayer.Character fresco
+--   - guard _G._equipBtnHooked evita doble-conexion al mismo boton
+--   - CharacterAdded resetea el guard para el proximo respawn
+--   - cooldown de 0.3s entre presses para evitar doble-fire
 -- ================================================================
 task.spawn(function()
     local _UIS2 = game:GetService("UserInputService")
@@ -64534,29 +64616,47 @@ task.spawn(function()
     local _pg2 = _lp2:WaitForChild("PlayerGui", 15)
     if not _pg2 then return end
 
+    -- Guard global: evita hookear el mismo boton dos veces
+    _G._equipBtnHooked = false
+    local _lastEquipPress = -999
+    local EQUIP_CD = 0.3  -- cooldown entre presses (segundos)
+
+    -- SIEMPRE lee Character fresco desde LocalPlayer (no captura el closure)
     local function _equipKnifeForSA()
-        -- Registrar tiempo de equip SIEMPRE, antes de cualquier otra accion
-        -- Esto evita que _ksaDoThrow se dispare por el mismo touch
+        -- Cooldown para evitar doble-fire
+        local now = os.clock()
+        if now - _lastEquipPress < EQUIP_CD then return end
+        _lastEquipPress = now
+
+        -- Registrar tiempo de equip ANTES de cualquier operacion
+        -- Evita que _ksaDoThrow se dispare por el mismo touch
         KnifeSAState._lastEquipTime = os.clock()
 
+        -- Leer Character FRESCO (no capturado en closure)
         local char = _lp2.Character
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
 
-        -- Verificar si el knife ya esta en el personaje
+        -- Leer Backpack FRESCO
+        local bp = _lp2.Backpack
+
+        -- Verificar si el knife ya esta equipado en el Character
         local knifeInChar = char:FindFirstChild("Knife")
         if knifeInChar then
-            -- Ya equipado: desequipar (moverlo de vuelta al Backpack)
+            -- Ya equipado -> desequipar
             pcall(function() hum:UnequipTools() end)
+            -- Esperar un frame y re-registrar lastEquipTime
+            -- para que _ksaDoThrow no se dispare al soltar
+            task.wait(0.05)
+            KnifeSAState._lastEquipTime = os.clock()
             return
         end
 
-        -- Buscar el knife en el Backpack
-        local bp = _lp2.Backpack
+        -- Buscar knife en Backpack
         local knifeInBP = bp and bp:FindFirstChild("Knife")
         if not knifeInBP then return end
 
-        -- Metodo 1: mover Tool al Character (replica correctamente al servidor)
+        -- Metodo 1: mover Tool directamente al Character (replica al servidor en mobile)
         local equipOk = false
         pcall(function()
             knifeInBP.Parent = char
@@ -64568,31 +64668,15 @@ task.spawn(function()
             pcall(function() hum:EquipTool(knifeInBP) end)
         end
 
-        -- Actualizar _lastEquipTime de nuevo despues del equip (el Equipped event
-        -- del knife lo sobreescribira, pero por si no se dispara)
+        -- Re-registrar lastEquipTime despues del equip
         task.wait(0.05)
         KnifeSAState._lastEquipTime = os.clock()
     end
 
-    local function _hookEquipBtn(equipBtn)
-        -- Conectar Activated (GuiButton) e InputBegan (Frame/ImageLabel) como respaldo
-        pcall(function()
-            equipBtn.Activated:Connect(function()
-                if not KnifeSAState or not KnifeSAState.enabled then return end
-                task.spawn(_equipKnifeForSA)
-            end)
-        end)
-        pcall(function()
-            equipBtn.InputBegan:Connect(function(inp)
-                if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-                if not KnifeSAState or not KnifeSAState.enabled then return end
-                -- Registrar _lastEquipTime inmediatamente al tocar (antes del Activated)
-                KnifeSAState._lastEquipTime = os.clock()
-            end)
-        end)
-    end
+    -- Hookea el boton; retorna true si lo encontro y conecto
+    local function _hookEquipBtn()
+        if _G._equipBtnHooked then return true end  -- ya hooked, no duplicar
 
-    local function _findAndHookEquipBtn()
         local gcui = _pg2:FindFirstChild("GameplayControlsUI")
         if not gcui then return false end
         local tc = gcui:FindFirstChild("TouchControls")
@@ -64601,25 +64685,54 @@ task.spawn(function()
         if not rb then return false end
         local equipBtn = rb:FindFirstChild("EquipWeapon")
         if not equipBtn then return false end
-        _hookEquipBtn(equipBtn)
+
+        -- Activated: dispara cuando el GuiButton recibe un tap completo
+        pcall(function()
+            equipBtn.Activated:Connect(function()
+                if not KnifeSAState or not KnifeSAState.enabled then return end
+                task.spawn(_equipKnifeForSA)
+            end)
+        end)
+
+        -- InputBegan: registrar _lastEquipTime inmediatamente al tocar
+        -- (antes de que Activated se dispare, para bloquear _ksaDoThrow)
+        pcall(function()
+            equipBtn.InputBegan:Connect(function(inp)
+                if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+                if not KnifeSAState or not KnifeSAState.enabled then return end
+                KnifeSAState._lastEquipTime = os.clock()
+            end)
+        end)
+
+        _G._equipBtnHooked = true
         return true
     end
 
-    -- Aplicar inmediatamente o esperar a que cargue la UI
-    if not _findAndHookEquipBtn() then
+    -- Hookear inmediatamente si la UI ya existe, si no esperar
+    if not _hookEquipBtn() then
         local _wc2
         _wc2 = _pg2.DescendantAdded:Connect(function(desc)
             if desc.Name == "EquipWeapon" then
                 task.wait(0.15)
-                if _findAndHookEquipBtn() then
+                if _hookEquipBtn() then
                     _wc2:Disconnect()
                 end
             end
         end)
     end
+
+    -- En cada respawn: resetear el guard para que el proximo CharacterAdded
+    -- pueda volver a hookear si el boton fue recreado por MM2
+    _lp2.CharacterAdded:Connect(function()
+        _G._equipBtnHooked = false
+        _lastEquipPress    = -999
+        -- Intentar re-hookear despues de un frame (UI puede tardar en cargar)
+        task.wait(0.5)
+        _hookEquipBtn()
+    end)
 end)
 -- ================================================================
--- == FIN FIX BOTON EQUIPAR MOBILE
+-- == FIN FIX BOTON EQUIPAR MOBILE v2
 -- ================================================================
 
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
