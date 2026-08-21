@@ -64589,14 +64589,14 @@ task.spawn(function()
         local bp = lp:FindFirstChildOfClass("Backpack")
         if c then
             for _, v in ipairs(c:GetChildren()) do
-                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name:lower():find("knife")) then
+                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name == "Knife" or v.Name:lower():find("knife")) then
                     return v, "char"
                 end
             end
         end
         if bp then
             for _, v in ipairs(bp:GetChildren()) do
-                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name:lower():find("knife")) then
+                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name == "Knife" or v.Name:lower():find("knife")) then
                     return v, "bp"
                 end
             end
@@ -64605,48 +64605,53 @@ task.spawn(function()
     end
 
     -- Obtiene KnifeThrown RemoteEvent del knife
+    -- Busca en Events.KnifeThrown (estructura estandar de MM2)
+    -- y tambien en el nivel raiz del knife como fallback
     local function getKnifeThrown(knife)
         if not knife then return nil end
+
+        -- Ruta estandar: Knife.Events.KnifeThrown
         local ev = knife:FindFirstChild("Events")
-        return ev and ev:FindFirstChild("KnifeThrown")
+        if ev then
+            local rem = ev:FindFirstChild("KnifeThrown")
+            if rem then return rem end
+        end
+
+        -- Fallback: buscar RemoteEvent llamado KnifeThrown en cualquier nivel
+        for _, v in ipairs(knife:GetDescendants()) do
+            if v:IsA("RemoteEvent") and v.Name == "KnifeThrown" then
+                return v
+            end
+        end
+
+        return nil
     end
 
-    -- Busca una Animation por nombre dentro de KnifeClient (Script con Animations hijas)
-    -- MM2 guarda las animaciones como hijos del LocalScript KnifeClient
-    local function findAnimInKnifeClient(knife, animName)
+    -- Obtiene ThrowKnife directamente desde la ruta exacta confirmada:
+    -- Knife.KnifeClient.ThrowKnife  (Animation hijo directo del LocalScript)
+    local function getThrowKnifeAnim(knife)
         if not knife then return nil end
-        -- Buscar en KnifeClient (LocalScript)
         local kc = knife:FindFirstChild("KnifeClient")
-        if kc then
-            -- Hijo directo con ese nombre
-            local direct = kc:FindFirstChild(animName)
-            if direct and direct:IsA("Animation") then return direct end
-            -- Buscar en subcarpetas (Dual, etc.)
-            for _, child in ipairs(kc:GetChildren()) do
-                local found = child:FindFirstChild(animName)
-                if found and found:IsA("Animation") then return found end
-                -- Un nivel mas adentro
-                if child:IsA("Folder") or child:IsA("Model") then
-                    for _, sub in ipairs(child:GetChildren()) do
-                        if sub:IsA("Animation") and sub.Name == animName then return sub end
-                    end
-                end
-            end
-            -- Fallback: cualquier Animation cuyo nombre contenga la keyword
-            local keyword = animName:lower()
-            for _, v in ipairs(kc:GetDescendants()) do
-                if v:IsA("Animation") and v.Name:lower():find(keyword) then
+        if not kc then return nil end
+
+        -- Ruta exacta: KnifeClient.ThrowKnife
+        local anim = kc:FindFirstChild("ThrowKnife")
+        if anim and anim:IsA("Animation") then return anim end
+
+        -- Fallback: cualquier Animation "throw" que no sea charge/hold
+        for _, v in ipairs(kc:GetChildren()) do
+            if v:IsA("Animation") then
+                local n = v.Name:lower()
+                if n:find("throw") and not n:find("charge") and not n:find("hold") then
                     return v
                 end
             end
         end
-        -- Fallback: buscar en todo el knife
-        local keyword = animName:lower()
-        for _, v in ipairs(knife:GetDescendants()) do
-            if v:IsA("Animation") and v.Name:lower():find(keyword) then
-                return v
-            end
-        end
+
+        -- Ultimo fallback: ThrowCharge
+        local charge = kc:FindFirstChild("ThrowCharge")
+        if charge and charge:IsA("Animation") then return charge end
+
         return nil
     end
 
@@ -64719,8 +64724,7 @@ task.spawn(function()
         local track    = nil
 
         if animator then
-            local animObj = findAnimInKnifeClient(knife, "ThrowKnife")
-                         or findAnimInKnifeClient(knife, "ThrowCharge")
+            local animObj = getThrowKnifeAnim(knife)
             if animObj then
                 local ok, tr = pcall(function() return animator:LoadAnimation(animObj) end)
                 if ok and tr then
@@ -64800,18 +64804,22 @@ task.spawn(function()
     end
 
     -- ----------------------------------------------------------------
-    -- TOUCH EN PANTALLA -> LANZAR  [NUEVO v3]
-    -- Cuando el knife esta en mano y el jugador toca la pantalla
-    -- (fuera de los botones), dispara el knife igual que el boton.
-    -- Replica el TouchTapInWorld del KnifeClient original.
+    -- TOUCH EN PANTALLA -> LANZAR  [v4]
+    --
+    -- Usamos InputBegan con Touch para detectar el tap en pantalla.
+    -- gameProcessed=true significa que el tap fue en un boton de UI -> ignorar.
+    -- Esto no colisiona con el TouchTapInWorld del KnifeClient original
+    -- porque ese solo dispara cuando v13==true (estado ThrowHold).
+    -- Nosotros disparamos directamente con FireServer siempre que el
+    -- knife este en mano, sin importar el estado interno del KnifeClient.
     -- ----------------------------------------------------------------
     local _touchThrowBusy  = false
     local _lastTouchThrowT = -999
-    local TOUCH_THROW_CD   = 0.6
+    local TOUCH_THROW_CD   = 0.5
 
-    UIS.TouchTapInWorld:Connect(function(position, processed)
-        -- processed = true significa que el tap fue en un boton de UI; ignorar
-        if processed then return end
+    UIS.InputBegan:Connect(function(inp, gp)
+        if gp then return end  -- tap en boton de UI -> ignorar
+        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
 
         local now = os.clock()
         if now - _lastTouchThrowT < TOUCH_THROW_CD then return end
