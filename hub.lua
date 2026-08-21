@@ -6732,9 +6732,9 @@ function _KnifeSA_setupKnife(knife)
     task.spawn(_preloadTracks)
 
     -- Nombres de throw y slash seg?n estructura real de MM2:
-    -- ThrowCharge primero porque es el nombre real en MM2.
+    -- FIX: ThrowCharge primero porque es la animacion correcta en KnifeClient de MM2.
     -- Animation1 es SOLO slash ? no usarla para throw.
-    local _throwAnimNames = {"ThrowKnife", "ThrowCharge", "Throw", "Animation2"}  -- ThrowKnife primero: es el nombre real en MM2 (Knife.KnifeClient.ThrowKnife)
+    local _throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}  -- ThrowCharge primero: animacion correcta en Knife.KnifeClient.ThrowCharge
     local _slashAnimNames = {"SlashKnife", "Slash", "Stab", "Hit", "Animation1"}
 
     local function _playThrowAnim()
@@ -49279,11 +49279,14 @@ function CreateCombatTab()
                     pcall(function()
                         -- Intentar re-scan de animaciones si _playThrowAnim no est? listo
                         if not KnifeSAState._playThrowAnim then
-                            -- Buscar ThrowKnife directamente en KnifeClient como fallback r?pido
+                            -- FIX: Buscar ThrowCharge primero en KnifeClient (animacion correcta de MM2)
                             local knifeChar = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Knife")
                             if knifeChar then
                                 local kc2 = knifeChar:FindFirstChild("KnifeClient")
-                                local tkAnim = kc2 and kc2:FindFirstChild("ThrowKnife")
+                                -- FIX: ThrowCharge es la animacion correcta, ThrowKnife como fallback
+                                local tkAnim = (kc2 and kc2:FindFirstChild("ThrowCharge"))
+                                    or (kc2 and kc2:FindFirstChild("ThrowKnife"))
+                                    or knifeChar:FindFirstChild("ThrowCharge", true)
                                 if tkAnim and tkAnim:IsA("Animation") then
                                     local animator2 = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                                         and LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):FindFirstChildOfClass("Animator")
@@ -64507,6 +64510,117 @@ task.spawn(function()
         end)
     end
 end)
+
+-- ================================================================
+-- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim)
+--
+-- PROBLEMA: cuando Knife SA esta activo, deshabilita KnifeClient y
+-- toma control del knife. El boton "EquipWeapon" nativo de MM2 en
+-- mobile llama a Humanoid:EquipTool/UnequipTools, pero como KnifeClient
+-- esta deshabilitado el equip puede no reflejarse correctamente y ademas
+-- el touch del boton Equipar podia disparar _ksaDoThrow (ThrowCharge).
+--
+-- SOLUCION: hookear el boton EquipWeapon del GameplayControlsUI para
+-- que al tocarlo:
+--   1. Registre _lastEquipTime (evita que _ksaDoThrow se dispare por ese touch)
+--   2. Mueva el knife directamente al Character (replica al servidor) si no esta equipado
+--   3. Lo desequipe (moverlo a Backpack) si ya esta equipado
+-- ================================================================
+task.spawn(function()
+    local _UIS2 = game:GetService("UserInputService")
+    if not _UIS2.TouchEnabled then return end
+
+    local _lp2 = game:GetService("Players").LocalPlayer
+    local _pg2 = _lp2:WaitForChild("PlayerGui", 15)
+    if not _pg2 then return end
+
+    local function _equipKnifeForSA()
+        -- Registrar tiempo de equip SIEMPRE, antes de cualquier otra accion
+        -- Esto evita que _ksaDoThrow se dispare por el mismo touch
+        KnifeSAState._lastEquipTime = os.clock()
+
+        local char = _lp2.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+
+        -- Verificar si el knife ya esta en el personaje
+        local knifeInChar = char:FindFirstChild("Knife")
+        if knifeInChar then
+            -- Ya equipado: desequipar (moverlo de vuelta al Backpack)
+            pcall(function() hum:UnequipTools() end)
+            return
+        end
+
+        -- Buscar el knife en el Backpack
+        local bp = _lp2.Backpack
+        local knifeInBP = bp and bp:FindFirstChild("Knife")
+        if not knifeInBP then return end
+
+        -- Metodo 1: mover Tool al Character (replica correctamente al servidor)
+        local equipOk = false
+        pcall(function()
+            knifeInBP.Parent = char
+            equipOk = true
+        end)
+
+        -- Metodo 2: EquipTool como fallback
+        if not equipOk then
+            pcall(function() hum:EquipTool(knifeInBP) end)
+        end
+
+        -- Actualizar _lastEquipTime de nuevo despues del equip (el Equipped event
+        -- del knife lo sobreescribira, pero por si no se dispara)
+        task.wait(0.05)
+        KnifeSAState._lastEquipTime = os.clock()
+    end
+
+    local function _hookEquipBtn(equipBtn)
+        -- Conectar Activated (GuiButton) e InputBegan (Frame/ImageLabel) como respaldo
+        pcall(function()
+            equipBtn.Activated:Connect(function()
+                if not KnifeSAState or not KnifeSAState.enabled then return end
+                task.spawn(_equipKnifeForSA)
+            end)
+        end)
+        pcall(function()
+            equipBtn.InputBegan:Connect(function(inp)
+                if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+                if not KnifeSAState or not KnifeSAState.enabled then return end
+                -- Registrar _lastEquipTime inmediatamente al tocar (antes del Activated)
+                KnifeSAState._lastEquipTime = os.clock()
+            end)
+        end)
+    end
+
+    local function _findAndHookEquipBtn()
+        local gcui = _pg2:FindFirstChild("GameplayControlsUI")
+        if not gcui then return false end
+        local tc = gcui:FindFirstChild("TouchControls")
+        if not tc then return false end
+        local rb = tc:FindFirstChild("RightBar")
+        if not rb then return false end
+        local equipBtn = rb:FindFirstChild("EquipWeapon")
+        if not equipBtn then return false end
+        _hookEquipBtn(equipBtn)
+        return true
+    end
+
+    -- Aplicar inmediatamente o esperar a que cargue la UI
+    if not _findAndHookEquipBtn() then
+        local _wc2
+        _wc2 = _pg2.DescendantAdded:Connect(function(desc)
+            if desc.Name == "EquipWeapon" then
+                task.wait(0.15)
+                if _findAndHookEquipBtn() then
+                    _wc2:Disconnect()
+                end
+            end
+        end)
+    end
+end)
+-- ================================================================
+-- == FIN FIX BOTON EQUIPAR MOBILE
+-- ================================================================
 
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
 -- ================================================================
