@@ -64661,19 +64661,26 @@ task.spawn(function()
 end)
 
 -- ================================================================
--- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim) v2
+-- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim) v3
 --
--- FIX v2: el hook anterior se rompia despues del primer uso porque:
---   1. Capturaba 'char' en el closure -> quedaba stale tras respawn
---   2. No tenia guard de doble-hook -> si el boton se recreaba, el
---      Activated anterior se desconectaba silenciosamente
---   3. No reconectaba en CharacterAdded
+-- FIX v3: corrige dos bugs del v2:
 --
--- SOLUCION v2:
---   - _equipKnifeForSA siempre lee LocalPlayer.Character fresco
---   - guard _G._equipBtnHooked evita doble-conexion al mismo boton
---   - CharacterAdded resetea el guard para el proximo respawn
---   - cooldown de 0.3s entre presses para evitar doble-fire
+--   BUG 1: Si KnifeSAState.enabled == false, el boton quedaba hooked
+--           pero el Activated retornaba inmediatamente -> el knife
+--           no se equipaba nunca aunque el SA estuviera apagado.
+--   FIX 1: Cuando SA esta desactivado NO interceptamos el Activated;
+--           el GameplayControlsScript del juego ya tiene su propio
+--           handler conectado y lo maneja correctamente.
+--
+--   BUG 2: El slot visual del knife en el BackpackUI del juego
+--           quedaba oculto. _hideBackpackUI() llama
+--           SetCoreGuiEnabled(Backpack, false) y el BackpackScript
+--           del juego lo vuelve a apagar en un loop infinito, asi
+--           que re-habilitarlo desde el hub no sirve.
+--   FIX 2: _ensureKnifeSlotVisible() busca directamente el Frame
+--           del slot 1 dentro del BackpackFrame y fuerza Visible=true
+--           si hay un knife presente, sin tocar CoreGuiEnabled.
+--           Se llama al cargar y en cada respawn.
 -- ================================================================
 task.spawn(function()
     local _UIS2 = game:GetService("UserInputService")
@@ -64688,7 +64695,7 @@ task.spawn(function()
     local _lastEquipPress = -999
     local EQUIP_CD = 0.3  -- cooldown entre presses (segundos)
 
-    -- SIEMPRE lee Character fresco desde LocalPlayer (no captura el closure)
+    -- SIEMPRE lee Character/Backpack frescos desde LocalPlayer
     local function _equipKnifeForSA()
         -- Cooldown para evitar doble-fire
         local now = os.clock()
@@ -64696,10 +64703,12 @@ task.spawn(function()
         _lastEquipPress = now
 
         -- Registrar tiempo de equip ANTES de cualquier operacion
-        -- Evita que _ksaDoThrow se dispare por el mismo touch
-        KnifeSAState._lastEquipTime = os.clock()
+        -- para bloquear _ksaDoThrow en el mismo touch
+        if KnifeSAState then
+            KnifeSAState._lastEquipTime = os.clock()
+        end
 
-        -- Leer Character FRESCO en cada llamada (nunca capturado en closure)
+        -- Leer Character FRESCO (nunca capturado en closure)
         local char = _lp2.Character
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
@@ -64707,14 +64716,14 @@ task.spawn(function()
         -- Leer Backpack FRESCO
         local bp = _lp2.Backpack
 
-        -- Verificar si el knife ya esta equipado en el Character
+        -- Ya equipado -> desequipar limpiamente
         local knifeInChar = char:FindFirstChild("Knife")
         if knifeInChar then
-            -- Ya equipado -> desequipar limpiamente
             pcall(function() hum:UnequipTools() end)
-            -- Esperar y re-registrar lastEquipTime para bloquear _ksaDoThrow
             task.wait(0.08)
-            KnifeSAState._lastEquipTime = os.clock()
+            if KnifeSAState then
+                KnifeSAState._lastEquipTime = os.clock()
+            end
             return
         end
 
@@ -64722,43 +64731,33 @@ task.spawn(function()
         local knifeInBP = bp and bp:FindFirstChild("Knife")
         if not knifeInBP then return end
 
-        -- Metodo principal: EquipTool (funciona en todos los executors mobile
-        -- y replica correctamente al servidor; el Backpack service lo acepta)
+        -- Metodo principal: EquipTool
         local equipOk = false
-        pcall(function()
-            hum:EquipTool(knifeInBP)
-            equipOk = true
-        end)
+        pcall(function() hum:EquipTool(knifeInBP); equipOk = true end)
 
-        -- Metodo 2: mover Parent al Character como fallback
-        -- (algunos executors bloquean EquipTool pero permiten Parent move)
+        -- Fallback: mover Parent directamente (executors que bloquean EquipTool)
         if not equipOk then
-            pcall(function()
-                knifeInBP.Parent = char
-                equipOk = true
-            end)
+            pcall(function() knifeInBP.Parent = char; equipOk = true end)
         end
 
         if not equipOk then return end
 
-        -- Esperar a que el knife aparezca realmente en el Character
-        -- (EquipTool es async en mobile; sin espera, _KnifeSA_setupKnife
-        -- puede correr antes de que el Tool llegue al Character)
+        -- Esperar a que el knife aparezca en el Character
+        -- (EquipTool es async en mobile)
         local waited = 0
         while not char:FindFirstChild("Knife") and waited < 0.5 do
             task.wait(0.05)
             waited = waited + 0.05
         end
 
-        -- Si el SA esta activo, llamar _KnifeSA_setupKnife manualmente
-        -- porque el ChildAdded del char puede no dispararse si el knife
-        -- llego por EquipTool antes de que el watcher estuviera conectado
+        -- Si SA activo, llamar _KnifeSA_setupKnife manualmente
+        -- (el ChildAdded puede no dispararse si el knife llego
+        --  por EquipTool antes de que el watcher estuviera conectado)
         local freshKnife = char:FindFirstChild("Knife")
         if freshKnife and KnifeSAState and KnifeSAState.enabled
         and type(_KnifeSA_setupKnife) == "function" then
-            -- Solo si el knife no fue ya configurado por el watcher
-            if not freshKnife:GetAttribute("_SA_SetupId") or
-               freshKnife:GetAttribute("_SA_SetupId") == 0 then
+            if not freshKnife:GetAttribute("_SA_SetupId")
+            or freshKnife:GetAttribute("_SA_SetupId") == 0 then
                 task.spawn(function()
                     task.wait(0.1)
                     pcall(_KnifeSA_setupKnife, freshKnife)
@@ -64768,36 +64767,65 @@ task.spawn(function()
 
         -- Re-registrar lastEquipTime despues del equip
         task.wait(0.05)
-        KnifeSAState._lastEquipTime = os.clock()
+        if KnifeSAState then
+            KnifeSAState._lastEquipTime = os.clock()
+        end
+    end
+
+    -- FIX v3 BUG 2: forzar visible el slot del knife en el BackpackUI
+    -- sin tocar SetCoreGuiEnabled (que el BackpackScript pisa en loop).
+    local function _ensureKnifeSlotVisible()
+        local backpackUI = _pg2:FindFirstChild("BackpackUI")
+        if not backpackUI then return end
+        local backpackFrame = backpackUI:FindFirstChild("BackpackFrame")
+        if not backpackFrame then return end
+
+        -- El BackpackScript del juego pone el knife en LayoutOrder=1 (slot 1)
+        for _, item in ipairs(backpackFrame:GetChildren()) do
+            if item:IsA("Frame") and item.LayoutOrder == 1 then
+                local char     = _lp2.Character
+                local bp       = _lp2.Backpack
+                local hasKnife = (char and char:FindFirstChild("Knife") ~= nil)
+                              or (bp   and bp:FindFirstChild("Knife")   ~= nil)
+                if hasKnife then
+                    pcall(function() item.Visible = true end)
+                end
+                break
+            end
+        end
     end
 
     -- Hookea el boton; retorna true si lo encontro y conecto
     local function _hookEquipBtn()
-        if _G._equipBtnHooked then return true end  -- ya hooked, no duplicar
+        if _G._equipBtnHooked then return true end
 
-        local gcui = _pg2:FindFirstChild("GameplayControlsUI")
+        local gcui     = _pg2:FindFirstChild("GameplayControlsUI")
         if not gcui then return false end
-        local tc = gcui:FindFirstChild("TouchControls")
+        local tc       = gcui:FindFirstChild("TouchControls")
         if not tc then return false end
-        local rb = tc:FindFirstChild("RightBar")
+        local rb       = tc:FindFirstChild("RightBar")
         if not rb then return false end
         local equipBtn = rb:FindFirstChild("EquipWeapon")
         if not equipBtn then return false end
 
-        -- Activated: dispara cuando el GuiButton recibe un tap completo
+        -- FIX v3 BUG 1: solo interceptar el Activated cuando SA esta activo.
+        -- Si SA esta off, NO conectamos nada extra -> el GameplayControlsScript
+        -- del juego ya tiene su propio Activated y equipa el knife normalmente.
         pcall(function()
             equipBtn.Activated:Connect(function()
-                if not KnifeSAState or not KnifeSAState.enabled then return end
-                task.spawn(_equipKnifeForSA)
+                if KnifeSAState and KnifeSAState.enabled then
+                    task.spawn(_equipKnifeForSA)
+                end
+                -- SA inactivo: sin return, sin nada -> el juego maneja solo
             end)
         end)
 
-        -- InputBegan: registrar _lastEquipTime inmediatamente al tocar
-        -- (antes de que Activated se dispare, para bloquear _ksaDoThrow)
+        -- InputBegan: registrar lastEquipTime al primer contacto
+        -- para bloquear throws accidentales del mismo touch
         pcall(function()
             equipBtn.InputBegan:Connect(function(inp)
                 if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-                if not KnifeSAState or not KnifeSAState.enabled then return end
+                if not KnifeSAState then return end
                 KnifeSAState._lastEquipTime = os.clock()
             end)
         end)
@@ -64819,18 +64847,24 @@ task.spawn(function()
         end)
     end
 
-    -- En cada respawn: resetear el guard para que el proximo CharacterAdded
-    -- pueda volver a hookear si el boton fue recreado por MM2
+    -- En cada respawn: resetear guard y re-hookear
+    -- (el boton puede haber sido recreado por MM2)
     _lp2.CharacterAdded:Connect(function()
         _G._equipBtnHooked = false
         _lastEquipPress    = -999
-        -- Intentar re-hookear despues de un frame (UI puede tardar en cargar)
         task.wait(0.5)
         _hookEquipBtn()
+        -- FIX v3: re-verificar slot del knife despues del respawn
+        task.wait(0.3)
+        _ensureKnifeSlotVisible()
     end)
+
+    -- Verificar slot del knife al cargar por primera vez
+    task.wait(1)
+    _ensureKnifeSlotVisible()
 end)
 -- ================================================================
--- == FIN FIX BOTON EQUIPAR MOBILE v2
+-- == FIN FIX BOTON EQUIPAR MOBILE v3
 -- ================================================================
 
 -- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
