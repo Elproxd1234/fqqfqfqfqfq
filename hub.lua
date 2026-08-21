@@ -6803,6 +6803,11 @@ function _KnifeSA_setupKnife(knife)
         -- Al equipar: invalidar cache de tracks y recargar (Animator puede haber cambiado tras respawn)
         _animTracks = {}
         task.spawn(_preloadTracks)
+        -- FIX EQUIP COOLDOWN: registrar el momento de equip para que _ksaDoThrow
+        -- no se dispare inmediatamente despues de equipar desde el backpack.
+        -- Sin esto, el touch en el boton Equipar podia llegar al hook del throw
+        -- y reproducir ThrowCharge justo al poner el knife en mano.
+        KnifeSAState._lastEquipTime = os.clock()
     end))
     addConn(knife.Unequipped:Connect(function()
         equipped = false; stabbing = false
@@ -49195,6 +49200,10 @@ function CreateCombatTab()
                     local myChar = LocalPlayer.Character
                     local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
                     if not hum or hum.Health <= 0 then return end
+                    -- FIX EQUIP COOLDOWN: si el knife fue equipado hace menos de 0.4s,
+                    -- es probable que el throw se haya disparado por el mismo touch
+                    -- que presiono el boton Equipar del backpack. Ignorar.
+                    if KnifeSAState._lastEquipTime and (os.clock() - KnifeSAState._lastEquipTime) < 0.4 then return end
                     -- Equipar knife si no est? en mano
                     local knife = myChar:FindFirstChild("Knife")
                     if not knife then
@@ -49379,8 +49388,11 @@ function CreateCombatTab()
                         ThrowBtn=true, ThrowKnife=true,
                         -- FIX: botones TouchInteract del juego (imagen del explorer)
                         TouchInteractKnife=true, TouchInteract=true,
-                        Use=true, Knife=true,
-                        -- Variantes adicionales por si el juego las renombra
+                        -- REMOVIDOS: Use=true y Knife=true  <- nombres demasiado genericos
+                        -- El boton "Equipar" del backpack/inventario nativo de MM2 tiene hijos
+                        -- llamados "Use" y "Knife", lo que causaba que hookearlo disparara
+                        -- _ksaDoThrow y reprodujera la animacion ThrowCharge al intentar equipar.
+                        -- El throw real ya esta cubierto por throwig/Throw/ThrowButton/ThrowKnife.
                         KnifeThrow=true, KnifeUse=true, KnifeBtn=true,
                     }
 
@@ -49436,8 +49448,12 @@ function CreateCombatTab()
                         for _, desc in ipairs(descs) do
                             if desc:IsA("GuiObject") then
                                 local n = desc.Name
-                                if n == "TouchInteractKnife" or n == "TouchInteract"
-                                or n == "Use" or n == "Knife" or n == "KnifeIcon"
+                                -- FIX: removidos "Use" y "Knife" de esta lista.
+                                -- Son nombres demasiado genericos: el boton nativo de inventario/backpack
+                                -- de MM2 tiene hijos con esos nombres y al hookearlos se disparaba
+                                -- _ksaDoThrow (ThrowCharge) al tocar el boton Equipar del juego.
+                                -- "TouchInteractKnife" y "KnifeIcon" son suficientemente especificos.
+                                if n == "TouchInteractKnife" or n == "KnifeIcon"
                                 or _throwBtnNames[n] then
                                     _tryHookObj(desc)
                                 end
@@ -49453,9 +49469,11 @@ function CreateCombatTab()
                         if _throwBtnNames[desc.Name] and desc:IsA("GuiObject") then
                             _tryHookObj(desc)
                         end
-                        -- Tambi?n capturar TouchInteractKnife y Use cuando aparecen
+                        -- FIX: removido "Use" de esta lista (nombre generico que matchea el boton
+                        -- Equipar del inventario de MM2 y causaba ThrowCharge al equipar el knife).
+                        -- Solo hookear TouchInteractKnife que es suficientemente especifico.
                         local n = desc.Name
-                        if (n == "TouchInteractKnife" or n == "TouchInteract" or n == "Use")
+                        if (n == "TouchInteractKnife" or n == "TouchInteract")
                         and desc:IsA("GuiObject") then
                             _tryHookObj(desc)
                         end
