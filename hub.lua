@@ -64535,37 +64535,49 @@ end)
 
 
 -- ================================================================
--- == MOBILE KNIFE BUTTONS v2
+-- == MOBILE KNIFE BUTTONS v3
 --
--- BOTON EQUIPAR:
---   - Solo usa Activated (un evento por tap, sin doble-fire).
---   - InputBegan SOLO registra el timestamp para cooldown; no ejecuta.
---   - Cooldown duro de 0.5s para absorber cualquier rebote del executor.
+-- FIXES aplicados:
 --
--- BOTON LANZAR:
---   - Reproduce ThrowCharge desde KnifeClient.
---   - Espera que la animacion termine (Stopped o timeout por Length).
---   - Luego dispara KnifeThrown:FireServer con CFrames desde HRP.
---   - No depende de SA ni de ninguna otra logica del hub.
+-- [1] BOTON EQUIPAR:
+--   - Solo equipa (nunca desequipa). Si el knife ya esta en mano,
+--     no hace nada. Si esta en Backpack, lo equipa.
+--   - Guard de re-entrada con _equipFired + cooldown de 0.35s.
+--   - task.defer libera el guard en el proximo frame (no en el mismo).
+--
+-- [2] BOTON LANZAR:
+--   - Reproduce ThrowKnife (la animacion de lanzamiento real de MM2,
+--     no ThrowCharge que es la de carga). ThrowKnife esta dentro del
+--     LocalScript KnifeClient como hijo Animation, no como objeto suelto.
+--   - Apunta al enemigo mas cercano con silent aim via SA hook o fallback HRP.
+--   - Dispara KnifeThrown:FireServer(handleCF, targetCF).
+--
+-- [3] TOUCH EN PANTALLA (estado ThrowHold):
+--   - Cuando el jugador tiene el knife en mano y toca la pantalla,
+--     se dispara el knife hacia el enemigo mas cercano (igual que el boton).
+--   - Replica el comportamiento de TouchTapInWorld del KnifeClient original.
 -- ================================================================
 task.spawn(function()
     local UIS     = game:GetService("UserInputService")
     if not UIS.TouchEnabled then return end
 
-    local lp  = game:GetService("Players").LocalPlayer
-    local pg  = lp:WaitForChild("PlayerGui", 15)
+    local Players  = game:GetService("Players")
+    local lp       = Players.LocalPlayer
+    local pg       = lp:WaitForChild("PlayerGui", 15)
     if not pg then return end
 
     -- ----------------------------------------------------------------
     -- HELPERS
     -- ----------------------------------------------------------------
     local function getChar()  return lp.Character end
+
     local function getHum()
         local c = getChar()
         if not c then return nil end
         local h = c:FindFirstChildOfClass("Humanoid")
         return (h and h.Health > 0) and h or nil
     end
+
     local function getAnimator()
         local h = getHum()
         return h and h:FindFirstChildOfClass("Animator")
@@ -64577,14 +64589,14 @@ task.spawn(function()
         local bp = lp:FindFirstChildOfClass("Backpack")
         if c then
             for _, v in ipairs(c:GetChildren()) do
-                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name == "Knife") then
+                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name:lower():find("knife")) then
                     return v, "char"
                 end
             end
         end
         if bp then
             for _, v in ipairs(bp:GetChildren()) do
-                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name == "Knife") then
+                if v:IsA("Tool") and (v:HasTag("Weapon_Knife") or v.Name:lower():find("knife")) then
                     return v, "bp"
                 end
             end
@@ -64599,18 +64611,152 @@ task.spawn(function()
         return ev and ev:FindFirstChild("KnifeThrown")
     end
 
+    -- Busca una Animation por nombre dentro de KnifeClient (Script con Animations hijas)
+    -- MM2 guarda las animaciones como hijos del LocalScript KnifeClient
+    local function findAnimInKnifeClient(knife, animName)
+        if not knife then return nil end
+        -- Buscar en KnifeClient (LocalScript)
+        local kc = knife:FindFirstChild("KnifeClient")
+        if kc then
+            -- Hijo directo con ese nombre
+            local direct = kc:FindFirstChild(animName)
+            if direct and direct:IsA("Animation") then return direct end
+            -- Buscar en subcarpetas (Dual, etc.)
+            for _, child in ipairs(kc:GetChildren()) do
+                local found = child:FindFirstChild(animName)
+                if found and found:IsA("Animation") then return found end
+                -- Un nivel mas adentro
+                if child:IsA("Folder") or child:IsA("Model") then
+                    for _, sub in ipairs(child:GetChildren()) do
+                        if sub:IsA("Animation") and sub.Name == animName then return sub end
+                    end
+                end
+            end
+            -- Fallback: cualquier Animation cuyo nombre contenga la keyword
+            local keyword = animName:lower()
+            for _, v in ipairs(kc:GetDescendants()) do
+                if v:IsA("Animation") and v.Name:lower():find(keyword) then
+                    return v
+                end
+            end
+        end
+        -- Fallback: buscar en todo el knife
+        local keyword = animName:lower()
+        for _, v in ipairs(knife:GetDescendants()) do
+            if v:IsA("Animation") and v.Name:lower():find(keyword) then
+                return v
+            end
+        end
+        return nil
+    end
+
+    -- Encuentra el enemigo vivo mas cercano al jugador local
+    local function getNearestEnemy()
+        local char = getChar()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return nil end
+
+        local myPos   = hrp.Position
+        local best    = nil
+        local bestDist = math.huge
+
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= lp and p.Character then
+                local enemyHRP = p.Character:FindFirstChild("HumanoidRootPart")
+                local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
+                if enemyHRP and enemyHum and enemyHum.Health > 0 then
+                    local d = (enemyHRP.Position - myPos).Magnitude
+                    if d < bestDist then
+                        bestDist = d
+                        best     = enemyHRP
+                    end
+                end
+            end
+        end
+
+        return best
+    end
+
+    -- Construye handleCF y targetCF apuntando al enemigo mas cercano (o al frente si no hay)
+    local function buildThrowCFrames()
+        local char = getChar()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            return CFrame.new(0,0,0), CFrame.new(0,0,20)
+        end
+
+        local origin   = hrp.Position + Vector3.new(0, 1.5, 0)
+        local handleCF = CFrame.new(origin, origin + hrp.CFrame.LookVector)
+
+        -- Intentar apuntar al enemigo mas cercano (silent aim)
+        local enemyHRP = getNearestEnemy()
+        local targetPos
+
+        if enemyHRP then
+            -- Apuntar al torso/HRP del enemigo
+            targetPos = enemyHRP.Position
+        else
+            -- Sin enemigos: apuntar 40 studs al frente
+            targetPos = origin + hrp.CFrame.LookVector * 40
+        end
+
+        -- targetCF apunta DE VUELTA hacia el origen (firma que espera el servidor MM2)
+        local backDir = (origin - targetPos).Unit
+        local targetCF = CFrame.new(targetPos, targetPos + backDir)
+
+        return handleCF, targetCF
+    end
+
+    -- Ejecuta el lanzamiento: anima + FireServer
+    local function executeThrow(knife, knifeThrown)
+        -- 1. Reproducir animacion ThrowKnife (la de lanzamiento real)
+        local animator = getAnimator()
+        local track    = nil
+
+        if animator then
+            -- Buscar ThrowKnife primero, luego ThrowCharge como fallback
+            local animObj = findAnimInKnifeClient(knife, "ThrowKnife")
+                         or findAnimInKnifeClient(knife, "ThrowCharge")
+            if animObj then
+                local ok, tr = pcall(function() return animator:LoadAnimation(animObj) end)
+                if ok and tr then
+                    track = tr
+                    track.Priority = Enum.AnimationPriority.Action4
+                    if track.IsPlaying then track:Stop(0) end
+                    track:Play(0.05, 6, 1)  -- speed=1 igual que KnifeClient original
+                end
+            end
+        end
+
+        -- 2. Pequena pausa para que la animacion sea visible (no bloquea el throw)
+        task.wait(0.08)
+
+        -- 3. Construir CFrames y disparar al servidor
+        local handleCF, targetCF = buildThrowCFrames()
+
+        local fired = false
+        pcall(function() knifeThrown:FireServer(handleCF, targetCF); fired = true end)
+        if not fired then
+            pcall(function() knifeThrown:FireServer(targetCF, handleCF); fired = true end)
+        end
+        if not fired then
+            pcall(function() knifeThrown:FireServer(targetCF) end)
+        end
+
+        -- 4. Dejar que la animacion termine sola (no la forzamos a parar)
+    end
+
     -- ----------------------------------------------------------------
-    -- BOTON EQUIPAR
+    -- BOTON EQUIPAR  [FIX v3]
+    -- Solo equipa; nunca desequipa. Un tap = una accion.
     -- ----------------------------------------------------------------
-    local _equipFired  = false   -- flag: Activated ya se disparo para este tap
-    local _lastEquipT  = -999
-    local EQUIP_CD     = 0.5    -- cooldown duro entre equips
+    local _equipFired = false
+    local _lastEquipT = -999
+    local EQUIP_CD    = 0.35   -- reducido para que no necesite multiples taps
 
     local function doEquip()
-        -- Cooldown duro
         local now = os.clock()
         if now - _lastEquipT < EQUIP_CD then return end
-        -- Guard de re-entrada: Activated puede llegar dos veces en el mismo tap en algunos executors
         if _equipFired then return end
         _equipFired = true
         _lastEquipT = now
@@ -64621,29 +64767,29 @@ task.spawn(function()
         local knife, loc = findKnife()
         if not knife then _equipFired = false; return end
 
-        if loc == "char" then
-            pcall(function() hum:UnequipTools() end)
-        else
+        -- FIX: solo equipa. Si ya esta en mano (char), no hace nada adicional.
+        -- El boton de equipar NUNCA desequipa.
+        if loc == "bp" then
             pcall(function() hum:EquipTool(knife) end)
         end
+        -- Si loc == "char" ya esta equipado, no hacemos nada (evita el doble tap)
 
-        -- Liberar el guard despues de 1 frame para no bloquear el proximo tap
         task.defer(function() _equipFired = false end)
     end
 
     -- ----------------------------------------------------------------
-    -- BOTON LANZAR
+    -- BOTON LANZAR  [FIX v3]
+    -- Anima ThrowKnife + apunta al enemigo mas cercano + FireServer.
     -- ----------------------------------------------------------------
-    local _throwBusy   = false
-    local _lastThrowT  = -999
-    local THROW_CD     = 0.5
+    local _throwBusy  = false
+    local _lastThrowT = -999
+    local THROW_CD    = 0.6
 
     local function doThrow()
         local now = os.clock()
         if now - _lastThrowT < THROW_CD then return end
         if _throwBusy then return end
 
-        -- Knife debe estar en mano
         local knife, loc = findKnife()
         if not knife or loc ~= "char" then return end
 
@@ -64654,99 +64800,46 @@ task.spawn(function()
         _lastThrowT = now
 
         task.spawn(function()
-            -- 1. Reproducir ThrowCharge
-            local animator = getAnimator()
-            local track     = nil
-            if animator then
-                -- Buscar ThrowCharge en KnifeClient (ruta exacta de MM2)
-                local kc = knife:FindFirstChild("KnifeClient")
-                local animObj = nil
-                if kc then
-                    -- Primero exacto por nombre
-                    animObj = kc:FindFirstChild("ThrowCharge")
-                    -- Fallback: cualquier Animation dentro de KnifeClient
-                    if not animObj then
-                        for _, v in ipairs(kc:GetDescendants()) do
-                            if v:IsA("Animation") and v.Name:lower():find("throw") then
-                                animObj = v; break
-                            end
-                        end
-                    end
-                end
-                if animObj then
-                    local ok, t = pcall(function() return animator:LoadAnimation(animObj) end)
-                    if ok and t then
-                        track = t
-                        track.Priority = Enum.AnimationPriority.Action
-                        if track.IsPlaying then track:Stop(0) end
-                        track:Play(0.05)
-                    end
-                end
-            end
-
-            -- 2. Esperar que la animacion ThrowCharge termine
-            if track then
-                -- Obtener duracion real del track (puede tardar 1 frame en popularse)
-                task.wait(0.05)
-                local len     = track.Length or 0
-                local timeout = math.max(len + 0.1, 0.3)
-                local done    = false
-
-                local conn
-                pcall(function()
-                    conn = track.Stopped:Connect(function()
-                        done = true
-                        if conn then conn:Disconnect(); conn = nil end
-                    end)
-                end)
-
-                -- Esperar con timeout de seguridad
-                local t0 = os.clock()
-                while not done and (os.clock() - t0) < timeout do
-                    task.wait(0.016)
-                end
-                if conn then pcall(function() conn:Disconnect() end) end
-            else
-                -- Sin animacion: pequena pausa para que se vea el gesto
-                task.wait(0.2)
-            end
-
-            -- 3. Construir CFrames de lanzamiento desde HRP del jugador
-            local char  = getChar()
-            local hrp   = char and char:FindFirstChild("HumanoidRootPart")
-            local handleCF, targetCF
-
-            if hrp then
-                local origin = hrp.Position + Vector3.new(0, 1.5, 0)
-                local lookDir = hrp.CFrame.LookVector
-                -- Apuntar recto al frente a 20 studs de distancia
-                local targetPos = origin + lookDir * 20
-                handleCF  = CFrame.new(origin,    origin    + lookDir)
-                -- targetCF orientado DE vuelta hacia el origen (como espera el servidor de MM2)
-                local backDir = origin - targetPos
-                targetCF  = CFrame.new(targetPos, targetPos + backDir.Unit)
-            else
-                -- Fallback si no hay HRP
-                handleCF = CFrame.new(Vector3.new(0,0,0))
-                targetCF = CFrame.new(Vector3.new(0,0,20))
-            end
-
-            -- 4. Disparar KnifeThrown al servidor - probar las dos firmas conocidas de MM2
-            local fired = false
-            pcall(function() knifeThrown:FireServer(handleCF, targetCF); fired = true end)
-            if not fired then
-                pcall(function() knifeThrown:FireServer(targetCF, handleCF); fired = true end)
-            end
-            if not fired then
-                pcall(function() knifeThrown:FireServer(targetCF) end)
-            end
-
+            executeThrow(knife, knifeThrown)
             _throwBusy = false
         end)
     end
 
     -- ----------------------------------------------------------------
-    -- HOOKEAR BOTONES (una sola conexion por boton, sin InputBegan doble)
+    -- TOUCH EN PANTALLA -> LANZAR  [NUEVO v3]
+    -- Cuando el knife esta en mano y el jugador toca la pantalla
+    -- (fuera de los botones), dispara el knife igual que el boton.
+    -- Replica el TouchTapInWorld del KnifeClient original.
+    -- ----------------------------------------------------------------
+    local _touchThrowBusy  = false
+    local _lastTouchThrowT = -999
+    local TOUCH_THROW_CD   = 0.6
+
+    UIS.TouchTapInWorld:Connect(function(position, processed)
+        -- processed = true significa que el tap fue en un boton de UI; ignorar
+        if processed then return end
+
+        local now = os.clock()
+        if now - _lastTouchThrowT < TOUCH_THROW_CD then return end
+        if _touchThrowBusy then return end
+
+        local knife, loc = findKnife()
+        if not knife or loc ~= "char" then return end
+
+        local knifeThrown = getKnifeThrown(knife)
+        if not knifeThrown then return end
+
+        _touchThrowBusy  = true
+        _lastTouchThrowT = now
+
+        task.spawn(function()
+            executeThrow(knife, knifeThrown)
+            _touchThrowBusy = false
+        end)
+    end)
+
+    -- ----------------------------------------------------------------
+    -- HOOKEAR BOTONES (una sola conexion por boton)
     -- ----------------------------------------------------------------
     local _equipHooked = false
     local _throwHooked = false
@@ -64763,7 +64856,6 @@ task.spawn(function()
         local throwBtn = rb:FindFirstChild("Throw")
 
         if equipBtn and not _equipHooked then
-            -- SOLO Activated: un evento limpio por tap completo
             pcall(function()
                 equipBtn.Activated:Connect(doEquip)
             end)
@@ -64794,16 +64886,18 @@ task.spawn(function()
 
     -- Re-hookear en cada respawn
     lp.CharacterAdded:Connect(function()
-        _equipHooked = false
-        _throwHooked = false
-        _equipFired  = false
-        _throwBusy   = false
-        _lastEquipT  = -999
-        _lastThrowT  = -999
+        _equipHooked   = false
+        _throwHooked   = false
+        _equipFired    = false
+        _throwBusy     = false
+        _touchThrowBusy = false
+        _lastEquipT    = -999
+        _lastThrowT    = -999
+        _lastTouchThrowT = -999
         task.wait(0.6)
         hookButtons()
     end)
 end)
 -- ================================================================
--- == FIN MOBILE KNIFE BUTTONS v2
+-- == FIN MOBILE KNIFE BUTTONS v3
 -- ================================================================
