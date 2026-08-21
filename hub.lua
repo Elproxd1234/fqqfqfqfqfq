@@ -7097,16 +7097,72 @@ function _KnifeSA_activate()
     KnifeSAState._knifeConns = {}
     local char = LocalPlayer.Character
     if not char then return end
-    -- Knife ya equipado
+    -- Knife ya equipado en el Character
     local knife = char:FindFirstChild("Knife")
     if knife then task.spawn(function() task.wait(0.1); _KnifeSA_setupKnife(knife) end) end
-    -- Knifes futuros
+    -- Knifes futuros en el Character (flujo normal de equip)
     if KnifeSAState._charConn then KnifeSAState._charConn:Disconnect() end
     KnifeSAState._charConn = char.ChildAdded:Connect(function(child)
         if child:IsA("Tool") and child.Name == "Knife" then
             task.wait(0.2)
             _KnifeSA_setupKnife(child)
         end
+    end)
+    -- FIX MOBILE EQUIP v1: tambi?n re-verificar el Character inmediatamente despu?s
+    -- de cualquier CharacterAdded (en caso de que el knife ya estaba en el Backpack
+    -- y el usuario presion? Equipar justo antes de que _KnifeSA_activate corriera).
+    task.spawn(function()
+        task.wait(0.3)
+        if not KnifeSAState.enabled then return end
+        local freshChar = LocalPlayer.Character
+        if not freshChar then return end
+        local freshKnife = freshChar:FindFirstChild("Knife") or freshChar:FindFirstChildOfClass("Tool")
+        if freshKnife and freshKnife:IsA("Tool") then
+            -- Solo hacer setup si no se hizo ya (evitar doble setup)
+            local _setupId = freshKnife:GetAttribute("_SA_SetupId")
+            if not _setupId or _setupId == 0 then
+                _KnifeSA_setupKnife(freshKnife)
+            end
+        end
+    end)
+    -- FIX MOBILE EQUIP v1: tambi?n monitorear el Backpack.
+    -- En m?vil, el knife puede llegar al Backpack antes de pasar al Character.
+    -- Cuando el Character lo recibe (ChildAdded), setupKnife ya conoce el objeto.
+    -- Este watcher tambi?n sirve de fallback: si el knife queda en Backpack,
+    -- fuerza el move al Character para que el SA pueda activarse.
+    if KnifeSAState._bpConn then KnifeSAState._bpConn:Disconnect() end
+    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if bp then
+        KnifeSAState._bpConn = bp.ChildAdded:Connect(function(child)
+            if not KnifeSAState.enabled then return end
+            if not (child:IsA("Tool") and child.Name == "Knife") then return end
+            -- El knife lleg? al Backpack: intentar moverlo al Character
+            -- solo si el Character no lo tiene ya (evitar doble setup)
+            task.wait(0.1)
+            local currentChar = LocalPlayer.Character
+            if not currentChar then return end
+            if currentChar:FindFirstChild("Knife") then return end  -- ya est? equipado
+            local currentHum = currentChar:FindFirstChildOfClass("Humanoid")
+            if not currentHum or currentHum.Health <= 0 then return end
+            -- M?todo primario: Parent move (replica al servidor en ejecutores m?viles)
+            local _moveOk = false
+            pcall(function()
+                child.Parent = currentChar
+                _moveOk = true
+            end)
+            -- Fallback: EquipTool si Parent move fall?
+            if not _moveOk then
+                pcall(function() currentHum:EquipTool(child) end)
+            end
+        end)
+    end
+    -- Re-hookear Backpack al respawnear (CharacterAdded limpia el viejo)
+    if KnifeSAState._charRespawnConn then KnifeSAState._charRespawnConn:Disconnect() end
+    KnifeSAState._charRespawnConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+        if not KnifeSAState.enabled then return end
+        -- Re-activar para el nuevo character
+        task.wait(0.5)
+        _KnifeSA_activate()
     end)
 end
 
@@ -7118,6 +7174,9 @@ function _KnifeSA_deactivate()
     end
     KnifeSAState._knifeConns = {}
     if KnifeSAState._charConn then KnifeSAState._charConn:Disconnect(); KnifeSAState._charConn = nil end
+    -- FIX MOBILE EQUIP v1: limpiar conexiones del Backpack watcher y CharacterAdded respawn
+    if KnifeSAState._bpConn then KnifeSAState._bpConn:Disconnect(); KnifeSAState._bpConn = nil end
+    if KnifeSAState._charRespawnConn then KnifeSAState._charRespawnConn:Disconnect(); KnifeSAState._charRespawnConn = nil end
 
     -- FIX KNIFE SA OFF: restaurar completamente el knife original
     -- Re-habilita KnifeClient, restaura CanCollide, detiene animaciones del SA
@@ -7195,7 +7254,15 @@ function _KnifeSA_deactivate()
                         pcall(function() hum3:UnequipTools() end)
                         task.wait(0.08)
                         if not KnifeSAState.enabled then  -- doble check
-                            pcall(function() hum3:EquipTool(k2) end)
+                            -- FIX MOBILE EQUIP v1: Parent move replica al servidor; EquipTool como fallback
+                            local _reEquipOk = false
+                            pcall(function()
+                                k2.Parent = c2  -- m?todo primario: mueve al Character
+                                _reEquipOk = true
+                            end)
+                            if not _reEquipOk then
+                                pcall(function() hum3:EquipTool(k2) end)
+                            end
                         end
                     end
                 end
@@ -49161,12 +49228,42 @@ function CreateCombatTab()
                     if not knife then
                         local bpKnife = LocalPlayer.Backpack:FindFirstChild("Knife")
                         if bpKnife then
-                            pcall(function() hum:EquipTool(bpKnife) end)
-                            task.wait(0.12)
+                            -- FIX MOBILE EQUIP v1: EquipTool desde el cliente no replica al servidor
+                            -- en ejecutores m?viles. Usamos el m?todo de mover el Tool al Character
+                            -- directamente (tool.Parent = char) que s? replica, con retries.
+                            local _equipOk = false
+                            -- M?todo 1: mover el Tool al Character (replica al servidor)
+                            pcall(function()
+                                bpKnife.Parent = LocalPlayer.Character
+                                _equipOk = true
+                            end)
+                            -- Esperar un frame para que el Character procese el equip
+                            task.wait(0.08)
                             knife = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Knife")
+                            -- M?todo 2: EquipTool como fallback si el Parent move fall?
+                            if not knife then
+                                pcall(function() hum:EquipTool(bpKnife) end)
+                                task.wait(0.12)
+                                knife = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Knife")
+                            end
+                            -- M?todo 3: buscar cualquier Tool si Knife no se encontr? por nombre
+                            if not knife then
+                                knife = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                            end
                         end
                     end
                     if not knife then return end
+                    -- FIX MOBILE EQUIP v1: confirmar que el knife est? realmente en el Character
+                    -- antes de continuar. Si lleg? al Character v?a Parent move, el Equipped
+                    -- event ya deber?a haber disparado en _KnifeSA_setupKnife.
+                    -- Dar un frame extra si el Character a?n no proces? el Tool.
+                    local _knifeInChar = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(knife.Name)
+                    if not _knifeInChar then
+                        task.wait(0.05)
+                        _knifeInChar = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(knife.Name)
+                    end
+                    if not _knifeInChar then return end  -- guard final: no animar si no est? equipado
+                    knife = _knifeInChar  -- usar la referencia m?s fresca
                     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
                     if not myHRP then return end
                     local events = knife:FindFirstChild("Events") or knife
@@ -64370,19 +64467,19 @@ end)
 -- ================================================================
 -- == MOBILE KNIFE INTEGRATION v2
 --
--- CORRECCIÓN v2: eliminado el hook al botón "Lanzar" de la barra
--- del juego — el hub ya lo maneja internamente vía KnifeSAState
--- cuando Knife Silent Aim está activo. Hookearlo de nuevo causaba
+-- CORRECCI?N v2: eliminado el hook al bot?n "Lanzar" de la barra
+-- del juego ? el hub ya lo maneja internamente v?a KnifeSAState
+-- cuando Knife Silent Aim est? activo. Hookearlo de nuevo causaba
 -- doble-fire e interferencia con el equip normal del inventario.
 --
--- LO QUE HACE ESTA VERSIÓN:
---   Touch rápido en pantalla (tap) ? Slash, SOLO si SA está activo
---     y el tap NO cayó sobre ningún GuiButton de la UI del juego
+-- LO QUE HACE ESTA VERSI?N:
+--   Touch r?pido en pantalla (tap) ? Slash, SOLO si SA est? activo
+--     y el tap NO cay? sobre ning?n GuiButton de la UI del juego
 --     ni sobre el hub.
 --
 -- Lo que NO hace (lo maneja el hub):
---   • Botón "Lanzar" / throwig ? ya hooked por KnifeSAState._mobileConns
---   • ThrowCharge vía botón ? idem
+--   ? Bot?n "Lanzar" / throwig ? ya hooked por KnifeSAState._mobileConns
+--   ? ThrowCharge v?a bot?n ? idem
 -- ================================================================
 
 task.spawn(function()
@@ -64400,15 +64497,15 @@ task.spawn(function()
     local _conns    = {}
     local _lastSlash = -999
     local SLASH_CD   = 0.55   -- cooldown entre slashes (segundos)
-    local THROW_CD   = 0.35   -- separación mínima con un throw previo
-    local MAX_DUR    = 0.35   -- duración máxima de un tap (no drag)
-    local MAX_DRIFT  = 22     -- pixels máximos de movimiento en un tap
+    local THROW_CD   = 0.35   -- separaci?n m?nima con un throw previo
+    local MAX_DUR    = 0.35   -- duraci?n m?xima de un tap (no drag)
+    local MAX_DRIFT  = 22     -- pixels m?ximos de movimiento en un tap
 
     local function _addConn(c)
         if c then table.insert(_conns, c) end
     end
 
-    -- -- HELPER: ¿el punto (x,y) está dentro de un GuiObject? -----
+    -- -- HELPER: ?el punto (x,y) est? dentro de un GuiObject? -----
     local function _inRect(obj, x, y)
         local ok, r = pcall(function()
             local ap = obj.AbsolutePosition
@@ -64419,7 +64516,7 @@ task.spawn(function()
         return ok and r
     end
 
-    -- -- HELPER: ¿el tap cayó sobre algún botón de UI activo? -----
+    -- -- HELPER: ?el tap cay? sobre alg?n bot?n de UI activo? -----
     -- Solo verifica GuiButton (TextButton / ImageButton) visibles
     -- para no bloquear taps sobre partes del juego que no tienen UI.
     local function _tapIsOnButton(x, y)
@@ -64433,7 +64530,7 @@ task.spawn(function()
             end
         end
 
-        -- 2. CoreGui (hub puede estar ahí)
+        -- 2. CoreGui (hub puede estar ah?)
         local cg = game:GetService("CoreGui")
         local ok2, descs2 = pcall(function() return cg:GetDescendants() end)
         if ok2 then
@@ -64447,9 +64544,9 @@ task.spawn(function()
         return false
     end
 
-    -- -- ACCIÓN: Slash vía touch -----------------------------------
+    -- -- ACCI?N: Slash v?a touch -----------------------------------
     local function _doSlashTouch()
-        -- Solo si KnifeSA está activo y expone la función
+        -- Solo si KnifeSA est? activo y expone la funci?n
         if not KnifeSAState then return end
         if not KnifeSAState.enabled then return end
         if type(KnifeSAState._playSlashAnim) ~= "function" then return end
@@ -64462,7 +64559,7 @@ task.spawn(function()
         -- Cooldown slash
         local now = os.clock()
         if now - _lastSlash < SLASH_CD then return end
-        -- Separación con throw (no solapar animaciones)
+        -- Separaci?n con throw (no solapar animaciones)
         if KnifeSAState._lastThrowTime and now - KnifeSAState._lastThrowTime < THROW_CD then return end
         _lastSlash = now
 
@@ -64471,11 +64568,11 @@ task.spawn(function()
         end)
     end
 
-    -- -- DETECCIÓN DE TAP (InputBegan + InputEnded) ----------------
+    -- -- DETECCI?N DE TAP (InputBegan + InputEnded) ----------------
     local _tStart = -999
     local _tX, _tY = -999, -999
 
-    -- InputBegan: solo registrar posición inicial, NO ejecutar nada
+    -- InputBegan: solo registrar posici?n inicial, NO ejecutar nada
     _addConn(_UIS.InputBegan:Connect(function(inp, sunk)
         if inp.UserInputType ~= Enum.UserInputType.Touch then return end
         -- Registrar siempre (incluso si sunk=true) para poder comparar en InputEnded
@@ -64484,7 +64581,7 @@ task.spawn(function()
         _tY     = inp.Position.Y
     end))
 
-    -- InputEnded: evaluar si fue tap válido para slash
+    -- InputEnded: evaluar si fue tap v?lido para slash
     _addConn(_UIS.InputEnded:Connect(function(inp)
         if inp.UserInputType ~= Enum.UserInputType.Touch then return end
         if _tStart < 0 then return end
@@ -64493,14 +64590,14 @@ task.spawn(function()
         local dx      = math.abs(inp.Position.X - _tX)
         local dy      = math.abs(inp.Position.Y - _tY)
         local sx, sy  = _tX, _tY
-        _tStart = -999  -- resetear para el próximo ciclo
+        _tStart = -999  -- resetear para el pr?ximo ciclo
 
-        -- ¿Fue un tap (corto y sin arrastre)?
+        -- ?Fue un tap (corto y sin arrastre)?
         if elapsed > MAX_DUR   then return end
         if dx > MAX_DRIFT or dy > MAX_DRIFT then return end
 
-        -- ¿Cayó sobre un GuiButton? (inventario, hub, controles del juego)
-        -- Si sí ? el juego ya lo maneja (equip, hub click, etc.), no interferir
+        -- ?Cay? sobre un GuiButton? (inventario, hub, controles del juego)
+        -- Si s? ? el juego ya lo maneja (equip, hub click, etc.), no interferir
         if _tapIsOnButton(sx, sy) then return end
 
         -- Tap limpio en el mundo 3D ? slash
@@ -64513,7 +64610,7 @@ task.spawn(function()
         _lastSlash = -999
     end))
 
-    -- Exposición global mínima para debug
+    -- Exposici?n global m?nima para debug
     _G._MobileKnifeSystem = {
         doSlashTouch = _doSlashTouch,
         cleanup = function()
@@ -64522,7 +64619,7 @@ task.spawn(function()
         end,
     }
 
-    _log("[MobileKnife v2] Touch ? Slash activo. Botón Lanzar ? manejado por KnifeSAState.")
+    _log("[MobileKnife v2] Touch ? Slash activo. Bot?n Lanzar ? manejado por KnifeSAState.")
 end)
 -- ================================================================
 -- == FIN MOBILE KNIFE INTEGRATION v2
