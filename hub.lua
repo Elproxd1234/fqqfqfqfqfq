@@ -64678,43 +64678,47 @@ task.spawn(function()
     end
 
     -- Construye handleCF y targetCF apuntando al enemigo mas cercano (o al frente si no hay)
-    local function buildThrowCFrames()
+    -- Construye handleCF (del Handle real del knife) y targetCF (apunta al enemigo)
+    local function buildThrowCFrames(knife)
         local char = getChar()
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            return CFrame.new(0,0,0), CFrame.new(0,0,20)
-        end
 
-        local origin   = hrp.Position + Vector3.new(0, 1.5, 0)
-        local handleCF = CFrame.new(origin, origin + hrp.CFrame.LookVector)
+        -- handleCF: CFrame del Handle real del knife
+        -- El KnifeClient original hace: FireServer(Handle.CFrame, targetCFrame)
+        local handle   = knife and knife:FindFirstChild("Handle")
+        local handleCF = handle and handle.CFrame
+                      or (hrp and CFrame.new(hrp.Position + Vector3.new(0, 1.5, 0), hrp.Position + hrp.CFrame.LookVector))
+                      or CFrame.new(0, 0, 0)
 
-        -- Intentar apuntar al enemigo mas cercano (silent aim)
+        local origin = handleCF.Position
+
+        -- targetPos: enemigo mas cercano o 40 studs al frente
         local enemyHRP = getNearestEnemy()
         local targetPos
 
         if enemyHRP then
-            -- Apuntar al torso/HRP del enemigo
             targetPos = enemyHRP.Position
-        else
-            -- Sin enemigos: apuntar 40 studs al frente
+        elseif hrp then
             targetPos = origin + hrp.CFrame.LookVector * 40
+        else
+            targetPos = origin + Vector3.new(0, 0, -40)
         end
 
-        -- targetCF apunta DE VUELTA hacia el origen (firma que espera el servidor MM2)
-        local backDir = (origin - targetPos).Unit
-        local targetCF = CFrame.new(targetPos, targetPos + backDir)
+        -- targetCF: apunta DE VUELTA al origen (firma exacta MM2)
+        local backDir = origin - targetPos
+        if backDir.Magnitude < 0.001 then backDir = Vector3.new(0, 0, 1) end
+        local targetCF = CFrame.new(targetPos, targetPos + backDir.Unit)
 
         return handleCF, targetCF
     end
 
-    -- Ejecuta el lanzamiento: anima + FireServer
+    -- Ejecuta el lanzamiento: anima + FireServer con firma exacta del servidor
     local function executeThrow(knife, knifeThrown)
-        -- 1. Reproducir animacion ThrowKnife (la de lanzamiento real)
+        -- 1. Reproducir animacion ThrowKnife
         local animator = getAnimator()
         local track    = nil
 
         if animator then
-            -- Buscar ThrowKnife primero, luego ThrowCharge como fallback
             local animObj = findAnimInKnifeClient(knife, "ThrowKnife")
                          or findAnimInKnifeClient(knife, "ThrowCharge")
             if animObj then
@@ -64723,27 +64727,17 @@ task.spawn(function()
                     track = tr
                     track.Priority = Enum.AnimationPriority.Action4
                     if track.IsPlaying then track:Stop(0) end
-                    track:Play(0.05, 6, 1)  -- speed=1 igual que KnifeClient original
+                    track:Play(0.05, 6, 1)
                 end
             end
         end
 
-        -- 2. Pequena pausa para que la animacion sea visible (no bloquea el throw)
-        task.wait(0.08)
+        -- 2. Minima pausa para que la animacion arranque
+        task.wait(0.05)
 
-        -- 3. Construir CFrames y disparar al servidor
-        local handleCF, targetCF = buildThrowCFrames()
-
-        local fired = false
-        pcall(function() knifeThrown:FireServer(handleCF, targetCF); fired = true end)
-        if not fired then
-            pcall(function() knifeThrown:FireServer(targetCF, handleCF); fired = true end)
-        end
-        if not fired then
-            pcall(function() knifeThrown:FireServer(targetCF) end)
-        end
-
-        -- 4. Dejar que la animacion termine sola (no la forzamos a parar)
+        -- 3. Handle.CFrame + targetCF -> FireServer (firma exacta de MM2)
+        local handleCF, targetCF = buildThrowCFrames(knife)
+        pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
     end
 
     -- ----------------------------------------------------------------
