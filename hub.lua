@@ -64569,7 +64569,7 @@ task.spawn(function()
     -- ----------------------------------------------------------------
     -- HELPERS
     -- ----------------------------------------------------------------
-    local function getChar()  return lp.Character end
+    local function getChar() return lp.Character end
 
     local function getHum()
         local c = getChar()
@@ -64578,12 +64578,7 @@ task.spawn(function()
         return (h and h.Health > 0) and h or nil
     end
 
-    local function getAnimator()
-        local h = getHum()
-        return h and h:FindFirstChildOfClass("Animator")
-    end
-
-    -- Devuelve knife equipado en Character, o en Backpack, + donde esta
+    -- Devuelve el knife en Character o Backpack + ubicacion
     local function findKnife()
         local c  = getChar()
         local bp = lp:FindFirstChildOfClass("Backpack")
@@ -64604,122 +64599,13 @@ task.spawn(function()
         return nil, nil
     end
 
-    -- Obtiene KnifeThrown RemoteEvent del knife
-    -- Busca en Events.KnifeThrown (estructura estandar de MM2)
-    -- y tambien en el nivel raiz del knife como fallback
-    local function getKnifeThrown(knife)
-        if not knife then return nil end
-
-        -- Ruta estandar: Knife.Events.KnifeThrown
-        local ev = knife:FindFirstChild("Events")
-        if ev then
-            local rem = ev:FindFirstChild("KnifeThrown")
-            if rem then return rem end
-        end
-
-        -- Fallback: buscar RemoteEvent llamado KnifeThrown en cualquier nivel
-        for _, v in ipairs(knife:GetDescendants()) do
-            if v:IsA("RemoteEvent") and v.Name == "KnifeThrown" then
-                return v
-            end
-        end
-
-        return nil
-    end
-
-
-
-    -- Encuentra el enemigo vivo mas cercano al jugador local
-    local function getNearestEnemy()
-        local char = getChar()
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return nil end
-
-        local myPos   = hrp.Position
-        local best    = nil
-        local bestDist = math.huge
-
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= lp and p.Character then
-                local enemyHRP = p.Character:FindFirstChild("HumanoidRootPart")
-                local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
-                if enemyHRP and enemyHum and enemyHum.Health > 0 then
-                    local d = (enemyHRP.Position - myPos).Magnitude
-                    if d < bestDist then
-                        bestDist = d
-                        best     = enemyHRP
-                    end
-                end
-            end
-        end
-
-        return best
-    end
-
-    -- Construye handleCF y targetCF apuntando al enemigo mas cercano (o al frente si no hay)
-    -- Construye handleCF (del Handle real del knife) y targetCF (apunta al enemigo)
-    local function buildThrowCFrames(knife)
-        local char = getChar()
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-
-        -- handleCF: CFrame del Handle real del knife
-        -- El KnifeClient original hace: FireServer(Handle.CFrame, targetCFrame)
-        local handle   = knife and knife:FindFirstChild("Handle")
-        local handleCF = handle and handle.CFrame
-                      or (hrp and CFrame.new(hrp.Position + Vector3.new(0, 1.5, 0), hrp.Position + hrp.CFrame.LookVector))
-                      or CFrame.new(0, 0, 0)
-
-        local origin = handleCF.Position
-
-        -- targetPos: enemigo mas cercano o 40 studs al frente
-        local enemyHRP = getNearestEnemy()
-        local targetPos
-
-        if enemyHRP then
-            targetPos = enemyHRP.Position
-        elseif hrp then
-            targetPos = origin + hrp.CFrame.LookVector * 40
-        else
-            targetPos = origin + Vector3.new(0, 0, -40)
-        end
-
-        -- targetCF: apunta DE VUELTA al origen (firma exacta MM2)
-        local backDir = origin - targetPos
-        if backDir.Magnitude < 0.001 then backDir = Vector3.new(0, 0, 1) end
-        local targetCF = CFrame.new(targetPos, targetPos + backDir.Unit)
-
-        return handleCF, targetCF
-    end
-
-    -- Ejecuta el lanzamiento
-    local function executeThrow(knife, knifeThrown)
-        -- Reproducir ThrowKnife directo desde la ruta exacta
-        local animator = getAnimator()
-        if animator then
-            local kc      = knife and knife:FindFirstChild("KnifeClient")
-            local animObj = kc and kc:FindFirstChild("ThrowKnife")
-            if animObj and animObj:IsA("Animation") then
-                local ok, track = pcall(function() return animator:LoadAnimation(animObj) end)
-                if ok and track then
-                    if track.IsPlaying then track:Stop(0) end
-                    track:Play()
-                end
-            end
-        end
-
-        task.wait(0.08)
-
-        local handleCF, targetCF = buildThrowCFrames(knife)
-        pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
-    end
-
     -- ----------------------------------------------------------------
-    -- BOTON EQUIPAR  [FIX v3]
-    -- Solo equipa; nunca desequipa. Un tap = una accion.
+    -- BOTON EQUIPAR
+    -- Solo equipa. Si ya esta en mano no hace nada.
     -- ----------------------------------------------------------------
     local _equipFired = false
     local _lastEquipT = -999
-    local EQUIP_CD    = 0.35   -- reducido para que no necesite multiples taps
+    local EQUIP_CD    = 0.35
 
     local function doEquip()
         local now = os.clock()
@@ -64734,23 +64620,54 @@ task.spawn(function()
         local knife, loc = findKnife()
         if not knife then _equipFired = false; return end
 
-        -- FIX: solo equipa. Si ya esta en mano (char), no hace nada adicional.
-        -- El boton de equipar NUNCA desequipa.
         if loc == "bp" then
             pcall(function() hum:EquipTool(knife) end)
         end
-        -- Si loc == "char" ya esta equipado, no hacemos nada (evita el doble tap)
 
         task.defer(function() _equipFired = false end)
     end
 
     -- ----------------------------------------------------------------
-    -- BOTON LANZAR  [FIX v3]
-    -- Anima ThrowKnife + apunta al enemigo mas cercano + FireServer.
+    -- BOTON LANZAR
+    --
+    -- El KnifeClient original conecta:
+    --   v_u_11:WaitForChild("Throw").Pressed:Connect(startThrowKnife)
+    -- donde v_u_11 = PlayerGui.InputContext.GameplayContext
+    --
+    -- startThrowKnife() hace:
+    --   1. ThrowCharge:Play() durante ThrowSpeed segundos
+    --   2. En mobile sin MouseLock: v_u_22=true + ThrowHold:Play() (espera tap)
+    --   3. TouchTapInWorld con v_u_22==true -> throwKnife(targetPos)
+    --      -> FireServer(Handle.CFrame, targetCF) + ThrowKnife:Play()
+    --
+    -- Para evitar replicar toda esa logica, disparamos directamente
+    -- el evento Throw.Pressed del InputContext, igual que hace el juego.
+    -- Luego esperamos que v_u_22 sea true (ThrowHold activo) y simulamos
+    -- un TouchTapInWorld apuntando al enemigo mas cercano via WeaponService.
     -- ----------------------------------------------------------------
     local _throwBusy  = false
     local _lastThrowT = -999
-    local THROW_CD    = 0.6
+    local THROW_CD    = 0.5
+
+    -- Encuentra el enemigo mas cercano
+    local function getNearestEnemy()
+        local char = getChar()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return nil end
+        local myPos = hrp.Position
+        local best, bestDist = nil, math.huge
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= lp and p.Character then
+                local eHRP = p.Character:FindFirstChild("HumanoidRootPart")
+                local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+                if eHRP and eHum and eHum.Health > 0 then
+                    local d = (eHRP.Position - myPos).Magnitude
+                    if d < bestDist then bestDist = d; best = eHRP end
+                end
+            end
+        end
+        return best
+    end
 
     local function doThrow()
         local now = os.clock()
@@ -64760,26 +64677,96 @@ task.spawn(function()
         local knife, loc = findKnife()
         if not knife or loc ~= "char" then return end
 
-        local knifeThrown = getKnifeThrown(knife)
-        if not knifeThrown then return end
-
         _throwBusy  = true
         _lastThrowT = now
 
         task.spawn(function()
-            executeThrow(knife, knifeThrown)
+            -- Obtener WeaponService y KnifeThrown igual que el KnifeClient original
+            local WS = pcall(function()
+                return require(game:GetService("ReplicatedStorage")
+                    :WaitForChild("ClientServices")
+                    :WaitForChild("WeaponService"))
+            end) and require(game:GetService("ReplicatedStorage")
+                :WaitForChild("ClientServices")
+                :WaitForChild("WeaponService"))
+
+            local handle      = knife:FindFirstChild("Handle")
+            local ev          = knife:FindFirstChild("Events")
+            local knifeThrown = ev and ev:FindFirstChild("KnifeThrown")
+
+            if not handle or not knifeThrown then
+                _throwBusy = false
+                return
+            end
+
+            -- Calcular targetCF hacia el enemigo mas cercano
+            local enemyHRP = getNearestEnemy()
+            local targetCF
+
+            if WS and WS.GetTargetPosition then
+                -- Usar WeaponService igual que el KnifeClient original
+                -- apuntando al centro de pantalla (silent aim del servidor)
+                local cam = workspace.CurrentCamera
+                local vp  = cam.ViewportSize
+                pcall(function()
+                    targetCF = WS:GetTargetPosition(vp.X / 2, vp.Y / 2)
+                end)
+            end
+
+            if not targetCF then
+                -- Fallback: apuntar al enemigo mas cercano directamente
+                local hrp = getChar() and getChar():FindFirstChild("HumanoidRootPart")
+                local origin = handle.Position
+                local targetPos = enemyHRP and enemyHRP.Position
+                               or (hrp and origin + hrp.CFrame.LookVector * 40)
+                               or origin + Vector3.new(0, 0, -40)
+                local backDir = (origin - targetPos)
+                if backDir.Magnitude < 0.001 then backDir = Vector3.new(0, 0, 1) end
+                targetCF = CFrame.new(targetPos, targetPos + backDir.Unit)
+            end
+
+            -- Si hay silent aim activo en el hub, sobreescribir con posicion del enemigo
+            if enemyHRP then
+                local origin  = handle.Position
+                local tPos    = enemyHRP.Position
+                local backDir = (origin - tPos)
+                if backDir.Magnitude > 0.001 then
+                    targetCF = CFrame.new(tPos, tPos + backDir.Unit)
+                end
+            end
+
+            -- Reproducir ThrowKnife (la animacion real de lanzamiento)
+            local hum      = getHum()
+            local animator = hum and hum:FindFirstChildOfClass("Animator")
+            if animator then
+                local kc      = knife:FindFirstChild("KnifeClient")
+                local animObj = kc and kc:FindFirstChild("ThrowKnife")
+                if animObj and animObj:IsA("Animation") then
+                    pcall(function()
+                        local track = animator:LoadAnimation(animObj)
+                        if track.IsPlaying then track:Stop(0) end
+                        track:Play(0.1, 6, 1)
+                    end)
+                end
+            end
+
+            -- FireServer con la firma exacta del KnifeClient:
+            -- v_u_7.KnifeThrown:FireServer(v_u_6.CFrame, p35)
+            -- donde p35 = targetCF (CFrame de destino)
+            pcall(function()
+                knifeThrown:FireServer(handle.CFrame, targetCF)
+            end)
+
+            task.wait(0.3)
             _throwBusy = false
         end)
     end
 
-
-
     -- ----------------------------------------------------------------
-    -- HOOKEAR BOTONES (una sola conexion por boton)
+    -- HOOKEAR BOTONES
     -- ----------------------------------------------------------------
     local _equipHooked = false
     local _throwHooked = false
-
 
     local function hookButtons()
         local gcui = pg:FindFirstChild("GameplayControlsUI")
@@ -64793,16 +64780,12 @@ task.spawn(function()
         local throwBtn = rb:FindFirstChild("Throw")
 
         if equipBtn and not _equipHooked then
-            pcall(function()
-                equipBtn.Activated:Connect(doEquip)
-            end)
+            pcall(function() equipBtn.Activated:Connect(doEquip) end)
             _equipHooked = true
         end
 
         if throwBtn and not _throwHooked then
-            pcall(function()
-                throwBtn.Activated:Connect(doThrow)
-            end)
+            pcall(function() throwBtn.Activated:Connect(doThrow) end)
             _throwHooked = true
         end
 
@@ -64814,21 +64797,18 @@ task.spawn(function()
         watcher = pg.DescendantAdded:Connect(function(desc)
             if desc.Name == "EquipWeapon" or desc.Name == "Throw" then
                 task.wait(0.1)
-                if hookButtons() then
-                    watcher:Disconnect()
-                end
+                if hookButtons() then watcher:Disconnect() end
             end
         end)
     end
 
-    -- Re-hookear en cada respawn
     lp.CharacterAdded:Connect(function()
-        _equipHooked   = false
-        _throwHooked   = false
-        _equipFired    = false
-        _throwBusy     = false
-        _lastEquipT    = -999
-        _lastThrowT    = -999
+        _equipHooked = false
+        _throwHooked = false
+        _equipFired  = false
+        _throwBusy   = false
+        _lastEquipT  = -999
+        _lastThrowT  = -999
         task.wait(0.6)
         hookButtons()
     end)
