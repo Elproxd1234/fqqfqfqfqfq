@@ -6734,16 +6734,29 @@ function _KnifeSA_setupKnife(knife)
     -- Nombres de throw y slash seg?n estructura real de MM2:
     -- FIX: ThrowCharge primero porque es la animacion correcta en KnifeClient de MM2.
     -- Animation1 es SOLO slash ? no usarla para throw.
-    local _throwAnimNames = {"ThrowCharge", "ThrowKnife", "Throw", "Animation2"}  -- ThrowCharge primero: animacion correcta en Knife.KnifeClient.ThrowCharge
+    -- ThrowHold se reproduce DESPUES de ThrowCharge (secuencia real de MM2)
+    -- _playThrowAnim reproduce ThrowCharge; _playThrowHoldAnim reproduce ThrowHold
+    local _throwAnimNames     = {"ThrowCharge", "ThrowHold", "ThrowKnife", "Throw", "Animation2"}
+    local _throwHoldAnimNames = {"ThrowHold"}
     local _slashAnimNames = {"SlashKnife", "Slash", "Stab", "Hit", "Animation1"}
 
+    -- Reproduce ThrowCharge (carga del lanzamiento)
+    -- Cuando termina, _ksaDoThrow llama a _playThrowHoldAnim antes de FireServer
     local function _playThrowAnim()
         KnifeSAState._playThrowAnim = _playThrowAnim  -- exponer para _ksaDoThrow mobile
-        KnifeSAState._lastThrowTrackName = nil         -- resetear antes de reproducir
+        KnifeSAState._lastThrowTrackName = nil
+        -- Intentar ThrowCharge primero (animacion de carga real de MM2)
+        if _animObjs["ThrowCharge"] then
+            if _playKnifeAnim("ThrowCharge", 1.0) then
+                KnifeSAState._lastThrowTrackName = "ThrowCharge"
+                return
+            end
+        end
+        -- Fallback secuencial
         for _, name in ipairs(_throwAnimNames) do
             if _animObjs[name] then
                 if _playKnifeAnim(name, 1.0) then
-                    KnifeSAState._lastThrowTrackName = name  -- guardar nombre del track activo
+                    KnifeSAState._lastThrowTrackName = name
                     return
                 end
             end
@@ -6759,6 +6772,50 @@ function _KnifeSA_setupKnife(knife)
             end
         end
     end
+
+    -- Reproduce ThrowHold (animacion de sostener el knife antes de lanzar)
+    -- Se llama justo DESPUES de que ThrowCharge termina y ANTES de FireServer
+    local function _playThrowHoldAnim()
+        KnifeSAState._playThrowHoldAnim = _playThrowHoldAnim
+        KnifeSAState._lastThrowHoldTrackName = nil
+        if _animObjs["ThrowHold"] then
+            if _playKnifeAnim("ThrowHold", 1.0) then
+                KnifeSAState._lastThrowHoldTrackName = "ThrowHold"
+                return true
+            end
+        end
+        return false  -- ThrowHold no existe en este knife, no bloquear el throw
+    end
+    KnifeSAState._playThrowHoldAnim = _playThrowHoldAnim
+
+    -- Helper para esperar que ThrowHold termine (o timeout si no existe)
+    local function _waitThrowHold()
+        if not _animObjs["ThrowHold"] then return end  -- no existe, salir rapido
+        local played = _playThrowHoldAnim()
+        if not played then return end
+        -- Esperar que el track Stopped se dispare
+        local holdDone = false
+        pcall(function()
+            local holdName = KnifeSAState._lastThrowHoldTrackName
+            local holdTrack = holdName and _animTracks[holdName]
+            if not holdTrack then return end
+            task.wait()  -- frame para que Length se populate
+            local len = holdTrack.Length or 0
+            if len < 0.05 then return end
+            local _hconn
+            _hconn = holdTrack.Stopped:Connect(function()
+                holdDone = true
+                if _hconn then _hconn:Disconnect(); _hconn = nil end
+            end)
+            task.delay(len + 0.3, function()
+                holdDone = true
+                if _hconn then _hconn:Disconnect(); _hconn = nil end
+            end)
+            local _t0 = os.clock()
+            repeat task.wait(0.016) until holdDone or (os.clock() - _t0 > len + 0.5)
+        end)
+    end
+    KnifeSAState._waitThrowHold = _waitThrowHold
 
     -- Exponer _animTracks para que _ksaDoThrow pueda esperar el fin del track
     KnifeSAState._getThrowTrack = function()
@@ -6910,6 +6967,11 @@ function _KnifeSA_setupKnife(knife)
                 local t0 = os.clock()
                 while not animFinished and (os.clock() - t0) < maxWait do
                     task.wait()
+                end
+
+                -- NUEVO: reproducir ThrowHold despues de ThrowCharge y antes de lanzar
+                if KnifeSAState._waitThrowHold then
+                    pcall(KnifeSAState._waitThrowHold)
                 end
             else
                 -- Instant Throw: matar cualquier animacion de throw en curso ahora mismo
@@ -49332,7 +49394,12 @@ function CreateCombatTab()
                         repeat task.wait(0.016) until _throwDone or (os.clock() - _t0 > len + 0.5)
                     end)
 
-                    -- 3. Calcular target SA y lanzar el knife al terminar ThrowCharge
+                    -- 2b. Reproducir ThrowHold despues de ThrowCharge y antes de lanzar
+                    if KnifeSAState._waitThrowHold then
+                        pcall(KnifeSAState._waitThrowHold)
+                    end
+
+                    -- 3. Calcular target SA y lanzar el knife al terminar ThrowCharge + ThrowHold
                     -- FIX MOBILE THROW: recalcular handleCF/targetCF AQUI, despues de la animacion,
                     -- usando la misma logica de prediccion que el desktop (RMB).
                     do
@@ -64632,7 +64699,7 @@ task.spawn(function()
         -- Evita que _ksaDoThrow se dispare por el mismo touch
         KnifeSAState._lastEquipTime = os.clock()
 
-        -- Leer Character FRESCO (no capturado en closure)
+        -- Leer Character FRESCO en cada llamada (nunca capturado en closure)
         local char = _lp2.Character
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
@@ -64643,11 +64710,10 @@ task.spawn(function()
         -- Verificar si el knife ya esta equipado en el Character
         local knifeInChar = char:FindFirstChild("Knife")
         if knifeInChar then
-            -- Ya equipado -> desequipar
+            -- Ya equipado -> desequipar limpiamente
             pcall(function() hum:UnequipTools() end)
-            -- Esperar un frame y re-registrar lastEquipTime
-            -- para que _ksaDoThrow no se dispare al soltar
-            task.wait(0.05)
+            -- Esperar y re-registrar lastEquipTime para bloquear _ksaDoThrow
+            task.wait(0.08)
             KnifeSAState._lastEquipTime = os.clock()
             return
         end
@@ -64656,16 +64722,48 @@ task.spawn(function()
         local knifeInBP = bp and bp:FindFirstChild("Knife")
         if not knifeInBP then return end
 
-        -- Metodo 1: mover Tool directamente al Character (replica al servidor en mobile)
+        -- Metodo principal: EquipTool (funciona en todos los executors mobile
+        -- y replica correctamente al servidor; el Backpack service lo acepta)
         local equipOk = false
         pcall(function()
-            knifeInBP.Parent = char
+            hum:EquipTool(knifeInBP)
             equipOk = true
         end)
 
-        -- Metodo 2: EquipTool como fallback
+        -- Metodo 2: mover Parent al Character como fallback
+        -- (algunos executors bloquean EquipTool pero permiten Parent move)
         if not equipOk then
-            pcall(function() hum:EquipTool(knifeInBP) end)
+            pcall(function()
+                knifeInBP.Parent = char
+                equipOk = true
+            end)
+        end
+
+        if not equipOk then return end
+
+        -- Esperar a que el knife aparezca realmente en el Character
+        -- (EquipTool es async en mobile; sin espera, _KnifeSA_setupKnife
+        -- puede correr antes de que el Tool llegue al Character)
+        local waited = 0
+        while not char:FindFirstChild("Knife") and waited < 0.5 do
+            task.wait(0.05)
+            waited = waited + 0.05
+        end
+
+        -- Si el SA esta activo, llamar _KnifeSA_setupKnife manualmente
+        -- porque el ChildAdded del char puede no dispararse si el knife
+        -- llego por EquipTool antes de que el watcher estuviera conectado
+        local freshKnife = char:FindFirstChild("Knife")
+        if freshKnife and KnifeSAState and KnifeSAState.enabled
+        and type(_KnifeSA_setupKnife) == "function" then
+            -- Solo si el knife no fue ya configurado por el watcher
+            if not freshKnife:GetAttribute("_SA_SetupId") or
+               freshKnife:GetAttribute("_SA_SetupId") == 0 then
+                task.spawn(function()
+                    task.wait(0.1)
+                    pcall(_KnifeSA_setupKnife, freshKnife)
+                end)
+            end
         end
 
         -- Re-registrar lastEquipTime despues del equip
