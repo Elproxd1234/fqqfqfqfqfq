@@ -64627,33 +64627,6 @@ task.spawn(function()
         return nil
     end
 
-    -- Obtiene ThrowKnife directamente desde la ruta exacta confirmada:
-    -- Knife.KnifeClient.ThrowKnife  (Animation hijo directo del LocalScript)
-    local function getThrowKnifeAnim(knife)
-        if not knife then return nil end
-        local kc = knife:FindFirstChild("KnifeClient")
-        if not kc then return nil end
-
-        -- Ruta exacta: KnifeClient.ThrowKnife
-        local anim = kc:FindFirstChild("ThrowKnife")
-        if anim and anim:IsA("Animation") then return anim end
-
-        -- Fallback: cualquier Animation "throw" que no sea charge/hold
-        for _, v in ipairs(kc:GetChildren()) do
-            if v:IsA("Animation") then
-                local n = v.Name:lower()
-                if n:find("throw") and not n:find("charge") and not n:find("hold") then
-                    return v
-                end
-            end
-        end
-
-        -- Ultimo fallback: ThrowCharge
-        local charge = kc:FindFirstChild("ThrowCharge")
-        if charge and charge:IsA("Animation") then return charge end
-
-        return nil
-    end
 
     -- Hook KnifeStabbed para bloquear el stab mientras lanzamos
     -- Cuando _G._hubThrowActive==true, silenciamos el FireServer de KnifeStabbed
@@ -64742,37 +64715,29 @@ task.spawn(function()
         return handleCF, targetCF
     end
 
-    -- Ejecuta el lanzamiento: anima + FireServer con firma exacta del servidor
+    -- Ejecuta el lanzamiento
     local function executeThrow(knife, knifeThrown)
-        -- Bloquear stabKnife del KnifeClient mientras lanzamos
-        -- El KnifeClient chequea _G._hubThrowActive antes de ejecutar el stab
         _G._hubThrowActive = true
 
-        -- 1. Reproducir animacion ThrowKnife
+        -- Reproducir ThrowKnife directo desde la ruta exacta
         local animator = getAnimator()
-        local track    = nil
-
         if animator then
-            local animObj = getThrowKnifeAnim(knife)
-            if animObj then
-                local ok, tr = pcall(function() return animator:LoadAnimation(animObj) end)
-                if ok and tr then
-                    track = tr
-                    track.Priority = Enum.AnimationPriority.Action4
+            local kc      = knife and knife:FindFirstChild("KnifeClient")
+            local animObj = kc and kc:FindFirstChild("ThrowKnife")
+            if animObj and animObj:IsA("Animation") then
+                local ok, track = pcall(function() return animator:LoadAnimation(animObj) end)
+                if ok and track then
                     if track.IsPlaying then track:Stop(0) end
-                    track:Play(0.05, 6, 1)
+                    track:Play()
                 end
             end
         end
 
-        -- 2. Minima pausa para que la animacion arranque antes del FireServer
         task.wait(0.08)
 
-        -- 3. Handle.CFrame + targetCF -> FireServer (firma exacta de MM2)
         local handleCF, targetCF = buildThrowCFrames(knife)
         pcall(function() knifeThrown:FireServer(handleCF, targetCF) end)
 
-        -- Liberar el bloqueo despues de un frame
         task.wait(0.1)
         _G._hubThrowActive = false
     end
