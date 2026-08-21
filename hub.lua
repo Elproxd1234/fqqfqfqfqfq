@@ -64534,509 +64534,200 @@ end)
 
 
 -- ================================================================
--- FIX MOBILE: la gun se equipa sola al tocar cualquier parte de la pantalla.
--- CAUSA: el GameplayButton del juego hookea el ContextActionService con
--- un binding de touch que abarca toda la pantalla. Cualquier touch que
--- no caiga sobre otro boton UI con Sunk=true llega al EquipWeapon handler.
--- SOLUCION: interceptar __namecall para bloquear Humanoid:EquipTool/UnequipTools
--- cuando el touch NO ocurrio dentro del area visual del boton EquipWeapon.
+-- == MOBILE KNIFE BUTTONS v1
+--
+-- BOTON EQUIPAR: hookea EquipWeapon del GameplayControlsUI para
+-- equipar/desequipar el knife del backpack del jugador.
+-- No depende de SA ni de ninguna otra logica del hub.
+--
+-- BOTON LANZAR: hookea Throw del GameplayControlsUI para reproducir
+-- la animacion ThrowCharge del KnifeClient cuando se presiona.
 -- ================================================================
 task.spawn(function()
-    local _UIS = game:GetService("UserInputService")
-    if not _UIS.TouchEnabled then return end
+    local UIS = game:GetService("UserInputService")
+    if not UIS.TouchEnabled then return end
 
-    local _lp   = game:GetService("Players").LocalPlayer
-    local _pg   = _lp:WaitForChild("PlayerGui", 15)
-    if not _pg then return end
+    local lp  = game:GetService("Players").LocalPlayer
+    local pg  = lp:WaitForChild("PlayerGui", 15)
+    if not pg then return end
 
-    -- Ultima posicion de touch registrada globalmente
-    local _lastTouchX, _lastTouchY = -999, -999
-    local _lastTouchTime = -999
+    -- ----------------------------------------------------------------
+    -- HELPERS
+    -- ----------------------------------------------------------------
 
-    _UIS.InputBegan:Connect(function(inp, sunk)
-        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-        _lastTouchX    = inp.Position.X
-        _lastTouchY    = inp.Position.Y
-        _lastTouchTime = os.clock()
-    end)
-
-    -- Funcion que verifica si el ultimo touch cayo dentro del boton EquipWeapon
-    local function _touchWasOnEquipBtn(equipBtn)
-        if os.clock() - _lastTouchTime > 0.5 then return false end  -- touch demasiado viejo
-        local ok, inBtn = pcall(function()
-            local ap  = equipBtn.AbsolutePosition
-            local as  = equipBtn.AbsoluteSize
-            return _lastTouchX >= ap.X and _lastTouchX <= ap.X + as.X
-               and _lastTouchY >= ap.Y and _lastTouchY <= ap.Y + as.Y
-        end)
-        return ok and inBtn
+    -- Obtener humanoid fresco del personaje actual
+    local function getHum()
+        local char = lp.Character
+        if not char then return nil end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return nil end
+        return hum
     end
 
-    local function _applyFix()
-        local gcui = _pg:FindFirstChild("GameplayControlsUI")
+    -- Buscar el knife en Character o Backpack
+    local function findKnife()
+        local char = lp.Character
+        local bp   = lp:FindFirstChildOfClass("Backpack")
+        if char then
+            local k = char:FindFirstChild("Knife")
+            if k and k:IsA("Tool") then return k, "char" end
+        end
+        if bp then
+            local k = bp:FindFirstChild("Knife")
+            if k and k:IsA("Tool") then return k, "bp" end
+        end
+        return nil, nil
+    end
+
+    -- Cargar y reproducir ThrowCharge desde KnifeClient del knife equipado
+    local function playThrowCharge()
+        local knife, loc = findKnife()
+        -- Solo reproducir si el knife esta en mano (Character)
+        if not knife or loc ~= "char" then return end
+
+        local char = lp.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        local animator = hum and hum:FindFirstChildOfClass("Animator")
+        if not animator then return end
+
+        -- Buscar ThrowCharge dentro de KnifeClient (ruta exacta de MM2)
+        local kc = knife:FindFirstChild("KnifeClient")
+        if not kc then return end
+
+        local throwChargeAnim = kc:FindFirstChild("ThrowCharge")
+            or kc:FindFirstChildWhichIsA("Animation")
+        if not throwChargeAnim then
+            -- Busqueda recursiva como fallback
+            for _, v in ipairs(kc:GetDescendants()) do
+                if v:IsA("Animation") and v.Name == "ThrowCharge" then
+                    throwChargeAnim = v
+                    break
+                end
+            end
+        end
+        if not throwChargeAnim then return end
+
+        pcall(function()
+            local track = animator:LoadAnimation(throwChargeAnim)
+            track.Priority = Enum.AnimationPriority.Action
+            if track.IsPlaying then track:Stop(0) end
+            track:Play(0.05)
+        end)
+    end
+
+    -- ----------------------------------------------------------------
+    -- EQUIP BUTTON: equipar/desequipar knife al presionar EquipWeapon
+    -- ----------------------------------------------------------------
+    local _lastEquip = -999
+    local EQUIP_CD   = 0.35
+
+    local function onEquipPressed()
+        local now = os.clock()
+        if now - _lastEquip < EQUIP_CD then return end
+        _lastEquip = now
+
+        local hum = getHum()
+        if not hum then return end
+
+        local knife, loc = findKnife()
+        if not knife then return end
+
+        if loc == "char" then
+            -- Ya equipado -> desequipar
+            pcall(function() hum:UnequipTools() end)
+        else
+            -- En backpack -> equipar
+            pcall(function() hum:EquipTool(knife) end)
+        end
+    end
+
+    -- ----------------------------------------------------------------
+    -- THROW BUTTON: reproducir ThrowCharge al presionar Throw
+    -- ----------------------------------------------------------------
+    local _lastThrow = -999
+    local THROW_CD   = 0.45
+
+    local function onThrowPressed()
+        local now = os.clock()
+        if now - _lastThrow < THROW_CD then return end
+        _lastThrow = now
+        task.spawn(playThrowCharge)
+    end
+
+    -- ----------------------------------------------------------------
+    -- HOOKEAR BOTONES
+    -- Intenta conectarse a los botones; si no existen todavia, espera.
+    -- Se re-hookea en cada CharacterAdded por si MM2 los recrea.
+    -- ----------------------------------------------------------------
+    local _equipHooked = false
+    local _throwHooked = false
+
+    local function hookButtons()
+        local gcui = pg:FindFirstChild("GameplayControlsUI")
         if not gcui then return false end
         local tc = gcui:FindFirstChild("TouchControls")
         if not tc then return false end
         local rb = tc:FindFirstChild("RightBar")
         if not rb then return false end
+
         local equipBtn = rb:FindFirstChild("EquipWeapon")
-        if not equipBtn then return false end
+        local throwBtn = rb:FindFirstChild("Throw")
 
-        -- Hookear __namecall para interceptar Humanoid:EquipTool
-        -- cuando el touch no fue sobre el boton EquipWeapon
-        if not (getrawmetatable and setreadonly and newcclosure and getnamecallmethod) then
-            -- Fallback sin metatable: escuchar CharacterAdded y parchear Humanoid directamente
-            local function _patchChar(char)
-                -- Remplazar EquipTool con wrapper que verifica el touch
-                -- Nota: solo funciona en executors que permiten rawset en instancias
-                pcall(function()
-                    local hum = char:WaitForChild("Humanoid", 5)
-                    if not hum then return end
-                    -- Monitorear ChildAdded del Character para detectar equips automaticos de gun.
-                    -- FIX: ignorar completamente knives - solo revertir guns no intencionales.
-                    char.ChildAdded:Connect(function(child)
-                        if not child:IsA("Tool") then return end
-                        -- Si es knife: NUNCA interferir, dejar pasar siempre
-                        if child:HasTag("Weapon_Knife") or child.Name == "Knife" then return end
-                        -- Solo actuar sobre guns
-                        if not (child:HasTag("Weapon_Gun") or child.Name == "Gun") then return end
-                        -- Una gun se equipo sola: verificar si el touch fue en el boton
-                        if not _touchWasOnEquipBtn(equipBtn) then
-                            task.wait()  -- diferir un frame
-                            pcall(function() hum:UnequipTools() end)
-                        end
-                    end)
+        -- Equip button
+        if equipBtn and not _equipHooked then
+            pcall(function()
+                equipBtn.Activated:Connect(onEquipPressed)
+            end)
+            -- Fallback InputBegan por si Activated no dispara
+            pcall(function()
+                equipBtn.InputBegan:Connect(function(inp)
+                    if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+                    onEquipPressed()
                 end)
-            end
-            local char0 = _lp.Character
-            if char0 then task.spawn(_patchChar, char0) end
-            _lp.CharacterAdded:Connect(function(c) task.spawn(_patchChar, c) end)
-            return true
+            end)
+            _equipHooked = true
         end
 
-        -- Hook __namecall (Solara y executors completos)
-        local _mt = getrawmetatable(game)
-        if not _G._equipFixRealNC then
-            _G._equipFixRealNC = _mt.__namecall
+        -- Throw button
+        if throwBtn and not _throwHooked then
+            pcall(function()
+                throwBtn.Activated:Connect(onThrowPressed)
+            end)
+            pcall(function()
+                throwBtn.InputBegan:Connect(function(inp)
+                    if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+                    onThrowPressed()
+                end)
+            end)
+            _throwHooked = true
         end
-        local _realNC = _G._equipFixRealNC
-        setreadonly(_mt, false)
-        _mt.__namecall = newcclosure(function(self, ...)
-            local method = ""
-            pcall(function() method = getnamecallmethod() end)
 
-            -- Interceptar Humanoid:EquipTool SOLO para guns que se disparan solas.
-            -- FIX: NO bloquear knives jamas - el knife siempre debe pasar sin filtro.
-            -- Antes el bloque aplicaba a cualquier Tool, lo que impedia equipar el
-            -- knife cuando el touch no caia exactamente sobre el boton EquipWeapon.
-            if method == "EquipTool" then
-                local isHum = false
-                pcall(function() isHum = self:IsA("Humanoid") end)
-                if isHum then
-                    local args = {...}
-                    local tool = args[1]
-                    local isGun = false
-                    local isKnife = false
-                    pcall(function()
-                        isGun   = tool and tool:IsA("Tool")
-                                  and (tool:HasTag("Weapon_Gun") or tool.Name == "Gun")
-                        -- Knife: tag oficial MM2 o nombre "Knife" - NUNCA bloquear
-                        isKnife = tool and tool:IsA("Tool")
-                                  and (tool:HasTag("Weapon_Knife") or tool.Name == "Knife")
-                    end)
-                    -- Solo bloquear guns que se equipan solas (touch fuera del boton)
-                    -- Si es knife, dejar pasar siempre
-                    if isGun and not isKnife and not _touchWasOnEquipBtn(equipBtn) then
-                        return
-                    end
-                end
-            end
-
-            return _realNC(self, ...)
-        end)
-        setreadonly(_mt, true)
-        return true
+        return _equipHooked and _throwHooked
     end
 
-    -- Intentar aplicar inmediatamente; si GameplayControlsUI no existe, esperar
-    if not _applyFix() then
-        local _watchConn
-        _watchConn = _pg.DescendantAdded:Connect(function(desc)
-            if desc.Name == "EquipWeapon" then
+    -- Intentar hookear inmediatamente
+    if not hookButtons() then
+        local watcher
+        watcher = pg.DescendantAdded:Connect(function(desc)
+            if desc.Name == "EquipWeapon" or desc.Name == "Throw" then
                 task.wait(0.1)
-                if _applyFix() then
-                    _watchConn:Disconnect()
-                end
-            end
-        end)
-    end
-end)
-
--- ================================================================
--- == FIX BOTON EQUIPAR MOBILE (Knife Silent Aim) v3
---
--- FIX v3: corrige dos bugs del v2:
---
---   BUG 1: Si KnifeSAState.enabled == false, el boton quedaba hooked
---           pero el Activated retornaba inmediatamente -> el knife
---           no se equipaba nunca aunque el SA estuviera apagado.
---   FIX 1: Cuando SA esta desactivado NO interceptamos el Activated;
---           el GameplayControlsScript del juego ya tiene su propio
---           handler conectado y lo maneja correctamente.
---
---   BUG 2: El slot visual del knife en el BackpackUI del juego
---           quedaba oculto. _hideBackpackUI() llama
---           SetCoreGuiEnabled(Backpack, false) y el BackpackScript
---           del juego lo vuelve a apagar en un loop infinito, asi
---           que re-habilitarlo desde el hub no sirve.
---   FIX 2: _ensureKnifeSlotVisible() busca directamente el Frame
---           del slot 1 dentro del BackpackFrame y fuerza Visible=true
---           si hay un knife presente, sin tocar CoreGuiEnabled.
---           Se llama al cargar y en cada respawn.
--- ================================================================
-task.spawn(function()
-    local _UIS2 = game:GetService("UserInputService")
-    if not _UIS2.TouchEnabled then return end
-
-    local _lp2 = game:GetService("Players").LocalPlayer
-    local _pg2 = _lp2:WaitForChild("PlayerGui", 15)
-    if not _pg2 then return end
-
-    -- Guard global: evita hookear el mismo boton dos veces
-    _G._equipBtnHooked = false
-    local _lastEquipPress = -999
-    local EQUIP_CD = 0.3  -- cooldown entre presses (segundos)
-
-    -- SIEMPRE lee Character/Backpack frescos desde LocalPlayer
-    local function _equipKnifeForSA()
-        -- Cooldown para evitar doble-fire
-        local now = os.clock()
-        if now - _lastEquipPress < EQUIP_CD then return end
-        _lastEquipPress = now
-
-        -- Registrar tiempo de equip ANTES de cualquier operacion
-        -- para bloquear _ksaDoThrow en el mismo touch
-        if KnifeSAState then
-            KnifeSAState._lastEquipTime = os.clock()
-        end
-
-        -- Leer Character FRESCO (nunca capturado en closure)
-        local char = _lp2.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return end
-
-        -- Leer Backpack FRESCO
-        local bp = _lp2.Backpack
-
-        -- Ya equipado -> desequipar limpiamente
-        local knifeInChar = char:FindFirstChild("Knife")
-        if knifeInChar then
-            pcall(function() hum:UnequipTools() end)
-            task.wait(0.08)
-            if KnifeSAState then
-                KnifeSAState._lastEquipTime = os.clock()
-            end
-            return
-        end
-
-        -- Buscar knife en Backpack
-        local knifeInBP = bp and bp:FindFirstChild("Knife")
-        if not knifeInBP then return end
-
-        -- Metodo principal: EquipTool
-        local equipOk = false
-        pcall(function() hum:EquipTool(knifeInBP); equipOk = true end)
-
-        -- Fallback: mover Parent directamente (executors que bloquean EquipTool)
-        if not equipOk then
-            pcall(function() knifeInBP.Parent = char; equipOk = true end)
-        end
-
-        if not equipOk then return end
-
-        -- Esperar a que el knife aparezca en el Character
-        -- (EquipTool es async en mobile)
-        local waited = 0
-        while not char:FindFirstChild("Knife") and waited < 0.5 do
-            task.wait(0.05)
-            waited = waited + 0.05
-        end
-
-        -- Si SA activo, llamar _KnifeSA_setupKnife manualmente
-        -- (el ChildAdded puede no dispararse si el knife llego
-        --  por EquipTool antes de que el watcher estuviera conectado)
-        local freshKnife = char:FindFirstChild("Knife")
-        if freshKnife and KnifeSAState and KnifeSAState.enabled
-        and type(_KnifeSA_setupKnife) == "function" then
-            if not freshKnife:GetAttribute("_SA_SetupId")
-            or freshKnife:GetAttribute("_SA_SetupId") == 0 then
-                task.spawn(function()
-                    task.wait(0.1)
-                    pcall(_KnifeSA_setupKnife, freshKnife)
-                end)
-            end
-        end
-
-        -- Re-registrar lastEquipTime despues del equip
-        task.wait(0.05)
-        if KnifeSAState then
-            KnifeSAState._lastEquipTime = os.clock()
-        end
-    end
-
-    -- FIX v3 BUG 2: forzar visible el slot del knife en el BackpackUI
-    -- sin tocar SetCoreGuiEnabled (que el BackpackScript pisa en loop).
-    local function _ensureKnifeSlotVisible()
-        local backpackUI = _pg2:FindFirstChild("BackpackUI")
-        if not backpackUI then return end
-        local backpackFrame = backpackUI:FindFirstChild("BackpackFrame")
-        if not backpackFrame then return end
-
-        -- El BackpackScript del juego pone el knife en LayoutOrder=1 (slot 1)
-        for _, item in ipairs(backpackFrame:GetChildren()) do
-            if item:IsA("Frame") and item.LayoutOrder == 1 then
-                local char     = _lp2.Character
-                local bp       = _lp2.Backpack
-                local hasKnife = (char and char:FindFirstChild("Knife") ~= nil)
-                              or (bp   and bp:FindFirstChild("Knife")   ~= nil)
-                if hasKnife then
-                    pcall(function() item.Visible = true end)
-                end
-                break
-            end
-        end
-    end
-
-    -- Hookea el boton; retorna true si lo encontro y conecto
-    local function _hookEquipBtn()
-        if _G._equipBtnHooked then return true end
-
-        local gcui     = _pg2:FindFirstChild("GameplayControlsUI")
-        if not gcui then return false end
-        local tc       = gcui:FindFirstChild("TouchControls")
-        if not tc then return false end
-        local rb       = tc:FindFirstChild("RightBar")
-        if not rb then return false end
-        local equipBtn = rb:FindFirstChild("EquipWeapon")
-        if not equipBtn then return false end
-
-        -- FIX v3 BUG 1: solo interceptar el Activated cuando SA esta activo.
-        -- Si SA esta off, NO conectamos nada extra -> el GameplayControlsScript
-        -- del juego ya tiene su propio Activated y equipa el knife normalmente.
-        pcall(function()
-            equipBtn.Activated:Connect(function()
-                if KnifeSAState and KnifeSAState.enabled then
-                    task.spawn(_equipKnifeForSA)
-                end
-                -- SA inactivo: sin return, sin nada -> el juego maneja solo
-            end)
-        end)
-
-        -- InputBegan: registrar lastEquipTime al primer contacto
-        -- para bloquear throws accidentales del mismo touch
-        pcall(function()
-            equipBtn.InputBegan:Connect(function(inp)
-                if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-                if not KnifeSAState then return end
-                KnifeSAState._lastEquipTime = os.clock()
-            end)
-        end)
-
-        _G._equipBtnHooked = true
-        return true
-    end
-
-    -- Hookear inmediatamente si la UI ya existe, si no esperar
-    if not _hookEquipBtn() then
-        local _wc2
-        _wc2 = _pg2.DescendantAdded:Connect(function(desc)
-            if desc.Name == "EquipWeapon" then
-                task.wait(0.15)
-                if _hookEquipBtn() then
-                    _wc2:Disconnect()
+                if hookButtons() then
+                    watcher:Disconnect()
                 end
             end
         end)
     end
 
-    -- En cada respawn: resetear guard y re-hookear
-    -- (el boton puede haber sido recreado por MM2)
-    _lp2.CharacterAdded:Connect(function()
-        _G._equipBtnHooked = false
-        _lastEquipPress    = -999
-        task.wait(0.5)
-        _hookEquipBtn()
-        -- FIX v3: re-verificar slot del knife despues del respawn
-        task.wait(0.3)
-        _ensureKnifeSlotVisible()
+    -- Re-hookear en cada respawn
+    lp.CharacterAdded:Connect(function()
+        _equipHooked = false
+        _throwHooked = false
+        _lastEquip   = -999
+        _lastThrow   = -999
+        task.wait(0.6)
+        hookButtons()
     end)
-
-    -- Verificar slot del knife al cargar por primera vez
-    task.wait(1)
-    _ensureKnifeSlotVisible()
 end)
 -- ================================================================
--- == FIN FIX BOTON EQUIPAR MOBILE v3
--- ================================================================
-
--- (barra flotante externa eliminada: la navegacion ahora es la sidebar izquierda)
--- ================================================================
--- == MOBILE KNIFE INTEGRATION v2
---
--- CORRECCI?N v2: eliminado el hook al bot?n "Lanzar" de la barra
--- del juego ? el hub ya lo maneja internamente v?a KnifeSAState
--- cuando Knife Silent Aim est? activo. Hookearlo de nuevo causaba
--- doble-fire e interferencia con el equip normal del inventario.
---
--- LO QUE HACE ESTA VERSI?N:
---   Touch r?pido en pantalla (tap) ? Slash, SOLO si SA est? activo
---     y el tap NO cay? sobre ning?n GuiButton de la UI del juego
---     ni sobre el hub.
---
--- Lo que NO hace (lo maneja el hub):
---   ? Bot?n "Lanzar" / throwig ? ya hooked por KnifeSAState._mobileConns
---   ? ThrowCharge v?a bot?n ? idem
--- ================================================================
-
-task.spawn(function()
-
-    -- -- GUARDIA: solo mobile --------------------------------------
-    local _UIS = game:GetService("UserInputService")
-    if not _UIS.TouchEnabled then return end
-
-    local _Players = game:GetService("Players")
-    local _lp      = _Players.LocalPlayer
-    local _pg      = _lp:WaitForChild("PlayerGui", 15)
-    if not _pg then return end
-
-    -- -- ESTADO ---------------------------------------------------
-    local _conns    = {}
-    local _lastSlash = -999
-    local SLASH_CD   = 0.55   -- cooldown entre slashes (segundos)
-    local THROW_CD   = 0.35   -- separaci?n m?nima con un throw previo
-    local MAX_DUR    = 0.35   -- duraci?n m?xima de un tap (no drag)
-    local MAX_DRIFT  = 22     -- pixels m?ximos de movimiento en un tap
-
-    local function _addConn(c)
-        if c then table.insert(_conns, c) end
-    end
-
-    -- -- HELPER: ?el punto (x,y) est? dentro de un GuiObject? -----
-    local function _inRect(obj, x, y)
-        local ok, r = pcall(function()
-            local ap = obj.AbsolutePosition
-            local as = obj.AbsoluteSize
-            return x >= ap.X and x <= ap.X + as.X
-               and y >= ap.Y and y <= ap.Y + as.Y
-        end)
-        return ok and r
-    end
-
-    -- -- HELPER: ?el tap cay? sobre alg?n bot?n de UI activo? -----
-    -- Solo verifica GuiButton (TextButton / ImageButton) visibles
-    -- para no bloquear taps sobre partes del juego que no tienen UI.
-    local function _tapIsOnButton(x, y)
-        -- 1. Revisar todos los GuiButton en PlayerGui (UI del juego + hub)
-        local ok, descs = pcall(function() return _pg:GetDescendants() end)
-        if ok then
-            for _, obj in ipairs(descs) do
-                if obj:IsA("GuiButton") and obj.Visible and obj.Active then
-                    if _inRect(obj, x, y) then return true end
-                end
-            end
-        end
-
-        -- 2. CoreGui (hub puede estar ah?)
-        local cg = game:GetService("CoreGui")
-        local ok2, descs2 = pcall(function() return cg:GetDescendants() end)
-        if ok2 then
-            for _, obj in ipairs(descs2) do
-                if obj:IsA("GuiButton") and obj.Visible and obj.Active then
-                    if _inRect(obj, x, y) then return true end
-                end
-            end
-        end
-
-        return false
-    end
-
-    -- -- ACCI?N: Slash v?a touch -----------------------------------
-    local function _doSlashTouch()
-        -- Solo si KnifeSA est? activo y expone la funci?n
-        if not KnifeSAState then return end
-        if not KnifeSAState.enabled then return end
-        if type(KnifeSAState._playSlashAnim) ~= "function" then return end
-
-        -- Verificar personaje vivo
-        local char = _lp.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return end
-
-        -- Cooldown slash
-        local now = os.clock()
-        if now - _lastSlash < SLASH_CD then return end
-        -- Separaci?n con throw (no solapar animaciones)
-        if KnifeSAState._lastThrowTime and now - KnifeSAState._lastThrowTime < THROW_CD then return end
-        _lastSlash = now
-
-        task.spawn(function()
-            pcall(KnifeSAState._playSlashAnim)
-        end)
-    end
-
-    -- -- DETECCI?N DE TAP (InputBegan + InputEnded) ----------------
-    local _tStart = -999
-    local _tX, _tY = -999, -999
-
-    -- InputBegan: solo registrar posici?n inicial, NO ejecutar nada
-    _addConn(_UIS.InputBegan:Connect(function(inp, sunk)
-        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-        -- Registrar siempre (incluso si sunk=true) para poder comparar en InputEnded
-        _tStart = os.clock()
-        _tX     = inp.Position.X
-        _tY     = inp.Position.Y
-    end))
-
-    -- InputEnded: evaluar si fue tap v?lido para slash
-    _addConn(_UIS.InputEnded:Connect(function(inp)
-        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
-        if _tStart < 0 then return end
-
-        local elapsed = os.clock() - _tStart
-        local dx      = math.abs(inp.Position.X - _tX)
-        local dy      = math.abs(inp.Position.Y - _tY)
-        local sx, sy  = _tX, _tY
-        _tStart = -999  -- resetear para el pr?ximo ciclo
-
-        -- ?Fue un tap (corto y sin arrastre)?
-        if elapsed > MAX_DUR   then return end
-        if dx > MAX_DRIFT or dy > MAX_DRIFT then return end
-
-        -- ?Cay? sobre un GuiButton? (inventario, hub, controles del juego)
-        -- Si s? ? el juego ya lo maneja (equip, hub click, etc.), no interferir
-        if _tapIsOnButton(sx, sy) then return end
-
-        -- Tap limpio en el mundo 3D ? slash
-        _doSlashTouch()
-    end))
-
-    -- -- LIMPIEZA AL RESPAWN ---------------------------------------
-    _addConn(_lp.CharacterAdded:Connect(function()
-        _tStart  = -999
-        _lastSlash = -999
-    end))
-
-    -- Exposici?n global m?nima para debug
-    _G._MobileKnifeSystem = {
-        doSlashTouch = _doSlashTouch,
-        cleanup = function()
-            for _, c in ipairs(_conns) do pcall(function() c:Disconnect() end) end
-            _conns = {}
-        end,
-    }
-
-    _log("[MobileKnife v2] Touch ? Slash activo. Bot?n Lanzar ? manejado por KnifeSAState.")
-end)
--- ================================================================
--- == FIN MOBILE KNIFE INTEGRATION v2
+-- == FIN MOBILE KNIFE BUTTONS v1
 -- ================================================================
