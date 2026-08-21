@@ -64812,6 +64812,121 @@ task.spawn(function()
         task.wait(0.6)
         hookButtons()
     end)
+
+    -- ----------------------------------------------------------------
+    -- TOUCH EN PANTALLA -> LANZAR KNIFE (cuando brazo levantado)
+    --
+    -- El KnifeClient original tiene:
+    --   UIS.TouchTapInWorld:Connect(function(p53, p54)
+    --       if p53 and not p54 then
+    --           if v_u_22 then  -- v_u_22 = ThrowHold activo (brazo levantado)
+    --               throwKnife(WeaponService:GetTargetPosition(p53.X, p53.Y))
+    --           end
+    --       end
+    --   end)
+    --
+    -- Nosotros interceptamos InputBegan Touch y si el knife esta equipado,
+    -- buscamos el enemigo mas cercano con silent aim y llamamos FireServer
+    -- directamente con la misma firma que throwKnife():
+    --   KnifeThrown:FireServer(Handle.CFrame, targetCF)
+    --
+    -- Nota: NO verificamos v_u_22 porque desde afuera no podemos leerla.
+    -- En cambio usamos un cooldown para no interferir con el stab normal.
+    -- ----------------------------------------------------------------
+    local _touchCD    = 0.6
+    local _lastTouch  = -999
+    local _touchBusy  = false
+
+    UIS.InputBegan:Connect(function(inp, gp)
+        if gp then return end
+        if inp.UserInputType ~= Enum.UserInputType.Touch then return end
+
+        local now = os.clock()
+        if now - _lastTouch < _touchCD then return end
+        if _touchBusy then return end
+
+        -- Solo actuar si el knife esta en mano
+        local knife, loc = findKnife()
+        if not knife or loc ~= "char" then return end
+
+        local ev          = knife:FindFirstChild("Events")
+        local knifeThrown = ev and ev:FindFirstChild("KnifeThrown")
+        local handle      = knife:FindFirstChild("Handle")
+        if not knifeThrown or not handle then return end
+
+        _touchBusy = true
+        _lastTouch = now
+
+        task.spawn(function()
+            -- Calcular targetCF: enemigo mas cercano (silent aim)
+            local enemyHRP = getNearestEnemy()
+            local targetCF
+
+            if enemyHRP then
+                -- Apuntar directo al HRP del enemigo mas cercano
+                local origin  = handle.Position
+                local tPos    = enemyHRP.Position
+                local backDir = (origin - tPos)
+                if backDir.Magnitude > 0.001 then
+                    targetCF = CFrame.new(tPos, tPos + backDir.Unit)
+                end
+            end
+
+            if not targetCF then
+                -- Fallback: WeaponService centro de pantalla
+                local ok, WS = pcall(function()
+                    return require(game:GetService("ReplicatedStorage")
+                        :WaitForChild("ClientServices")
+                        :WaitForChild("WeaponService"))
+                end)
+                if ok and WS and WS.GetTargetPosition then
+                    local cam = workspace.CurrentCamera
+                    local vp  = cam.ViewportSize
+                    pcall(function()
+                        targetCF = WS:GetTargetPosition(vp.X / 2, vp.Y / 2)
+                    end)
+                end
+            end
+
+            if not targetCF then
+                -- Fallback final: 40 studs al frente
+                local char = getChar()
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local origin  = handle.Position
+                    local tPos    = origin + hrp.CFrame.LookVector * 40
+                    local backDir = (origin - tPos)
+                    targetCF = CFrame.new(tPos, tPos + backDir.Unit)
+                end
+            end
+
+            if not targetCF then _touchBusy = false; return end
+
+            -- Reproducir ThrowKnife igual que throwKnife() del KnifeClient original
+            local hum      = getHum()
+            local animator = hum and hum:FindFirstChildOfClass("Animator")
+            if animator then
+                local kc      = knife:FindFirstChild("KnifeClient")
+                local animObj = kc and kc:FindFirstChild("ThrowKnife")
+                if animObj and animObj:IsA("Animation") then
+                    pcall(function()
+                        local track = animator:LoadAnimation(animObj)
+                        if track.IsPlaying then track:Stop(0) end
+                        track:Play(0.1, 6, 1)
+                    end)
+                end
+            end
+
+            -- Firma exacta de throwKnife() del KnifeClient:
+            -- v_u_7.KnifeThrown:FireServer(v_u_6.CFrame, p35)
+            pcall(function()
+                knifeThrown:FireServer(handle.CFrame, targetCF)
+            end)
+
+            task.wait(0.3)
+            _touchBusy = false
+        end)
+    end)
 end)
 -- ================================================================
 -- == FIN MOBILE KNIFE BUTTONS v3
